@@ -1,0 +1,117 @@
+body {
+    background-color: var(--background-color-dark);
+    font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    -webkit-user-select: none;
+    -webkit-touch-callout: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: row;
+    overflow: hidden;
+    color: var(--text-color);
+}
+
+#deconnexion {
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+#deconnexion:hover{
+    background-color: rgba(239, 28, 67, 0.76);
+    transition: all 0.2s ease;
+    border-color: rgba(239, 28, 67, 0.76);
+}
+
+.container-main {
+    position: relative;
+    margin: 16px;
+    background-color: var(--container-background);
+    flex-grow: 1;
+    height: calc(100vh - 32px);
+    border-radius: 12px;
+    border: 1px solid var(--container-border-color);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--container-border-color) transparent;
+}
+
+.container-main::-webkit-scrollbar {
+    width: 8px;
+}
+
+.container-main::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.container-main::-webkit-scrollbar-thumb {
+    background-color: var(--container-border-color);
+    border-radius: 8px;
+}
+
+.page-title {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    color: var(--white);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.section-card {
+    background-color: var(--card-background);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 24px;
+    border: 1px solid var(--container-border-color);
+}
+
+.card-title {
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 16px;
+    color: var(--white);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.content-wrapper {
+    padding: 24px;
+}
+
+.grid-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 24px;
+    margin-bottom: 24px;
+}
+
+.deconnexion:hover{
+    background-color: rgba(255, 58, 94, 0.1);
+}
+
+.flex-container {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+@media (max-width: 768px) {
+    body {
+        flex-direction: column;
+    }
+
+    .container-main {
+        margin: 8px;
+        height: calc(100vh - 16px - 60px);
+    }
+
+    .grid-container {
+        grid-template-columns: 1fr;
+    }
+}

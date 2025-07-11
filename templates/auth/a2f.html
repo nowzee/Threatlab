@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Two-Factor Authentication</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/variable.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
+</head>
+<body>
+    <div class="login-container">
+        <div class="login-header">
+            <h1>A2F Authentication</h1>
+        </div>
+        <form class="login-form" action="/auth/a2f" method="post">
+            <div class="form-group code-inputs">
+                {% for i in range(6) %}
+                <input type="text" class="code-box" maxlength="1" inputmode="numeric" pattern="[0-9]*"
+                       oninput="moveToNext(this, {{ i }})" id="code-{{ i }}">
+                {% endfor %}
+                <input type="hidden" name="code" id="full-code">
+            </div>
+            {% if error %}
+            <div class="error-message">
+                {{ error }}
+            </div>
+            {% endif %}
+        </form>
+    </div>
+</body>
+<script>
+function moveToNext(input, index) {
+    const next = document.getElementById('code-' + (index + 1));
+    if (input.value.length === 1 && next) {
+        next.focus();
+    }
+
+    // Vérifie si tous les champs sont remplis avec des chiffres valides
+    let code = '';
+    for (let i = 0; i < 6; i++) {
+        const val = document.getElementById('code-' + i).value;
+        if (!val.match(/^[0-9]$/)) {
+            return; // Ne fait rien si un champ n'est pas encore rempli ou invalide
+        }
+        code += val;
+    }
+
+    // Tous les champs sont valides : remplir le champ caché et soumettre le formulaire
+    document.getElementById('full-code').value = code;
+
+    // Petite pause pour que l'utilisateur voie le dernier chiffre (facultatif)
+    setTimeout(() => {
+        document.querySelector('.login-form').submit();
+    }, 200);
+}
+</script>
+</html>
