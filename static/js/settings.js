@@ -31,6 +31,29 @@ document.addEventListener('DOMContentLoaded', function() {
         const passwordForm = securityPane.querySelector('form') || 
                           createPasswordForm(securityPane);
 
+        // Ajouter les barres de robustesse du mot de passe si elles n'existent pas déjà
+        const newPasswordInput = passwordForm.querySelector('input[name="new_password"]');
+        if (newPasswordInput && !document.getElementById('password-strength')) {
+            // Créer le conteneur pour les barres de robustesse
+            const strengthContainer = document.createElement('div');
+            strengthContainer.id = 'password-strength';
+            strengthContainer.className = 'password-strength-meter';
+
+            // Créer les trois barres
+            for (let i = 0; i < 3; i++) {
+                const bar = document.createElement('div');
+                bar.className = 'strength-bar';
+                bar.dataset.level = i + 1;
+                strengthContainer.appendChild(bar);
+            }
+
+            // Ajouter le conteneur après l'input du nouveau mot de passe
+            newPasswordInput.parentNode.insertBefore(strengthContainer, newPasswordInput.nextSibling);
+
+            // Ajouter l'événement pour évaluer la robustesse en temps réel
+            newPasswordInput.addEventListener('input', evaluatePasswordStrength);
+        }
+
         passwordForm.addEventListener('submit', handlePasswordChange);
     }
 
@@ -115,6 +138,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
+        // Vérifier la longueur minimale du mot de passe
+        if (newPassword.length < 12) {
+            showStatus(statusDiv, 'Le mot de passe doit contenir au moins 12 caractères', 'error');
+            return;
+        }
+
         // Collecter les données du formulaire
         const formData = new FormData();
         formData.append('old_password', passwordInputs[0].value);
@@ -135,12 +164,21 @@ document.addEventListener('DOMContentLoaded', function() {
                 passwordInputs.forEach(input => {
                     input.value = '';
                 });
+
+                // Réinitialiser l'indicateur de robustesse
+                const strengthMeter = document.getElementById('password-strength');
+                if (strengthMeter) {
+                    const bars = strengthMeter.querySelectorAll('.strength-bar');
+                    bars.forEach(bar => bar.classList.remove('active'));
+                    strengthMeter.className = 'password-strength-meter';
+                }
             } else {
-                showStatus(statusDiv, 'Échec de la modification du mot de passe. Vérifiez votre mot de passe actuel.', 'error');
+                // Afficher le message d'erreur spécifique s'il existe, sinon utiliser un message par défaut
+                const errorMessage = data.error || 'Échec de la modification du mot de passe. Vérifiez votre mot de passe actuel.';
+                showStatus(statusDiv, errorMessage, 'error');
             }
         })
-        .catch(error => {
-            console.error('Erreur:', error);
+        .catch(_ => {
             showStatus(statusDiv, 'Une erreur est survenue. Veuillez réessayer.', 'error');
         });
     }
@@ -153,6 +191,7 @@ document.addEventListener('DOMContentLoaded', function() {
      */
     function showStatus(element, message, type) {
         element.textContent = message;
+        element.style.color = type === 'success' ? '#00e676' : 'rgba(207,15,31,0.92)';
         element.className = 'form-status';
         element.classList.add(`status-${type}`);
 
@@ -162,6 +201,71 @@ document.addEventListener('DOMContentLoaded', function() {
                 element.textContent = '';
                 element.className = 'form-status';
             }, 5000);
+        }
+    }
+
+    /**
+     * Évalue la robustesse du mot de passe et met à jour l'indicateur visuel
+     * @param {Event} event - L'événement d'entrée
+     */
+    function evaluatePasswordStrength(event) {
+        const password = event.target.value;
+        const strengthMeter = document.getElementById('password-strength');
+        const bars = strengthMeter.querySelectorAll('.strength-bar');
+
+        // Réinitialiser toutes les barres
+        bars.forEach(bar => bar.classList.remove('active'));
+
+        // Si le mot de passe est vide, ne pas afficher de barres
+        if (password.length === 0) {
+            strengthMeter.className = 'password-strength-meter';
+            return;
+        }
+
+        // Critères de robustesse (correspondant aux regex du backend)
+        const hasMinLength = password.length >= 12;
+        const hasLowerCase = /[a-z]/.test(password);
+        const hasUpperCase = /[A-Z]/.test(password);
+        const hasNumbers = /[0-9]/.test(password);
+        const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+        // Calculer le score
+        let score = 0;
+        if (hasMinLength) score++;
+        if (hasLowerCase && hasUpperCase) score++;
+        if (hasNumbers) score++;
+        if (hasSpecialChars) score++;
+
+        // Déterminer la force du mot de passe (1, 2 ou 3 barres)
+        let strength;
+        if (score <= 1) {
+            strength = 1; // Faible
+        } else if (score <= 3) {
+            strength = 2; // Moyen
+        } else {
+            strength = 3; // Fort (tous les critères satisfaits)
+        }
+
+        // Mettre à jour les barres en fonction de la robustesse
+        for (let i = 0; i < strength; i++) {
+            bars[i].classList.add('active');
+        }
+
+        // Ajouter une classe indiquant le niveau global
+        strengthMeter.className = 'password-strength-meter';
+        const levels = ['weak', 'medium', 'strong'];
+        strengthMeter.classList.add(levels[strength - 1]);
+
+        // Ajouter un texte d'aide basé sur les critères manquants
+        const helpText = document.querySelector('.form-help');
+        if (helpText) {
+            let message = 'Exigences: au moins 12 caractères';
+            if (!hasLowerCase) message += ', une lettre minuscule';
+            if (!hasUpperCase) message += ', une lettre majuscule';
+            if (!hasNumbers) message += ', un chiffre';
+            if (!hasSpecialChars) message += ', un caractère spécial';
+
+            helpText.textContent = message;
         }
     }
 });

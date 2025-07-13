@@ -350,6 +350,36 @@
         color: var(--danger-color) !important;
     }
 
+    .password-strength-meter {
+        display: flex;
+        gap: 5px;
+        margin: 10px 0;
+    }
+
+    .strength-bar {
+        height: 6px;
+        flex: 1;
+        background-color: var(--container-border-color);
+        border-radius: 3px;
+        transition: background-color 0.3s ease;
+    }
+
+    .strength-bar.active {
+        background-color: var(--danger-color);
+    }
+
+    .password-strength-meter.weak .strength-bar.active {
+        background-color: var(--danger-color);
+    }
+
+    .password-strength-meter.medium .strength-bar.active {
+        background-color: var(--warning-color);
+    }
+
+    .password-strength-meter.strong .strength-bar.active {
+        background-color: var(--success-color);
+    }
+
     @keyframes fadeIn {
         from { opacity: 0; }
         to { opacity: 1; }
@@ -383,25 +413,6 @@
             });
         });
 
-        // Simuler l'enregistrement des paramètres
-        const saveButtons = document.querySelectorAll('.settings-actions .btn-primary');
-        saveButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                // Afficher un message de confirmation (utiliserait une notification dans une vraie application)
-                alert('Paramètres enregistrés avec succès!');
-            });
-        });
-
-        // Confirmation pour la réinitialisation des données
-        const resetButton = document.querySelector('#advanced-pane .btn-danger');
-        if (resetButton) {
-            resetButton.addEventListener('click', function(e) {
-                e.preventDefault();
-                if (confirm('Êtes-vous absolument sûr de vouloir réinitialiser toutes les données? Cette action est irréversible.')) {
-                    alert('Réinitialisation simulée - Dans une vraie application, toutes les données seraient supprimées.');
-                }
-            });
-        }
     });
 </script>
 {% endblock %}
