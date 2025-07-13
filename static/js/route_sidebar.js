@@ -1,16 +1,29 @@
-
 /**
  * Gestion de la navigation dans la sidebar
  * Configure les liens de la barre latérale pour charger les bonnes pages
  */
 
-document.addEventListener('DOMContentLoaded', function() {
+// Mapping des boutons vers leurs URLs correspondantes
+const buttonUrlMap = {
+    'dashboard-btn': '/dashboard',
+    'manage-btn': '/manage',
+    'manage-agent-btn': '/manage',
+    'deploy-btn': '/deploy',
+    'config-btn': '/config',
+    'logs-btn': '/logs',
+    'reports-btn': '/reports',
+    'alerts-btn': '/alerts',
+    'templates-btn': '/templates',
+    'help-btn': '/help'
+};
+
+document.addEventListener('DOMContentLoaded', function () {
     // Sélectionner tous les boutons de la sidebar
     const sidebarButtons = document.querySelectorAll('.btn-sidebar');
 
     // Ajouter des écouteurs d'événements à chaque bouton
     sidebarButtons.forEach(button => {
-        button.addEventListener('click', function(e) {
+        button.addEventListener('click', function (e) {
             // Empêcher la navigation par défaut si le lien n'a pas d'attribut href
             if (!this.getAttribute('href')) {
                 e.preventDefault();
@@ -28,7 +41,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Gestionnaire spécifique pour le bouton de déconnexion
     const deconnexionBtn = document.getElementById('deconnexion');
     if (deconnexionBtn) {
-        deconnexionBtn.addEventListener('click', function(e) {
+        deconnexionBtn.addEventListener('click', function (e) {
             e.preventDefault();
             window.location.href = '/auth/logout';
         });
@@ -43,41 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
  * Évite le rechargement si on est déjà sur la page
  */
 function navigateToPage(buttonId) {
-    let targetUrl = '/';
-
-    // Déterminer l'URL cible en fonction de l'ID du bouton
-    switch (buttonId) {
-        case 'dashboard-btn':
-            targetUrl = '/dashboard';
-            break;
-        case 'manage-btn':
-        case 'manage-agent-btn':
-            targetUrl = '/manage';
-            break;
-        case 'deploy-btn':
-            targetUrl = '/deploy';
-            break;
-        case 'config-btn':
-            targetUrl = '/config';
-            break;
-        case 'logs-btn':
-            targetUrl = '/logs';
-            break;
-        case 'reports-btn':
-            targetUrl = '/reports';
-            break;
-        case 'alerts-btn':
-            targetUrl = '/alerts';
-            break;
-        case 'templates-btn':
-            targetUrl = '/templates';
-            break;
-        case 'help-btn':
-            targetUrl = '/help';
-            break;
-        default:
-            targetUrl = '/dashboard';
-    }
+    const targetUrl = buttonUrlMap[buttonId] || '/dashboard';
 
     // Vérifier si on est déjà sur la page cible
     const currentPath = window.location.pathname;
@@ -103,27 +82,11 @@ function highlightActiveButton() {
     });
 
     // Déterminer quel bouton doit être actif
-    let activeButtonId = '';
-
-    if (currentPath === '/' || currentPath === '/dashboard') {
-        activeButtonId = 'dashboard-btn';
-    } else if (currentPath === '/manage') {
-        activeButtonId = 'manage-btn';
-    } else if (currentPath === '/deploy') {
-        activeButtonId = 'deploy-btn';
-    } else if (currentPath === '/config') {
-        activeButtonId = 'config-btn';
-    } else if (currentPath.includes('/logs')) {
-        activeButtonId = 'logs-btn';
-    } else if (currentPath.includes('/reports')) {
-        activeButtonId = 'reports-btn';
-    } else if (currentPath.includes('/alerts')) {
-        activeButtonId = 'alerts-btn';
-    } else if (currentPath.includes('/templates')) {
-        activeButtonId = 'templates-btn';
-    } else if (currentPath.includes('/help')) {
-        activeButtonId = 'help-btn';
-    }
+    let activeButtonId = Object.entries(buttonUrlMap).find(([id, url]) => {
+        return currentPath === '/' && url === '/dashboard' ||
+            currentPath === url ||
+            (url !== '/dashboard' && currentPath.includes(url));
+    })?.[0] || '';
 
     // Appliquer la classe 'active' au bouton correspondant
     if (activeButtonId) {
