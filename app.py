@@ -1,6 +1,7 @@
 from flask import Flask, render_template, request, redirect, url_for, session, jsonify
 import os
 from route.auth.login import auth_bp
+from route.config.security import config_account_bp
 from module.database.setup_db import setup_dbs
 import secrets
 
@@ -10,6 +11,7 @@ app.config['DATABASE'] = os.path.join(app.root_path, 'honeypot.db')
 
 # Register blueprints
 app.register_blueprint(auth_bp)
+app.register_blueprint(config_account_bp)
 
 @app.before_request
 def before_request():

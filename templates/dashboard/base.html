@@ -134,6 +134,9 @@
 
     <!-- Scripts JavaScript -->
     <script src="{{ url_for('static', filename='js/route_sidebar.js') }}"></script>
+        {% if request.path == '/config' %}
+        <script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+        {% endif %}
     <script>
         // Script pour basculer la sidebar sur mobile
         document.getElementById('mobile-menu-toggle').addEventListener('click', function() {
