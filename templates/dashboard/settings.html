@@ -11,13 +11,50 @@
 
     <div class="section-card">
         <div class="settings-tabs">
-            <button class="settings-tab active" data-tab="notifications">Notifications</button>
-            <button class="settings-tab" data-tab="security">Sécurité</button>
+            <button class="settings-tab active" data-tab="security">Sécurité</button>
+            <button class="settings-tab" data-tab="notifications">Notifications</button>
             <button class="settings-tab" data-tab="api">API</button>
             <button class="settings-tab" data-tab="advanced">Avancé</button>
         </div>
 
         <div class="settings-content">
+
+            <!-- Onglet Sécurité -->
+            <div class="settings-pane active" id="security-pane">
+                <form id="password-change-form">
+                    <div class="form-group">
+                        <label class="form-label">Changer le mot de passe</label>
+                        <input type="password" class="form-control" name="old_password" placeholder="Mot de passe actuel">
+                    </div>
+
+                    <div class="form-group">
+                        <input type="password" class="form-control" name="new_password" placeholder="Nouveau mot de passe">
+                    </div>
+
+                    <div class="form-group">
+                        <input type="password" class="form-control" name="confirm_password" placeholder="Confirmer le nouveau mot de passe">
+                        <div class="form-help">Utilisez un mot de passe fort avec au moins 12 caractères</div>
+                    </div>
+
+                    <div id="password-status" class="form-status"></div>
+
+                    <div class="settings-actions">
+                        <button type="submit" class="btn btn-primary">Changer le mot de passe</button>
+                    </div>
+                </form>
+
+                <div class="form-group">
+                    <label class="form-label">Authentification à deux facteurs</label>
+                    <div class="two-factor-status">
+                        <div class="status-indicator status-online">
+                            <span class="status-dot"></span>
+                            <span>Activée</span>
+                        </div>
+                        <button class="btn btn-secondary btn-sm">Désactiver</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Onglet Notifications -->
             <div class="settings-pane" id="notifications-pane">
                 <div class="form-group">
@@ -56,42 +93,6 @@
 
                 <div class="settings-actions">
                     <button class="btn btn-primary">Enregistrer les modifications</button>
-                </div>
-            </div>
-
-            <!-- Onglet Sécurité -->
-            <div class="settings-pane" id="security-pane">
-                <form id="password-change-form">
-                    <div class="form-group">
-                        <label class="form-label">Changer le mot de passe</label>
-                        <input type="password" class="form-control" name="old_password" placeholder="Mot de passe actuel">
-                    </div>
-
-                    <div class="form-group">
-                        <input type="password" class="form-control" name="new_password" placeholder="Nouveau mot de passe">
-                    </div>
-
-                    <div class="form-group">
-                        <input type="password" class="form-control" name="confirm_password" placeholder="Confirmer le nouveau mot de passe">
-                        <div class="form-help">Utilisez un mot de passe fort avec au moins 12 caractères</div>
-                    </div>
-
-                    <div id="password-status" class="form-status"></div>
-
-                    <div class="settings-actions">
-                        <button type="submit" class="btn btn-primary">Changer le mot de passe</button>
-                    </div>
-                </form>
-
-                <div class="form-group">
-                    <label class="form-label">Authentification à deux facteurs</label>
-                    <div class="two-factor-status">
-                        <div class="status-indicator status-online">
-                            <span class="status-dot"></span>
-                            <span>Activée</span>
-                        </div>
-                        <button class="btn btn-secondary btn-sm">Désactiver</button>
-                    </div>
                 </div>
             </div>
 
