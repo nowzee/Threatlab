@@ -6,7 +6,7 @@ from module.database.setup_db import setup_dbs
 import secrets
 
 app = Flask(__name__)
-app.config['SECRET_KEY'] = secrets.token_hex(16)
+app.config['SECRET_KEY'] = secrets.token_hex(2048)
 app.config['DATABASE'] = os.path.join(app.root_path, 'honeypot.db')
 
 # Register blueprints
@@ -16,7 +16,8 @@ app.register_blueprint(config_account_bp)
 @app.before_request
 def before_request():
     # Liste des endpoints accessibles sans authentification
-    public_endpoints = ["static", "auth.login", "auth.a2f"]
+    public_endpoints = ["static", "auth.login"]
+    a2f_endpoints = ['auth.a2f']
 
     # Redirection vers login si non connecté et endpoint non public
     if not session.get('logged_in') and request.endpoint not in public_endpoints:
