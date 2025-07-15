@@ -519,7 +519,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', filename='js/qrcode.min.js') }}"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Gestion des onglets de paramètres
@@ -594,18 +593,18 @@
                         // Fermer la modal d'activation
                         document.getElementById('a2f-activate-modal').style.display = 'none';
 
-                        // Afficher le QR code
+                        // Afficher le QR code reçu du serveur
                         document.getElementById('a2f-secret-key').textContent = data.secret;
                         const qrcodeContainer = document.getElementById('qrcode-container');
                         qrcodeContainer.innerHTML = '';
-                        new QRCode(qrcodeContainer, {
-                            text: data.url,
-                            width: 200,
-                            height: 200,
-                            colorDark: "#000000",
-                            colorLight: "#ffffff",
-                            correctLevel: QRCode.CorrectLevel.H
-                        });
+
+                        // Créer une image avec le QR code base64 fourni par le serveur
+                        const qrImage = document.createElement('img');
+                        qrImage.src = data.qrcode;
+                        qrImage.alt = 'QR Code pour authentification';
+                        qrImage.style.width = '200px';
+                        qrImage.style.height = '200px';
+                        qrcodeContainer.appendChild(qrImage);
 
                         document.getElementById('a2f-qrcode-modal').style.display = 'block';
                     } else {

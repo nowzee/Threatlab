@@ -3,6 +3,9 @@ from module.database.account import change_password_account
 from module.database.auth import auth_user, get_otp_secret, update_otp_status, a2f_active
 import re
 import pyotp
+import qrcode
+import io
+import base64
 
 
 config_account_bp = Blueprint('account', __name__, url_prefix='/account')
@@ -51,22 +54,46 @@ def active_a2f():
 
 
     if request.form.get('password') is None or request.form.get('active') is None:
+        print("eeee")
         return jsonify({'success': False, 'error': 'Informations manquantes'})
 
     if not auth_user(session['username'], password):
+        print("password incorrect")
         return jsonify({'success': False, 'error': 'Mot de passe incorrect'})
 
     if activated == 'true':
         # Création de la clé otp avec génération du QR code
         # Utiliser un secret de taille raisonnable pour compatibilité avec les applications TOTP
-        secret = pyotp.random_hex(2048)
+        secret = pyotp.random_hex(2048)  # 20 octets est plus adapté pour un secret TOTP
         totp = pyotp.TOTP(secret)
+
+        # Créer l'URL pour le QR code
+        provisioning_url = totp.provisioning_uri(name=session['username'], issuer_name='Threatlab')
+
+        # Générer le QR code côté serveur
+        qr = qrcode.QRCode(
+            version=1,
+            error_correction=qrcode.constants.ERROR_CORRECT_L,
+            box_size=10,
+            border=4,
+        )
+        qr.add_data(provisioning_url)
+        qr.make(fit=True)
+
+        # Créer une image à partir du QR code
+        img = qr.make_image(fill_color="black", back_color="white")
+
+        # Convertir l'image en base64 pour l'envoyer au client
+        buffered = io.BytesIO()
+        img.save(buffered, format="PNG")
+        qr_code_base64 = base64.b64encode(buffered.getvalue()).decode()
+
         # Stocker le secret dans la base de données
         if update_otp_status(session['username'], True, secret):
             return jsonify({
                 'success': True, 
                 'secret': secret, 
-                'url': totp.provisioning_uri(name=session['username'], issuer_name='Threatlab')
+                'qrcode': f"data:image/png;base64,{qr_code_base64}"
             })
         else:
             return jsonify({'success': False, 'error': 'Erreur lors de l\'activation de l\'A2F'})
