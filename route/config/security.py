@@ -1,6 +1,6 @@
 from flask import Blueprint, request, session, jsonify
 from module.database.account import change_password_account
-from module.database.auth import auth_user
+from module.database.auth import auth_user, get_otp_secret, update_otp_status, a2f_active
 import re
 import pyotp
 
@@ -46,30 +46,65 @@ def change_password():
 # Requete pour activer ou désactiver l'a2f
 @config_account_bp.route("/active_a2f", methods=['POST'])
 def active_a2f():
-
     activated = request.form.get('active')
     password = request.form.get('password')
 
+
     if request.form.get('password') is None or request.form.get('active') is None:
-        return jsonify({'success': False})
+        return jsonify({'success': False, 'error': 'Informations manquantes'})
 
     if not auth_user(session['username'], password):
-        return jsonify({'success': False})
+        return jsonify({'success': False, 'error': 'Mot de passe incorrect'})
 
     if activated == 'true':
-        # création de la clé otp avec le Qr code
-
+        # Création de la clé otp avec génération du QR code
+        # Utiliser un secret de taille raisonnable pour compatibilité avec les applications TOTP
         secret = pyotp.random_hex(2048)
         totp = pyotp.TOTP(secret)
-        return jsonify({'success': True, 'secret': secret, 'url': totp.provisioning_uri(name=session['username'], issuer_name='Threatlab')})
+        # Stocker le secret dans la base de données
+        if update_otp_status(session['username'], True, secret):
+            return jsonify({
+                'success': True, 
+                'secret': secret, 
+                'url': totp.provisioning_uri(name=session['username'], issuer_name='Threatlab')
+            })
+        else:
+            return jsonify({'success': False, 'error': 'Erreur lors de l\'activation de l\'A2F'})
+
     elif activated == 'false':
-        # Désactivation de l'a2f avec demande de du code temporaire pour valider la désactivation
+        # Désactivation de l'a2f avec vérification du code temporaire
         code = request.form.get('code')
-        secret = pyotp.random_hex(2048)
-        if pyotp.TOTP(secret).verify(code):
-            return jsonify({'success': True})
+        if not code:
+            return jsonify({'success': False, 'error': 'Code de vérification manquant'})
+
+        # Récupérer le secret existant pour vérifier le code
+        secret = get_otp_secret(session['username'])
+        if not secret:
+            return jsonify({'success': False, 'error': 'Configuration A2F non trouvée'})
+
+        # Vérifier le code TOTP
+        totp = pyotp.TOTP(secret)
+        if totp.verify(code):
+            # Désactiver l'A2F pour cet utilisateur
+            if update_otp_status(session['username'], False):
+                return jsonify({'success': True})
+            else:
+                return jsonify({'success': False, 'error': 'Erreur lors de la désactivation de l\'A2F'})
         else:
             return jsonify({'success': False, 'error': 'Code incorrect'})
 
+    return jsonify({'success': False, 'error': 'Opération non reconnue'})
 
-    return jsonify({'success': False})
+@config_account_bp.route("/check_a2f_status", methods=['GET'])
+def check_a2f_status():
+    """
+    Endpoint pour vérifier si l'authentification à deux facteurs est activée pour l'utilisateur connecté
+    """
+    if not session.get('logged_in') or not session.get('username'):
+        return jsonify({'success': False, 'error': 'Non authentifié'}), 401
+
+    try:
+        is_active = a2f_active(session['username'])
+        return jsonify({'success': True, 'active': is_active})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500

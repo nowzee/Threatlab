@@ -1,5 +1,5 @@
 from flask import Blueprint, render_template, request, redirect, url_for, session
-from module.database.auth import auth_user, a2f_active
+from module.database.auth import auth_user, a2f_active, get_otp_secret
 import pyotp
 
 # Create a blueprint for authentication routes
@@ -14,7 +14,6 @@ def login():
         return redirect(url_for('auth.a2f'))
 
     if request.method == 'POST' and request.content_length < 400:
-        print(request.content_length)
         username = request.form.get('username')
         password = request.form.get('password')
 
@@ -37,29 +36,33 @@ def login():
 
 @auth_bp.route("/a2f", methods=['GET', 'POST'])
 def a2f():
-    # Check if user is logged in
+    # Vérifier si l'utilisateur est connecté
     if not session.get('logged_in'):
         return redirect(url_for('auth.login'))
 
-    # If user already passed A2F, redirect to dashboard
-    if session.get('a2f'):
+    # Si l'utilisateur a déjà passé l'A2F, rediriger vers le tableau de bord
+    if session.get('a2f_validate'):
         return redirect(url_for('dashboard'))
 
     if request.method == 'POST':
         code = request.form.get('code')
-        # Get the user's secret key from the database or session
-        # This is a placeholder - in a real app, you would retrieve the user's secret key
-        secret = "JBSWY3DPEHPK3PXP"  # Example secret key
+        if not code:
+            return render_template("auth/a2f.html", error="Veuillez entrer un code de vérification")
 
-        # Create a TOTP object
+        # Récupérer la clé secrète de l'utilisateur depuis la base de données
+        secret = get_otp_secret(session['username'])
+        if not secret:
+            return render_template("auth/a2f.html", error="Erreur de configuration A2F. Contactez l'administrateur.")
+
+        # Créer un objet TOTP pour vérification
         totp = pyotp.TOTP(secret)
 
-        # Verify the code
+        # Vérifier le code
         if totp.verify(code):
-            session['a2f'] = True
+            session['a2f_validate'] = True
             return redirect(url_for('dashboard'))
         else:
-            return render_template("auth/a2f.html", error="Invalid verification code")
+            return render_template("auth/a2f.html", error="Code de vérification invalide")
 
     return render_template("auth/a2f.html")
 
