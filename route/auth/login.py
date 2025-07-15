@@ -21,6 +21,7 @@ def login():
             session['logged_in'] = True
             session['username'] = username
             if a2f_active(session['username']):
+                session['a2f_validate'] = False
                 return redirect(url_for('auth.a2f'))
             else:
                 return redirect(url_for('dashboard'))

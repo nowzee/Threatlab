@@ -23,6 +23,10 @@ def before_request():
     if not session.get('logged_in') and request.endpoint not in public_endpoints:
         return redirect(url_for('auth.login'))
 
+    if session.get('a2f_validate'):
+        if session['a2f_validate'] == False and request.endpoint not in a2f_endpoints:
+            return redirect(url_for('auth.a2f'))
+
 @app.route("/", methods=["GET"])
 def index():
     # Redirection vers le dashboard si l'utilisateur est connecté
