@@ -13,9 +13,13 @@ def login():
             return redirect(url_for('dashboard'))
         return redirect(url_for('auth.a2f'))
 
-    if request.method == 'POST':
+    if request.method == 'POST' and request.content_length < 400:
+        print(request.content_length)
         username = request.form.get('username')
         password = request.form.get('password')
+
+        if len(username) > 140 or len(password) > 140:
+            return render_template("auth/login.html", error="Invalid username or password")
 
         if auth_user(username, password):
             session['logged_in'] = True
@@ -27,7 +31,8 @@ def login():
                 return redirect(url_for('dashboard'))
         else:
             return render_template("auth/login.html", error="Invalid username or password")
-
+    elif request.method == 'POST' and request.content_length > 400:
+        return render_template("auth/login.html", error="Invalid username or password")
     return render_template("auth/login.html")
 
 @auth_bp.route("/a2f", methods=['GET', 'POST'])
