@@ -2,7 +2,7 @@ import sqlite3
 import hashlib
 
 def change_password_account(username :str, old_password :str, new_password :str):
-    old_password = hashlib.sha512(old_password.encode()).hexdigest()
+    old_password = hashlib.sha256(old_password.encode()).hexdigest()
 
     with sqlite3.connect('honeypot.db') as conn:
         cursor = conn.cursor()
@@ -10,7 +10,7 @@ def change_password_account(username :str, old_password :str, new_password :str)
         result = cursor.fetchone()
 
         if result:
-            new_password = hashlib.sha512(new_password.encode()).hexdigest()
+            new_password = hashlib.sha256(new_password.encode()).hexdigest()
 
             cursor.execute("UPDATE users SET password = ? WHERE id = ?", (new_password, result[0]))
             conn.commit()

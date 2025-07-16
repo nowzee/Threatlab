@@ -4,7 +4,7 @@ import hashlib
 
 def auth_user(username, password):
 
-    password = hashlib.sha512(password.encode()).hexdigest()
+    password = hashlib.sha256(password.encode()).hexdigest()
 
     with sqlite3.connect('honeypot.db') as conn:
         cursor = conn.cursor()
