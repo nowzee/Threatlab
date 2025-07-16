@@ -17,13 +17,13 @@ app.register_blueprint(config_account_bp)
 def before_request():
     # Liste des endpoints accessibles sans authentification
     public_endpoints = ["static", "auth.login"]
-    a2f_endpoints = ['auth.a2f']
+    a2f_endpoints = ['auth.a2f', 'static']
 
     # Redirection vers login si non connecté et endpoint non public
     if not session.get('logged_in') and request.endpoint not in public_endpoints:
         return redirect(url_for('auth.login'))
 
-    if session.get('a2f_validate'):
+    if session.get('a2f_validate') is not None:
         if session['a2f_validate'] == False and request.endpoint not in a2f_endpoints:
             return redirect(url_for('auth.a2f'))
 

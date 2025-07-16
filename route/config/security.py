@@ -64,7 +64,7 @@ def active_a2f():
     if activated == 'true':
         # Création de la clé otp avec génération du QR code
         # Utiliser un secret de taille raisonnable pour compatibilité avec les applications TOTP
-        secret = pyotp.random_hex(2048)  # 20 octets est plus adapté pour un secret TOTP
+        secret = pyotp.random_base32()
         totp = pyotp.TOTP(secret)
 
         # Créer l'URL pour le QR code
@@ -91,8 +91,7 @@ def active_a2f():
         # Stocker le secret dans la base de données
         if update_otp_status(session['username'], True, secret):
             return jsonify({
-                'success': True, 
-                'secret': secret, 
+                'success': True,
                 'qrcode': f"data:image/png;base64,{qr_code_base64}"
             })
         else:
