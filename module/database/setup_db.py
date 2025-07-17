@@ -67,7 +67,7 @@ def setup_dbs():
                            ''')
 
             raw_password = generate_random_string(16)
-            password = hashlib.sha512(raw_password.encode()).hexdigest()
+            password = hashlib.sha256(raw_password.encode()).hexdigest()
 
             User = "Admin"
 
