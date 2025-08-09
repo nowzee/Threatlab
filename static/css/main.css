@@ -1,0 +1,35 @@
+/* Styles pour le champ de vérification A2F */
+.verification-code-input {
+    margin: 10px 0;
+}
+
+.verification-code-input input {
+    font-size: 1.2em;
+    letter-spacing: 0.2em;
+    text-align: center;
+    width: 200px;
+    margin: 0 auto;
+    display: block;
+}
+
+#a2f-verification-container {
+    margin-top: 20px;
+    padding: 15px;
+    border: 1px solid #eaeaea;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+}
+
+#a2f-verification-status {
+    text-align: center;
+    margin-top: 10px;
+    min-height: 20px;
+}
+
+.form-status.status-success {
+    color: #00e676;
+}
+
+.form-status.status-error {
+    color: rgba(207,15,31,0.92);
+}

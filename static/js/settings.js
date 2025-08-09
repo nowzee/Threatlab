@@ -1,10 +1,12 @@
 /**
  * Fichier JavaScript pour gérer les fonctionnalités de la page de paramètres
- * Inclut la gestion du changement de mot de passe
+ * Inclut la gestion du changement de mot de passe et de l'authentification à deux facteurs
  */
 
 // Attendre que le DOM soit chargé
 document.addEventListener('DOMContentLoaded', function() {
+    // Initialiser les gestionnaires pour l'authentification à deux facteurs
+    initA2FHandlers();
     // Gestion des onglets de paramètres
     const tabs = document.querySelectorAll('.settings-tab');
     const panes = document.querySelectorAll('.settings-pane');
@@ -267,5 +269,184 @@ document.addEventListener('DOMContentLoaded', function() {
 
             helpText.textContent = message;
         }
+    }
+
+    /**
+     * Initialise les gestionnaires d'événements pour l'authentification à deux facteurs
+     */
+    function initA2FHandlers() {
+        // Récupérer les éléments A2F
+        const a2fToggleBtn = document.getElementById('a2f-toggle-btn');
+        const a2fActivateModal = document.getElementById('a2f-activate-modal');
+        const a2fQrcodeModal = document.getElementById('a2f-qrcode-modal');
+        const a2fDeactivateModal = document.getElementById('a2f-deactivate-modal');
+        const a2fActivateSubmit = document.getElementById('a2f-activate-submit');
+        const a2fQrcodeConfirm = document.getElementById('a2f-qrcode-confirm');
+        const a2fDeactivateSubmit = document.getElementById('a2f-deactivate-submit');
+        const closeModalButtons = document.querySelectorAll('.close-modal');
+
+        // Gestionnaires pour le nouveau champ de vérification
+        const a2fVerificationSubmit = document.getElementById('a2f-verification-submit');
+        const a2fVerificationCode = document.getElementById('a2f-verification-code');
+        const a2fVerificationStatus = document.getElementById('a2f-verification-status');
+
+        // Vérifier si les éléments existent
+        if (!a2fToggleBtn) return;
+
+        // Événements pour fermer les modales
+        closeModalButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                if (a2fActivateModal) a2fActivateModal.style.display = 'none';
+                if (a2fQrcodeModal) a2fQrcodeModal.style.display = 'none';
+                if (a2fDeactivateModal) a2fDeactivateModal.style.display = 'none';
+            });
+        });
+
+        // Événement pour vérifier le code TOTP
+        if (a2fVerificationSubmit) {
+            a2fVerificationSubmit.addEventListener('click', function() {
+                const code = a2fVerificationCode.value.trim();
+
+                // Vérifier que le code a été entré
+                if (!code) {
+                    showA2FStatus(a2fVerificationStatus, 'Veuillez entrer le code généré par votre application', 'error');
+                    return;
+                }
+
+                // Vérifier que le code a la bonne longueur
+                if (code.length !== 6 || !/^\d+$/.test(code)) {
+                    showA2FStatus(a2fVerificationStatus, 'Le code doit contenir 6 chiffres', 'error');
+                    return;
+                }
+
+                // Envoyer la requête de validation
+                const formData = new FormData();
+                formData.append('code', code);
+
+                fetch('/account/validation_a2f', {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'same-origin'
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        showA2FStatus(a2fVerificationStatus, 'Code validé avec succès! L\'authentification à deux facteurs est maintenant active.', 'success');
+                        checkA2FStatus();
+                        // Fermer la modale après un court délai
+                        setTimeout(() => {
+                            a2fQrcodeModal.style.display = 'none';
+                        }, 1000);
+                    } else {
+                        showA2FStatus(a2fVerificationStatus, data.error || 'Code incorrect. Veuillez réessayer.', 'error');
+                    }
+                })
+                .catch(error => {
+                    console.error('Erreur lors de la validation du code:', error);
+                    showA2FStatus(a2fVerificationStatus, 'Une erreur est survenue lors de la validation du code.', 'error');
+                });
+            });
+        }
+
+        /**
+         * Affiche un message d'état dans l'élément spécifié pour l'A2F
+         * @param {HTMLElement} element - L'élément où afficher le message
+         * @param {string} message - Le message à afficher
+         * @param {string} type - Le type de message ('success' ou 'error')
+         */
+        function showA2FStatus(element, message, type) {
+            if (!element) return;
+
+            element.textContent = message;
+            element.style.color = type === 'success' ? '#00e676' : 'rgba(207,15,31,0.92)';
+            element.className = 'form-status';
+            element.classList.add(`status-${type}`);
+
+            // Faire disparaître le message après un certain temps pour les succès
+            if (type === 'success') {
+                setTimeout(() => {
+                    element.textContent = '';
+                    element.className = 'form-status';
+                }, 5000);
+            }
+        }
+
+        /**
+         * Vérifie le statut A2F et met à jour l'interface
+         */
+        function checkA2FStatus() {
+            fetch('/account/check_a2f_status', {
+                method: 'GET',
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                // Mise à jour de l'interface en fonction du statut
+                updateA2FInterface(data.active);
+            })
+            .catch(error => {
+                console.error('Erreur lors de la vérification du statut A2F:', error);
+            });
+        }
+
+        /**
+         * Met à jour l'interface utilisateur en fonction du statut A2F
+         * @param {boolean} isActive - Indique si l'A2F est actif
+         */
+        function updateA2FInterface(isActive) {
+            const statusIndicator = document.getElementById('a2f-status-indicator');
+            const statusDot = statusIndicator ? statusIndicator.querySelector('.status-dot') : null;
+            const statusText = document.getElementById('a2f-status-text');
+            const toggleButton = document.getElementById('a2f-toggle-btn');
+
+            if (!statusIndicator || !statusText || !toggleButton) return;
+
+            // Mettre à jour l'indicateur de statut
+            if (isActive) {
+                statusIndicator.classList.add('status-active');
+                statusIndicator.classList.remove('status-inactive');
+                if (statusDot) statusDot.style.backgroundColor = '#00e676';
+                statusText.textContent = 'Activée';
+                toggleButton.textContent = 'Désactiver';
+                toggleButton.classList.remove('btn-primary');
+                toggleButton.classList.add('btn-danger');
+            } else {
+                statusIndicator.classList.add('status-inactive');
+                statusIndicator.classList.remove('status-active');
+                if (statusDot) statusDot.style.backgroundColor = '#cccccc';
+                statusText.textContent = 'Désactivée';
+                toggleButton.textContent = 'Activer';
+                toggleButton.classList.remove('btn-danger');
+                toggleButton.classList.add('btn-primary');
+            }
+
+            // Configurer le bouton pour ouvrir la bonne modale en fonction du statut
+            toggleButton.onclick = function() {
+                if (isActive) {
+                    // Ouvrir la modale de désactivation
+                    const deactivateModal = document.getElementById('a2f-deactivate-modal');
+                    if (deactivateModal) {
+                        deactivateModal.style.display = 'block';
+                        // Réinitialiser les champs
+                        const passwordInput = document.getElementById('a2f-deactivate-password');
+                        const codeInput = document.getElementById('a2f-deactivate-code');
+                        if (passwordInput) passwordInput.value = '';
+                        if (codeInput) codeInput.value = '';
+                    }
+                } else {
+                    // Ouvrir la modale d'activation
+                    const activateModal = document.getElementById('a2f-activate-modal');
+                    if (activateModal) {
+                        activateModal.style.display = 'block';
+                        // Réinitialiser le champ de mot de passe
+                        const passwordInput = document.getElementById('a2f-activate-password');
+                        if (passwordInput) passwordInput.value = '';
+                    }
+                }
+            };
+        }
+
+        // Vérifier le statut A2F au chargement de la page
+        checkA2FStatus();
     }
 });

@@ -87,7 +87,7 @@ def active_a2f():
         qr_code_base64 = base64.b64encode(buffered.getvalue()).decode()
 
         # Stocker le secret dans la base de données
-        if update_otp_status(session['username'], True, secret):
+        if update_otp_status(session['username'], 1, secret):
             return jsonify({
                 'success': True,
                 'secret': secret,
@@ -111,7 +111,7 @@ def active_a2f():
         totp = pyotp.TOTP(secret)
         if totp.verify(code):
             # Désactiver l'A2F pour cet utilisateur
-            if update_otp_status(session['username'], False):
+            if update_otp_status(session['username'], 0):
                 return jsonify({'success': True})
             else:
                 return jsonify({'success': False, 'error': 'Erreur lors de la désactivation de l\'A2F'})
@@ -130,6 +130,32 @@ def check_a2f_status():
 
     try:
         is_active = a2f_active(session['username'])
+        if is_active == 1:
+            is_active = True
+        elif is_active == 0 :
+            is_active = False
+        else:
+            is_active = True
         return jsonify({'success': True, 'active': is_active})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@config_account_bp.route("/validation_a2f", methods=['POST'])
+def valide_a2f():
+    """
+    Endpoint pour confirmer que l'utilisateur a bien stocké son secret et qu'il puisse le prouver avec son code TOTP
+    """
+
+    code = request.form.get('code')
+    secret = get_otp_secret(session['username'])
+
+    totp = pyotp.TOTP(secret)
+
+    # Vérifier le code
+    if totp.verify(code):
+        update_otp_status(session['username'], 2, secret)
+        return jsonify({'success': True})
+    else:
+        update_otp_status(session['username'], active_code=0)
+        return jsonify({'success': False})

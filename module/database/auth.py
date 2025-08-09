@@ -20,7 +20,7 @@ def a2f_active(username):
         cursor = conn.cursor()
         cursor.execute("SELECT otp_active FROM users WHERE username = ?", (username,))
         result = cursor.fetchone()[0]
-        if result == 1:
+        if result == 2:
             return True
         else:
             return False
@@ -35,15 +35,15 @@ def get_otp_secret(username):
             return result[0]
         return None
 
-def update_otp_status(username, is_active, secret=None):
+def update_otp_status(username, active_code, secret=None):
     """Active ou désactive l'A2F pour un utilisateur et met à jour le secret si fourni"""
     with sqlite3.connect('honeypot.db') as conn:
         cursor = conn.cursor()
         if secret:
             cursor.execute("UPDATE users SET otp_active = ?, otp_code = ? WHERE username = ?", 
-                         (1 if is_active else 0, secret, username))
+                         (active_code, secret, username))
         else:
             cursor.execute("UPDATE users SET otp_active = ? WHERE username = ?", 
-                         (1 if is_active else 0, username))
+                         (active_code, username))
         conn.commit()
         return True

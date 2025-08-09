@@ -12,7 +12,6 @@
     <div class="section-card">
         <div class="settings-tabs">
             <button class="settings-tab active" data-tab="security">Sécurité</button>
-            <button class="settings-tab" data-tab="notifications">Notifications</button>
             <button class="settings-tab" data-tab="api">API</button>
             <button class="settings-tab" data-tab="advanced">Avancé</button>
         </div>
@@ -87,8 +86,15 @@
                                     <p>Ou entrez cette clé manuellement :</p>
                                     <div class="secret-key" id="a2f-secret-key"></div>
                                 </div>
+                                <div class="form-group" id="a2f-verification-container">
+                                    <label>Veuillez entrer le code généré par votre application :</label>
+                                    <div class="verification-code-input">
+                                        <input type="text" id="a2f-verification-code" class="form-control" maxlength="6" inputmode="numeric" pattern="[0-9]*" placeholder="123456">
+                                    </div>
+                                    <div id="a2f-verification-status" class="form-status"></div>
+                                </div>
                                 <div class="form-actions">
-                                    <button class="btn btn-primary" id="a2f-qrcode-confirm">J'ai scanné le QR code</button>
+                                    <button class="btn btn-primary" id="a2f-verification-submit">Valider le code</button>
                                 </div>
                             </div>
                         </div>
@@ -119,47 +125,6 @@
                             </div>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Onglet Notifications -->
-            <div class="settings-pane" id="notifications-pane">
-                <div class="form-group">
-                    <label class="form-label">Méthodes de notification</label>
-                    <div class="checkbox-group">
-                        <label class="checkbox-label">
-                            <input type="checkbox" checked> Email
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" checked> Interface web
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox"> Webhook
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox"> Slack
-                        </label>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Email de notification</label>
-                    <input type="email" class="form-control" value="admin@example.com">
-                </div>
-
-                <div class="form-group">
-                    <label class="form-label">Niveau d'alerte minimum</label>
-                    <select class="form-control">
-                        <option value="low">Faible</option>
-                        <option value="medium" selected>Moyen</option>
-                        <option value="high">Élevé</option>
-                        <option value="critical">Critique</option>
-                    </select>
-                    <div class="form-help">Vous ne recevrez que les alertes de ce niveau ou plus élevé</div>
-                </div>
-
-                <div class="settings-actions">
-                    <button class="btn btn-primary">Enregistrer les modifications</button>
                 </div>
             </div>
 
@@ -618,15 +583,6 @@
                     console.error('Erreur:', error);
                     alert('Une erreur est survenue lors de la communication avec le serveur');
                 });
-            });
-        }
-
-        // Confirmation de scan du QR code
-        const qrcodeConfirmBtn = document.getElementById('a2f-qrcode-confirm');
-        if (qrcodeConfirmBtn) {
-            qrcodeConfirmBtn.addEventListener('click', function() {
-                document.getElementById('a2f-qrcode-modal').style.display = 'none';
-                checkA2FStatus(); // Mettre à jour l'interface
             });
         }
 
