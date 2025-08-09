@@ -54,11 +54,9 @@ def active_a2f():
 
 
     if request.form.get('password') is None or request.form.get('active') is None:
-        print("eeee")
         return jsonify({'success': False, 'error': 'Informations manquantes'})
 
     if not auth_user(session['username'], password):
-        print("password incorrect")
         return jsonify({'success': False, 'error': 'Mot de passe incorrect'})
 
     if activated == 'true':
@@ -92,6 +90,7 @@ def active_a2f():
         if update_otp_status(session['username'], True, secret):
             return jsonify({
                 'success': True,
+                'secret': secret,
                 'qrcode': f"data:image/png;base64,{qr_code_base64}"
             })
         else:
