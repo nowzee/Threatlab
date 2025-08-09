@@ -3,10 +3,18 @@
  * Inclut la gestion du changement de mot de passe et de l'authentification à deux facteurs
  */
 
+// Variables globales pour éviter les duplications
+let handlersInitialized = false;
+
 // Attendre que le DOM soit chargé
 document.addEventListener('DOMContentLoaded', function() {
+    // Éviter l'initialisation multiple
+    if (handlersInitialized) return;
+    handlersInitialized = true;
+
     // Initialiser les gestionnaires pour l'authentification à deux facteurs
     initA2FHandlers();
+
     // Gestion des onglets de paramètres
     const tabs = document.querySelectorAll('.settings-tab');
     const panes = document.querySelectorAll('.settings-pane');
@@ -29,8 +37,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Gestion du formulaire de changement de mot de passe
     const securityPane = document.getElementById('security-pane');
 
+    // Gestion des modales - CONSOLIDÉE
+    initModalHandlers();
+
     if (securityPane) {
-        const passwordForm = securityPane.querySelector('form') || 
+        const passwordForm = securityPane.querySelector('form') ||
                           createPasswordForm(securityPane);
 
         // Ajouter les barres de robustesse du mot de passe si elles n'existent pas déjà
@@ -57,6 +68,44 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         passwordForm.addEventListener('submit', handlePasswordChange);
+    }
+
+    /**
+     * Initialise les gestionnaires pour les modales de manière consolidée
+     */
+    function initModalHandlers() {
+        const modals = document.querySelectorAll('.modal');
+        const closeButtons = document.querySelectorAll('.modal-close-btn, .close-btn');
+
+        // Gestionnaire unique pour fermer toutes les modales
+        closeButtons.forEach(button => {
+            // Retirer les anciens événements potentiels
+            button.removeEventListener('click', closeModalHandler);
+            // Ajouter le nouveau gestionnaire
+            button.addEventListener('click', closeModalHandler);
+        });
+
+        // Fermer les modales en cliquant sur l'arrière-plan
+        modals.forEach(modal => {
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                }
+            });
+        });
+    }
+
+    /**
+     * Gestionnaire unique pour fermer les modales
+     */
+    function closeModalHandler(e) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            modal.style.display = 'none';
+        });
     }
 
     /**
@@ -114,22 +163,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const form = event.target;
         const statusDiv = document.getElementById('password-status');
         const passwordInputs = form.querySelectorAll('input[type="password"]');
-
-        // Vérifier que tous les champs sont remplis
-        let isValid = true;
-        passwordInputs.forEach(input => {
-            if (!input.value.trim()) {
-                isValid = false;
-                input.classList.add('invalid');
-            } else {
-                input.classList.remove('invalid');
-            }
-        });
-
-        if (!isValid) {
-            showStatus(statusDiv, 'Tous les champs sont obligatoires', 'error');
-            return;
-        }
 
         // Vérifier que les nouveaux mots de passe correspondent
         const newPassword = passwordInputs[1].value;
@@ -257,18 +290,6 @@ document.addEventListener('DOMContentLoaded', function() {
         strengthMeter.className = 'password-strength-meter';
         const levels = ['weak', 'medium', 'strong'];
         strengthMeter.classList.add(levels[strength - 1]);
-
-        // Ajouter un texte d'aide basé sur les critères manquants
-        const helpText = document.querySelector('.form-help');
-        if (helpText) {
-            let message = 'Exigences: au moins 12 caractères';
-            if (!hasLowerCase) message += ', une lettre minuscule';
-            if (!hasUpperCase) message += ', une lettre majuscule';
-            if (!hasNumbers) message += ', un chiffre';
-            if (!hasSpecialChars) message += ', un caractère spécial';
-
-            helpText.textContent = message;
-        }
     }
 
     /**
@@ -280,10 +301,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const a2fActivateModal = document.getElementById('a2f-activate-modal');
         const a2fQrcodeModal = document.getElementById('a2f-qrcode-modal');
         const a2fDeactivateModal = document.getElementById('a2f-deactivate-modal');
-        const a2fActivateSubmit = document.getElementById('a2f-activate-submit');
-        const a2fQrcodeConfirm = document.getElementById('a2f-qrcode-confirm');
-        const a2fDeactivateSubmit = document.getElementById('a2f-deactivate-submit');
-        const closeModalButtons = document.querySelectorAll('.close-modal');
 
         // Gestionnaires pour le nouveau champ de vérification
         const a2fVerificationSubmit = document.getElementById('a2f-verification-submit');
@@ -293,58 +310,56 @@ document.addEventListener('DOMContentLoaded', function() {
         // Vérifier si les éléments existent
         if (!a2fToggleBtn) return;
 
-        // Événements pour fermer les modales
-        closeModalButtons.forEach(button => {
-            button.addEventListener('click', () => {
-                if (a2fActivateModal) a2fActivateModal.style.display = 'none';
-                if (a2fQrcodeModal) a2fQrcodeModal.style.display = 'none';
-                if (a2fDeactivateModal) a2fDeactivateModal.style.display = 'none';
-            });
-        });
-
         // Événement pour vérifier le code TOTP
         if (a2fVerificationSubmit) {
-            a2fVerificationSubmit.addEventListener('click', function() {
-                const code = a2fVerificationCode.value.trim();
+            // Retirer l'ancien gestionnaire s'il existe
+            a2fVerificationSubmit.removeEventListener('click', handleA2FVerification);
+            a2fVerificationSubmit.addEventListener('click', handleA2FVerification);
+        }
 
-                // Vérifier que le code a été entré
-                if (!code) {
-                    showA2FStatus(a2fVerificationStatus, 'Veuillez entrer le code généré par votre application', 'error');
-                    return;
+        /**
+         * Gestionnaire pour la vérification du code A2F
+         */
+        function handleA2FVerification() {
+            const code = a2fVerificationCode.value.trim();
+
+            // Vérifier que le code a été entré
+            if (!code) {
+                showA2FStatus(a2fVerificationStatus, 'Veuillez entrer le code généré par votre application', 'error');
+                return;
+            }
+
+            // Vérifier que le code a la bonne longueur
+            if (code.length !== 6 || !/^\d+$/.test(code)) {
+                showA2FStatus(a2fVerificationStatus, 'Le code doit contenir 6 chiffres', 'error');
+                return;
+            }
+
+            // Envoyer la requête de validation
+            const formData = new FormData();
+            formData.append('code', code);
+
+            fetch('/account/validation_a2f', {
+                method: 'POST',
+                body: formData,
+                credentials: 'same-origin'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showA2FStatus(a2fVerificationStatus, 'Code validé avec succès! L\'authentification à deux facteurs est maintenant active.', 'success');
+                    checkA2FStatus();
+                    // Fermer la modale après un court délai
+                    setTimeout(() => {
+                        a2fQrcodeModal.style.display = 'none';
+                    }, 1000);
+                } else {
+                    showA2FStatus(a2fVerificationStatus, data.error || 'Code incorrect. Veuillez réessayer.', 'error');
                 }
-
-                // Vérifier que le code a la bonne longueur
-                if (code.length !== 6 || !/^\d+$/.test(code)) {
-                    showA2FStatus(a2fVerificationStatus, 'Le code doit contenir 6 chiffres', 'error');
-                    return;
-                }
-
-                // Envoyer la requête de validation
-                const formData = new FormData();
-                formData.append('code', code);
-
-                fetch('/account/validation_a2f', {
-                    method: 'POST',
-                    body: formData,
-                    credentials: 'same-origin'
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        showA2FStatus(a2fVerificationStatus, 'Code validé avec succès! L\'authentification à deux facteurs est maintenant active.', 'success');
-                        checkA2FStatus();
-                        // Fermer la modale après un court délai
-                        setTimeout(() => {
-                            a2fQrcodeModal.style.display = 'none';
-                        }, 1000);
-                    } else {
-                        showA2FStatus(a2fVerificationStatus, data.error || 'Code incorrect. Veuillez réessayer.', 'error');
-                    }
-                })
-                .catch(error => {
-                    console.error('Erreur lors de la validation du code:', error);
-                    showA2FStatus(a2fVerificationStatus, 'Une erreur est survenue lors de la validation du code.', 'error');
-                });
+            })
+            .catch(error => {
+                console.error('Erreur lors de la validation du code:', error);
+                showA2FStatus(a2fVerificationStatus, 'Une erreur est survenue lors de la validation du code.', 'error');
             });
         }
 
@@ -448,5 +463,110 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // Vérifier le statut A2F au chargement de la page
         checkA2FStatus();
+
+        // Gestionnaires pour les boutons d'activation et de désactivation
+        const a2fActivateSubmit = document.getElementById('a2f-activate-submit');
+        const a2fDeactivateSubmit = document.getElementById('a2f-deactivate-submit');
+
+        if (a2fActivateSubmit) {
+            // Retirer l'ancien gestionnaire s'il existe
+            a2fActivateSubmit.removeEventListener('click', handleA2FActivation);
+            a2fActivateSubmit.addEventListener('click', handleA2FActivation);
+        }
+
+        if (a2fDeactivateSubmit) {
+            // Retirer l'ancien gestionnaire s'il existe
+            a2fDeactivateSubmit.removeEventListener('click', handleA2FDeactivation);
+            a2fDeactivateSubmit.addEventListener('click', handleA2FDeactivation);
+        }
+
+        /**
+         * Gestionnaire pour l'activation de l'A2F
+         */
+        function handleA2FActivation() {
+            const password = document.getElementById('a2f-activate-password').value;
+            if (!password) {
+                alert('Veuillez entrer votre mot de passe');
+                return;
+            }
+
+            // Requête AJAX pour activer l'A2F
+            const formData = new FormData();
+            formData.append('active', 'true');
+            formData.append('password', password);
+
+            fetch('/account/active_a2f', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Fermer la modal d'activation
+                    document.getElementById('a2f-activate-modal').style.display = 'none';
+
+                    // Afficher le QR code reçu du serveur
+                    document.getElementById('a2f-secret-key').textContent = data.secret;
+                    const qrcodeContainer = document.getElementById('qrcode-container');
+                    qrcodeContainer.innerHTML = '';
+
+                    // Créer une image avec le QR code base64 fourni par le serveur
+                    const qrImage = document.createElement('img');
+                    qrImage.src = data.qrcode;
+                    qrImage.alt = 'QR Code pour authentification';
+                    qrImage.style.width = '200px';
+                    qrImage.style.height = '200px';
+                    qrcodeContainer.appendChild(qrImage);
+
+                    document.getElementById('a2f-qrcode-modal').style.display = 'block';
+                } else {
+                    alert(data.error || 'Une erreur est survenue lors de l\'activation de l\'A2F');
+                }
+            })
+            .catch(error => {
+                console.error('Erreur:', error);
+                alert('Une erreur est survenue lors de la communication avec le serveur');
+            });
+        }
+
+        /**
+         * Gestionnaire pour la désactivation de l'A2F
+         */
+        function handleA2FDeactivation() {
+            const password = document.getElementById('a2f-deactivate-password').value;
+            const code = document.getElementById('a2f-deactivate-code').value;
+
+            if (!password) {
+                alert('Veuillez entrer votre mot de passe');
+                return;
+            }
+
+            if (!code || code.length !== 6 || !/^\d+$/.test(code)) {
+                alert('Veuillez entrer un code de vérification valide à 6 chiffres');
+                return;
+            }
+
+            // Requête AJAX pour désactiver l'A2F
+            const formData = new FormData();
+            formData.append('active', 'false');
+            formData.append('password', password);
+            formData.append('code', code);
+
+            fetch('/account/active_a2f', {
+                method: 'POST',
+                body: formData
+            }).then(response => response.json()).then(data => {
+                if (data.success) {
+                    document.getElementById('a2f-deactivate-modal').style.display = 'none';
+                    alert('L\'authentification à deux facteurs a été désactivée avec succès');
+                    checkA2FStatus(); // Mettre à jour l'interface
+                } else {
+                    alert(data.error || 'Une erreur est survenue lors de la désactivation de l\'A2F');
+                }
+            }).catch(error => {
+                console.error('Erreur:', error);
+                alert('Une erreur est survenue lors de la communication avec le serveur');
+            });
+        }
     }
 });

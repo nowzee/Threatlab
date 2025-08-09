@@ -7,6 +7,14 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/variable.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/login.css') }}">
 </head>
+    <style>
+
+        /* Supprimer la bordure bleue par défaut du navigateur */
+        .code-box:focus {
+            -webkit-box-shadow: none !important;
+        }
+    </style>
+
 <body>
     <div class="login-container">
         <div class="login-header">
@@ -16,7 +24,7 @@
             <div class="form-group code-inputs">
                 {% for i in range(6) %}
                 <input type="text" class="code-box" maxlength="1" inputmode="numeric" pattern="[0-9]*"
-                       oninput="moveToNext(this, {{ i }})" id="code-{{ i }}">
+                       id="code-{{ i }}" autocomplete="off">
                 {% endfor %}
                 <input type="hidden" name="code" id="full-code">
             </div>
@@ -29,29 +37,78 @@
     </div>
 </body>
 <script>
-function moveToNext(input, index) {
-    const next = document.getElementById('code-' + (index + 1));
-    if (input.value.length === 1 && next) {
-        next.focus();
-    }
+document.addEventListener('DOMContentLoaded', function() {
+    const inputs = [];
 
-    // Vérifie si tous les champs sont remplis avec des chiffres valides
-    let code = '';
+    // Initialiser tous les champs
     for (let i = 0; i < 6; i++) {
-        const val = document.getElementById('code-' + i).value;
-        if (!val.match(/^[0-9]$/)) {
-            return; // Ne fait rien si un champ n'est pas encore rempli ou invalide
-        }
-        code += val;
+        inputs[i] = document.getElementById('code-' + i);
+
+        // Événement input pour la saisie normale
+        inputs[i].addEventListener('input', function(e) {
+            if (this.value.length === 1) {
+                // Se déplacer au champ suivant
+                if (i < 5) {
+                    inputs[i + 1].focus();
+                }
+            }
+            checkAndSubmit();
+        });
+
+        // Événement keydown pour la navigation
+        inputs[i].addEventListener('keydown', function(e) {
+            if (e.key === 'Backspace' && !this.value && i > 0) {
+                inputs[i - 1].focus();
+                inputs[i - 1].value = '';
+            }
+        });
+
+        // Événement paste pour tous les champs
+        inputs[i].addEventListener('paste', function(e) {
+            e.preventDefault();
+
+            const pastedData = e.clipboardData.getData('text');
+            const digits = pastedData.replace(/[^0-9]/g, '');
+
+            // Remplir les champs à partir du champ actuel
+            for (let j = 0; j < digits.length && (i + j) < 6; j++) {
+                inputs[i + j].value = digits[j];
+            }
+
+            // Déplacer le focus au dernier champ rempli ou au suivant
+            const lastFilledIndex = Math.min(i + digits.length - 1, 5);
+            const nextIndex = Math.min(i + digits.length, 5);
+
+            if (lastFilledIndex < 5) {
+                inputs[nextIndex].focus();
+            } else {
+                inputs[lastFilledIndex].focus();
+            }
+
+            checkAndSubmit();
+        });
     }
 
-    // Tous les champs sont valides : remplir le champ caché et soumettre le formulaire
-    document.getElementById('full-code').value = code;
+    function checkAndSubmit() {
+        let code = '';
+        let allFilled = true;
 
-    // Petite pause pour que l'utilisateur voie le dernier chiffre (facultatif)
-    setTimeout(() => {
-        document.querySelector('.login-form').submit();
-    }, 200);
-}
+        for (let i = 0; i < 6; i++) {
+            const val = inputs[i].value;
+            if (!val || !val.match(/^[0-9]$/)) {
+                allFilled = false;
+                break;
+            }
+            code += val;
+        }
+
+        if (allFilled) {
+            document.getElementById('full-code').value = code;
+            setTimeout(() => {
+                document.querySelector('.login-form').submit();
+            }, 200);
+        }
+    }
+});
 </script>
 </html>
