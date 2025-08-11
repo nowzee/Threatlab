@@ -11,6 +11,10 @@ body {
     background-image: radial-gradient(circle at 85% 20%, rgba(92, 20, 201, 0.32), transparent 40%);
 }
 
+*:focus {
+    -webkit-box-shadow: none !important;
+}
+
 .login-container {
     background-color: var(--container-background);
     border-radius: 12px;
