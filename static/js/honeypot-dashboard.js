@@ -1,84 +1,8 @@
-/**
- * Honeypot Dashboard JavaScript
- * Gestion des interactions et des données pour l'interface du tableau de bord
- */
-
 // Initialisation du dashboard
 document.addEventListener('DOMContentLoaded', function() {
-    initializeCharts();
     setupEventListeners();
     loadHoneypotStatus();
 });
-
-/**
- * Initialise les graphiques et visualisations
- */
-function initializeCharts() {
-
-    if (document.getElementById('traffic-chart')) {
-        renderTrafficChart();
-    }
-
-    if (document.getElementById('threat-distribution')) {
-        renderThreatDistribution();
-    }
-}
-
-/**
- * Dessine le graphique de trafic
- */
-function renderTrafficChart() {
-    // Exemple similaire pour le graphique de trafic
-    const canvas = document.getElementById('traffic-chart');
-    const ctx = canvas.getContext('2d');
-
-    // Dessiner le fond du graphique
-    ctx.fillStyle = 'rgba(0, 230, 118, 0.1)';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Dessiner des barres
-    const barWidth = canvas.width / 12;
-    const data = [20, 40, 30, 70, 50, 60, 80, 90, 65, 75, 85, 55];
-
-    data.forEach((value, index) => {
-        const height = (value / 100) * canvas.height;
-        const x = index * barWidth;
-        const y = canvas.height - height;
-
-        ctx.fillStyle = 'rgba(0, 230, 118, 0.7)';
-        ctx.fillRect(x, y, barWidth - 2, height);
-    });
-}
-
-/**
- * Visualise la distribution des menaces
- */
-function renderThreatDistribution() {
-    const container = document.getElementById('threat-distribution');
-    const data = [
-        { label: 'SQL Injection', value: 35 },
-        { label: 'Brute Force', value: 25 },
-        { label: 'XSS', value: 20 },
-        { label: 'DDoS', value: 15 },
-        { label: 'Autres', value: 5 }
-    ];
-
-    // Générer un graphique simple ou une visualisation
-    let html = '';
-    data.forEach(item => {
-        html += `
-            <div class="threat-item">
-                <div class="threat-label">${item.label}</div>
-                <div class="threat-bar-container">
-                    <div class="threat-bar" style="width: ${item.value}%"></div>
-                </div>
-                <div class="threat-value">${item.value}%</div>
-            </div>
-        `;
-    });
-
-    container.innerHTML = html;
-}
 
 /**
  * Configure les écouteurs d'événements pour l'interface
@@ -314,21 +238,4 @@ function showNotification(message, type = 'info') {
             }
         }, 300);
     });
-}
-
-/**
- * Bascule entre les thèmes clair et sombre (si implémenté)
- */
-function toggleTheme() {
-    // Cette fonction pourrait basculer une classe sur l'élément <html> ou <body>
-    // ou changer des variables CSS personnalisées
-    document.body.classList.toggle('light-theme');
-}
-
-/**
- * Bascule le menu pour les appareils mobiles
- */
-function toggleMobileMenu() {
-    const sidebar = document.querySelector('.container-sidebar');
-    sidebar.classList.toggle('open');
 }
