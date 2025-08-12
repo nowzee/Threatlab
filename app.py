@@ -1,11 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
 import os
 from route.auth.login import auth_bp
 from route.config.security import config_account_bp
 from module.database.setup_db import setup_dbs
 import secrets
-
-app = Flask(__name__)
+app = Flask(__name__, static_folder='./frontend/dist', static_url_path='')
 app.config['SECRET_KEY'] = secrets.token_hex(2048)
 app.config['DATABASE'] = os.path.join(app.root_path, 'honeypot.db')
 
@@ -16,45 +15,29 @@ app.register_blueprint(config_account_bp)
 @app.before_request
 def before_request():
     # Liste des endpoints accessibles sans authentification
-    public_endpoints = ["static", "auth.login"]
-    a2f_endpoints = ['auth.a2f', 'static']
+    public_endpoints = ["static", "auth.login", 'serve_static_or_index', 'auth.session_state', 'serve_vue_app']
+    a2f_endpoints = ['auth.a2f', 'static', 'serve_static_or_index', 'serve_vue_app']
+
+    print(request.endpoint)
 
     # Redirection vers login si non connecté et endpoint non public
     if not session.get('logged_in') and request.endpoint not in public_endpoints:
-        return redirect(url_for('auth.login'))
+        return jsonify({'auth_required': False}), 200
 
     if session.get('a2f_validate') is not None:
         if session['a2f_validate'] == False and request.endpoint not in a2f_endpoints:
-            return redirect(url_for('auth.a2f'))
+            return jsonify({"requires_a2f": True}), 200
 
-@app.route("/", methods=["GET"])
-def index():
-    # Redirection vers le dashboard si l'utilisateur est connecté
-    if session.get('logged_in'):
-        return redirect(url_for('dashboard'))
-    # Sinon, redirection vers la page de connexion
-    return redirect(url_for('auth.login'))
+@app.route('/')
+def serve_vue_app():
+    return send_from_directory(app.static_folder, 'index.html')
 
-@app.route("/dashboard")
-def dashboard():
-    # Rendu de la page du tableau de bord
-    return render_template("dashboard/dashboard.html")
+# Permet à Vue Router (mode history) de fonctionner avec les routes personnalisées
+@app.route('/<path>', methods=['GET', 'POST'])
+def serve_static_or_index(path):
+    return send_from_directory(app.static_folder, 'index.html')
 
-@app.route("/manage")
-def manage():
-    # Page pour gérer les honeypots
-    # Dans une version future, cela pourrait avoir son propre template
-    return render_template("dashboard/base.html", page_title="Gérer les Honeypots")
 
-@app.route("/deploy")
-def deploy():
-    # Page pour déployer de nouveaux honeypots
-    return render_template("dashboard/deploy.html")
-
-@app.route("/config")
-def config():
-    # Page de configuration système
-    return render_template("dashboard/settings.html")
 
 # API Routes
 @app.route("/api/honeypots", methods=["GET"])

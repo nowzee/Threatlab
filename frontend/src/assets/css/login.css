@@ -1,4 +1,4 @@
-body {
+.login-page {
     font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
     background-color: var(--background-color-dark);
     margin: 0;
@@ -6,13 +6,10 @@ body {
     display: flex;
     justify-content: center;
     align-items: center;
+    width: 100vw;
     height: 100vh;
     color: var(--text-color);
     background-image: radial-gradient(circle at 85% 20%, rgba(92, 20, 201, 0.32), transparent 40%);
-}
-
-*:focus {
-    -webkit-box-shadow: none !important;
 }
 
 .login-container {
@@ -24,6 +21,10 @@ body {
     max-width: 90%;
     border: 1px solid var(--container-border-color);
     animation: fadeIn 0.5s ease-in-out;
+}
+
+*:focus {
+    -webkit-box-shadow: none !important;
 }
 
 @keyframes fadeIn {
