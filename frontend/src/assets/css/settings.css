@@ -1,100 +1,223 @@
-/**
- * Styles pour la page de paramètres
- */
+    .settings-tabs {
+        display: flex;
+        border-bottom: 1px solid var(--container-border-color);
+        margin-bottom: 24px;
+        overflow-x: auto;
+        scrollbar-width: none;
+        text-decoration: none !important;
+    }
 
-/* Styles des onglets */
-.settings-tabs {
-    display: flex;
-    border-bottom: 1px solid rgba(0,0,0,0.1);
-    margin-bottom: 20px;
-}
+    .settings-tabs::-webkit-scrollbar {
+        display: none;
+    }
 
-.settings-tab {
-    padding: 10px 15px;
-    background: none;
-    border: none;
-    border-bottom: 2px solid transparent;
-    cursor: pointer;
-    font-weight: 500;
-    color: #666;
-    transition: all 0.2s ease;
-}
+    .settings-tab {
+        padding: 12px 20px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-color-muted);
+        background: none;
+        border: none;
+        border-bottom: 2px solid transparent;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+        text-decoration: none !important;
+    }
 
-.settings-tab:hover {
-    color: #333;
-}
+    .settings-tab:hover {
+        color: var(--white);
+    }
 
-.settings-tab.active {
-    color: #4a6cf7;
-    border-bottom: 2px solid #4a6cf7;
-}
+    .settings-tab.active {
+        color: var(--accent-color);
+        border-bottom-color: var(--accent-color);
+    }
 
-/* Styles des panneaux de paramètres */
-.settings-pane {
-    display: none;
-}
+    .settings-pane {
+        display: none;
+        animation: fadeIn 0.3s ease;
+    }
 
-.settings-pane.active {
-    display: block;
-}
+    .settings-pane.active {
+        display: block;
+    }
 
-/* Styles des actions */
-.settings-actions {
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid rgba(0,0,0,0.1);
-}
+    .settings-actions {
+        margin-top: 32px;
+        padding-top: 16px;
+        border-top: 1px solid var(--container-border-color);
+        display: flex;
+        justify-content: flex-end;
+    }
 
-/* Styles des messages d'état */
-.form-status {
-    margin: 15px 0;
-    padding: 10px;
-    border-radius: 4px;
-    font-weight: 500;
-}
+    .two-factor-status {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 12px 16px;
+        background-color: var(--card-background);
+        border-radius: 8px;
+        border: 1px solid var(--container-border-color);
+    }
 
-.form-status.status-success {
-    background-color: rgba(40, 167, 69, 0.1);
-    border-left: 3px solid #28a745;
-    color: #28a745;
-}
+    .text-danger {
+        color: var(--danger-color) !important;
+    }
 
-.form-status.status-error {
-    background-color: rgba(220, 53, 69, 0.1);
-    border-left: 3px solid #dc3545;
-    color: #dc3545;
-}
+    .password-strength-meter {
+        display: flex;
+        gap: 5px;
+        margin: 10px 0;
+    }
 
-/* Styles pour les champs invalides */
-input.invalid {
-    border-color: #dc3545;
-    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25);
-}
+    .strength-bar {
+        height: 6px;
+        flex: 1;
+        background-color: var(--container-border-color);
+        border-radius: 2px;
+        transition: background-color 0.3s ease;
+    }
 
-/* Styles pour les indicateurs de session */
-.two-factor-status {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
+    .strength-bar.active {
+        background-color: var(--danger-color);
+    }
 
-.status-indicator {
-    display: flex;
-    align-items: center;
-}
+    .password-strength-meter.weak .strength-bar.active {
+        background-color: var(--danger-color);
+    }
 
-.status-dot {
-    display: inline-block;
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    margin-right: 8px;
-}
+    .password-strength-meter.medium .strength-bar.active {
+        background-color: var(--warning-color);
+    }
 
-.status-online .status-dot {
-    background-color: #28a745;
-}
+    .password-strength-meter.strong .strength-bar.active {
+        background-color: var(--success-color);
+    }
 
-.status-offline .status-dot {
-    background-color: #dc3545;
-}
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    /* Styles pour les modales */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.6);
+        animation: fadeIn 0.3s ease;
+    }
+
+    .modal-content {
+        position: relative;
+        background-color: var(--card-background);
+        margin: 10% auto;
+        max-width: 500px;
+        border-radius: 8px;
+        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+        animation: slideIn 0.3s ease;
+    }
+
+    .modal-header {
+        padding: 16px 20px;
+        border-bottom: 1px solid var(--container-border-color);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .modal-header h3 {
+        margin: 0;
+        font-weight: 500;
+        color: var(--text-color);
+    }
+
+    .modal-body {
+        padding: 20px;
+    }
+
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 20px;
+    }
+
+    /* Styles pour le QR code */
+    .qrcode-container {
+        display: flex;
+        justify-content: center;
+        margin: 20px 0;
+        padding: 16px;
+        background-color: white;
+        border-radius: 8px;
+        width: fit-content;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .secret-key-container {
+        margin: 16px 0;
+        text-align: center;
+    }
+
+    .secret-key {
+        font-family: monospace;
+        background-color: var(--container-border-color);
+        padding: 8px 12px;
+        border-radius: 4px;
+        word-break: break-all;
+        margin-top: 8px;
+        cursor: text;
+        user-select: text;
+
+    }
+
+    .verification-code-input {
+        width: 100%;
+        margin: 8px 0;
+    }
+
+    /* Status indicators */
+    .status-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background-color: var(--danger-color);
+    }
+
+    .status-online .status-dot {
+        background-color: var(--success-color);
+    }
+
+    .status-offline .status-dot {
+        background-color: var(--danger-color);
+    }
+
+    @keyframes slideIn {
+        from { transform: translateY(-20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+
+    @media (max-width: 768px) {
+        .settings-tabs {
+            padding-bottom: 8px;
+        }
+
+        .modal-content {
+            width: 90%;
+            margin: 20% auto;
+        }
+    }
