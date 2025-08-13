@@ -208,3 +208,4 @@ __marimo__/
 
 # Database
 *.db
+.idea
