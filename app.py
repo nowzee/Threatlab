@@ -54,7 +54,7 @@ def get_honeypots():
 def get_alerts():
     # Exemple de données simulées
     alerts = [
-        {"id": 1, "timestamp": "2023-07-10 15:42", "honeypot": "Web-Honeypot-1", "type": "SQL Injection", "source_ip": "198.51.100.32", "severity": "high"},
+        {"id": 1, "timestamp": "2023-07-10 15:42", "honeypot": "Web-Honeypot-1", "type": "SQL Injection", "source_ip": "198.51.100.42", "severity": "high"},
         {"id": 2, "timestamp": "2023-07-10 14:28", "honeypot": "SSH-Trap", "type": "Brute Force", "source_ip": "203.0.113.45", "severity": "medium"},
         {"id": 3, "timestamp": "2023-07-10 12:15", "honeypot": "Web-Honeypot-1", "type": "XSS", "source_ip": "192.0.2.18", "severity": "medium"}
     ]
