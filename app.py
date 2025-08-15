@@ -2,14 +2,16 @@ from flask import Flask, render_template, request, redirect, url_for, session, j
 import os
 from route.auth.login import auth_bp
 from route.config.security import config_account_bp
+from route.agent.api_agent import agent_create_bp
 from module.database.setup_db import setup_dbs
 import secrets
 app = Flask(__name__, static_folder='./frontend/dist', static_url_path='')
-app.config['SECRET_KEY'] = secrets.token_hex(2048)
+app.config['SECRET_KEY'] = secrets.token_hex(4096)
 app.config['DATABASE'] = os.path.join(app.root_path, 'honeypot.db')
 
 # Register blueprints
 app.register_blueprint(auth_bp)
+app.register_blueprint(agent_create_bp)
 app.register_blueprint(config_account_bp)
 
 @app.before_request
@@ -32,7 +34,7 @@ def before_request():
 def serve_vue_app():
     return send_from_directory(app.static_folder, 'index.html')
 
-# Permet à Vue Router (mode history) de fonctionner avec les routes personnalisées
+# Permet à Vue Router de fonctionner avec les routes personnalisées
 @app.route('/<path>', methods=['GET', 'POST'])
 def serve_static_or_index(path):
     return send_from_directory(app.static_folder, 'index.html')
@@ -42,7 +44,7 @@ def serve_static_or_index(path):
 # API Routes
 @app.route("/api/honeypots", methods=["GET"])
 def get_honeypots():
-    # Exemple de données simulées - Dans une vraie application, récupérer depuis la base de données
+    # Data simulé
     honeypots = [
         {"id": 1, "name": "Web-Honeypot-1", "type": "Web Server", "status": "online", "alerts": 12},
         {"id": 2, "name": "SSH-Trap", "type": "SSH", "status": "online", "alerts": 5},
@@ -52,7 +54,7 @@ def get_honeypots():
 
 @app.route("/api/alerts", methods=["GET"])
 def get_alerts():
-    # Exemple de données simulées
+    # données simulées
     alerts = [
         {"id": 1, "timestamp": "2023-07-10 15:42", "honeypot": "Web-Honeypot-1", "type": "SQL Injection", "source_ip": "198.51.100.42", "severity": "high"},
         {"id": 2, "timestamp": "2023-07-10 14:28", "honeypot": "SSH-Trap", "type": "Brute Force", "source_ip": "203.0.113.45", "severity": "medium"},
@@ -73,5 +75,4 @@ def server_error(e):
 if __name__ == '__main__':
     # Initialisation de la base de données
     setup_dbs()
-    # Démarrage de l'application en mode production
     app.run(host='0.0.0.0', port=5000, debug=False)

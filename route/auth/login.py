@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, session, request, redirect, url_for, render_template
+from flask import Blueprint, jsonify, session, request
 from module.database.auth import auth_user, a2f_active, get_otp_secret
 import pyotp
 
@@ -39,37 +39,43 @@ def login():
             return jsonify({"authenticated": True, "requires_a2f": True}), 200
         return jsonify({"authenticated": True}), 200
 
+
 @auth_bp.route("/a2f", methods=['GET', 'POST'])
 def a2f():
     # Vérifier si l'utilisateur est connecté
     if not session.get('logged_in'):
-        return redirect(url_for('auth.login'))
+        if request.is_json:
+            return jsonify({"error": "Non authentifié"}), 401
 
     # Si l'utilisateur a déjà passé l'A2F, rediriger vers le tableau de bord
     if session.get('a2f_validate'):
-        return redirect(url_for('dashboard'))
+        if request.is_json:
+            return jsonify({"authenticated": True, "requires_a2f": False}), 200
 
     if request.method == 'POST':
-        code = request.form.get('code')
-        if not code:
-            return render_template("auth/a2f.html", error="Veuillez entrer un code de vérification")
+        if request.is_json:
+            # Traitement pour les requêtes JSON (Vue.js)
+            data = request.get_json(silent=True) or {}
+            code = data.get('code', '').strip()
 
-        # Récupérer la clé secrète de l'utilisateur depuis la base de données
-        secret = get_otp_secret(session['username'])
-        if not secret:
-            return render_template("auth/a2f.html", error="Erreur de configuration A2F. Contactez l'administrateur.")
+            if not code:
+                return jsonify({"error": "Veuillez entrer un code de vérification"}), 400
 
-        # Créer un objet TOTP pour vérification
-        totp = pyotp.TOTP(secret)
+            # Récupérer la clé secrète de l'utilisateur depuis la base de données
+            secret = get_otp_secret(session['username'])
+            if not secret:
+                return jsonify({"error": "Erreur de configuration A2F. Contactez l'administrateur."}), 500
 
-        # Vérifier le code
-        if totp.verify(code):
-            session['a2f_validate'] = True
-            return redirect(url_for('dashboard'))
-        else:
-            return render_template("auth/a2f.html", error="Code de vérification invalide")
+            # Créer un objet TOTP pour vérification
+            totp = pyotp.TOTP(secret)
 
-    return render_template("auth/a2f.html")
+            # Vérifier le code
+            if totp.verify(code):
+                session['a2f_validate'] = True
+                return jsonify({"authenticated": True, "requires_a2f": False}), 200
+            else:
+                return jsonify({"error": "Code de vérification invalide"}), 400
+
 
 @auth_bp.route("/logout")
 def logout():
