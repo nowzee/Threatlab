@@ -75,7 +75,7 @@ const checkAndSubmit = async () => {
       
       // Si le requirea2f est false, rediriger vers dashboard'
       if (!auth.requires_a2f) {
-        router.push({ name: 'dashboard' })
+        router.push({ name: 'home' })
       }
     } catch (e: any) {
       error.value = e?.message || 'Code de vérification invalide'
@@ -89,6 +89,7 @@ const checkAndSubmit = async () => {
 </script>
 
 <template>
+  <div class="login-page">
   <div class="login-container">
     <div class="login-header">
       <h1 style="color: white">A2F Authentication</h1>
@@ -115,6 +116,7 @@ const checkAndSubmit = async () => {
         >
       </div>
     </div>
+  </div>
   </div>
 </template>
 

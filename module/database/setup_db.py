@@ -66,6 +66,15 @@ def setup_dbs():
                            )
                            ''')
 
+            cursor.execute('''
+                           CREATE TABLE IF NOT EXISTS honey_agents
+                           (
+                               id INTEGER PRIMARY KEY,
+                               agent_name TEXT UNIQUE NOT NULL,
+                               api_key TEXT UNIQUE NOT NULL,
+                           )
+                           ''')
+
             raw_password = generate_random_string(16)
             password = hashlib.sha256(raw_password.encode()).hexdigest()
 

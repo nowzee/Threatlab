@@ -107,7 +107,10 @@ export const useAuthStore = defineStore('auth', {
         }
 
         const data = await res.json()
-        this.requires_a2f = !!data.requires_a2f
+
+        // Mettre à jour l'état : A2F validé, plus besoin d'A2F
+        this.requires_a2f = false
+        this.isAuthenticated = true
         
       } catch (e: any) {
         this.error = e?.message || 'Erreur de vérification'
