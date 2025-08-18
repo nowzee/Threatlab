@@ -47,20 +47,6 @@ export default defineComponent({
                 <div class="form-group">
                     <button class="btn btn-primary">Créer une nouvelle clé API</button>
                 </div>
-
-                <div class="form-group">
-                    <label class="form-label">Limites d'utilisation de l'API</label>
-                    <select class="form-control">
-                        <option value="unlimited">Illimité</option>
-                        <option value="1000" selected>1000 requêtes/heure</option>
-                        <option value="5000">5000 requêtes/heure</option>
-                        <option value="10000">10000 requêtes/heure</option>
-                    </select>
-                </div>
-
-                <div class="settings-actions">
-                    <button class="btn btn-primary">Enregistrer les modifications</button>
-                </div>
             </div>
 </template>
 
