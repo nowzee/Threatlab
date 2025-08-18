@@ -71,7 +71,66 @@ def setup_dbs():
                            (
                                id INTEGER PRIMARY KEY,
                                agent_name TEXT UNIQUE NOT NULL,
-                               api_key TEXT UNIQUE NOT NULL,
+                               secret_token TEXT UNIQUE NOT NULL
+                           )
+                           ''')
+
+            # Table pour stocker les logs d'attaques
+            cursor.execute('''
+                           CREATE TABLE IF NOT EXISTS attack_logs
+                           (
+                               id               INTEGER PRIMARY KEY,
+                               agent_id         INTEGER,
+                               source_ip        TEXT NOT NULL,
+                               source_port      INTEGER,
+                               target_port      INTEGER,
+                               service_type     TEXT NOT NULL,
+                               username_attempt TEXT,
+                               password_attempt TEXT,
+                               payload          TEXT,
+                               malware_hash     TEXT,
+                               attack_type      TEXT,
+                               country_code     TEXT,
+                               country_name     TEXT,
+                               FOREIGN KEY (agent_id) REFERENCES honey_agents (id)
+                           )
+                           ''')
+
+            # Table pour les IP malveillantes classifiées
+            cursor.execute('''
+                           CREATE TABLE IF NOT EXISTS malicious_ips
+                           (
+                               id               INTEGER PRIMARY KEY,
+                               ip_address       TEXT UNIQUE NOT NULL,
+                               first_seen       DATETIME DEFAULT CURRENT_TIMESTAMP,
+                               last_seen        DATETIME DEFAULT CURRENT_TIMESTAMP,
+                               attack_count     INTEGER  DEFAULT 1,
+                               attack_types     TEXT,
+                               services_attacked TEXT,
+                               country_code     TEXT,
+                               country_name     TEXT,
+                               seen_in_agents   TEXT NOT NULL,
+                               reputation_score INTEGER  DEFAULT 0,
+                               classification   TEXT,
+                               notes            TEXT
+                           )
+                           ''')
+
+            # Table pour les payloads et malwares
+            cursor.execute('''
+                           CREATE TABLE IF NOT EXISTS payloads
+                           (
+                               id              INTEGER PRIMARY KEY,
+                               malicious_ip_id INTEGER,
+                               payload_name    TEXT NOT NULL,
+                               payload_hash    TEXT UNIQUE NOT NULL,
+                               payload_content TEXT,
+                               payload_type    TEXT,
+                               malware_family  TEXT,
+                               first_seen      DATETIME DEFAULT CURRENT_TIMESTAMP,
+                               last_seen       DATETIME DEFAULT CURRENT_TIMESTAMP,
+                               detection_count INTEGER  DEFAULT 1,
+                               FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
                            )
                            ''')
 
