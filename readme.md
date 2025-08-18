@@ -1,6 +1,6 @@
 # Threatlab — Plateforme de gestion de honeypots
 
-HoneyOps est une plateforme centralisée pour déployer, superviser et orchestrer des honeypots. Elle collecte les événements d’attaque en temps réel, fournit un tableau de bord pour l’analyse, et s’intègre de manière modulaire avec des systèmes externes d’ingestion et de CTI (ELK/Elastic, OpenCTI, etc.).
+Threatlab est une plateforme centralisée pour déployer, superviser et orchestrer des honeypots. Elle collecte les événements d’attaque en temps réel, fournit un tableau de bord pour l’analyse, et s’intègre de manière modulaire avec des systèmes externes d’ingestion et de CTI (ELK/Elastic, OpenCTI, etc.).
 
 - Supervision des honeypots (état, type, volume d’alertes)
 - Collecte d’alertes et événements d’attaque
@@ -8,7 +8,7 @@ HoneyOps est une plateforme centralisée pour déployer, superviser et orchestre
 - Architecture modulaire pensée pour l’export des données (ELK, OpenCTI…)
 ---
 
-## ✨ Fonctionnalités clés
+## Fonctionnalité
 
 - Gestion des honeypots
   - Vue d’ensemble des instances (nom, type, statut, niveau d’activité)
@@ -101,11 +101,6 @@ Endpoints disponibles pour l’interface et l’écosystème:
   - Retourne la liste des honeypots et leur statut
 - GET /api/alerts
   - Retourne les dernières alertes collectées
-
-Notes:
-- Les endpoints d’authentification et d’A2F protègent l’accès aux zones sensibles de l’application.
-- En environnement de dev, des données simulées peuvent être renvoyées pour l’UI.
-
 ---
 
 ## 🧭 Roadmap
@@ -115,14 +110,6 @@ Notes:
 - Système d’agents/honeypots déployables à la demande
 - Règles de détection, scoring et corrélations
 - Webhooks et intégrations SIEM supplémentaires
-
----
-
-## 🧪 Tests
-
-- Tests unitaires et d’intégration pour l’API et les connecteurs
-- Jeux de données de simulation pour l’UI
-- Tests de charge sur les pipelines d’export (si volumétrie élevée)
 
 ---
 
