@@ -1,12 +1,13 @@
-from flask import Blueprint, jsonify, session, request, current_app
+from flask import Blueprint, jsonify, request, current_app
 import secrets
 import hashlib
 import time
 import uuid
+from module.database.agent import create_agent_token
 
 agent_create_bp = Blueprint('agent_create', __name__, url_prefix='/api')
 
-def generer_cle_api_hybride_uuid_agent(agent_name=""):
+def generer_apikey_agent(agent_name=""):
     prefixe = "agent"
     secret_key = current_app.config.get('SECRET_KEY', '')
 
@@ -21,7 +22,10 @@ def generer_cle_api_hybride_uuid_agent(agent_name=""):
 @agent_create_bp.route("/agent/create", methods=['POST'])
 def agent_create():
     agent_name = request.json.get('agent_name')
-    agent_platform = request.json.get('agent_platform')
-    agent_type = request.json.get('agent_type')
 
-    return jsonify({'api_key': generer_cle_api_hybride_uuid_agent(agent_name)})
+    secret_token = generer_apikey_agent(agent_name)
+
+    if create_agent_token(agent_name, secret_token):
+        return jsonify({'success': True, 'secret_token': secret_token}), 200
+    else:
+        return jsonify({'success': False}), 500
