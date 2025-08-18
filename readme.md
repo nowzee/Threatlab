@@ -94,23 +94,12 @@ Bonnes pratiques:
 
 ---
 
-## 🧩 API (aperçu)
+## Endpoints API
 
-Endpoints disponibles pour l’interface et l’écosystème:
 - GET /api/honeypots
   - Retourne la liste des honeypots et leur statut
 - GET /api/alerts
   - Retourne les dernières alertes collectées
----
-
-## 🧭 Roadmap
-
-- Connecteurs officiels ELK et OpenCTI (stabilisées, avec configuration UI)
-- Normalisation avancée des événements (ECS, STIX 2.1)
-- Système d’agents/honeypots déployables à la demande
-- Règles de détection, scoring et corrélations
-- Webhooks et intégrations SIEM supplémentaires
-
 ---
 
 ## 📬 Support & contact
