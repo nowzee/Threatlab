@@ -71,7 +71,11 @@ def setup_dbs():
                            (
                                id INTEGER PRIMARY KEY,
                                agent_name TEXT UNIQUE NOT NULL,
-                               secret_token TEXT UNIQUE NOT NULL
+                               service_type TEXT NOT NULL,
+                               is_active    INTEGER DEFAULT 0,
+                               created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                               updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                               secret_token_sha256 TEXT UNIQUE NOT NULL
                            )
                            ''')
 
@@ -96,7 +100,7 @@ def setup_dbs():
                            )
                            ''')
 
-            # Table pour les IP malveillantes classifiées
+            # Table pour les IP malveillantes classifie
             cursor.execute('''
                            CREATE TABLE IF NOT EXISTS malicious_ips
                            (
