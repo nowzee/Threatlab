@@ -1,4 +1,3 @@
-import sqlite3
 import hashlib
 from module.database.db_manager import DatabaseManagerUser
 
