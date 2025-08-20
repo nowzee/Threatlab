@@ -71,6 +71,8 @@ def setup_dbs():
                            (
                                id INTEGER PRIMARY KEY,
                                agent_name TEXT UNIQUE NOT NULL,
+                               ip_address TEXT NOT NULL,
+                               country_name TEXT,
                                service_type TEXT NOT NULL,
                                is_active    INTEGER DEFAULT 0,
                                created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
