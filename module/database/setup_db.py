@@ -4,6 +4,7 @@ import string
 import time
 import hashlib
 import secrets
+from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser
 
 
 def generate_custom_snowflake(username: str) -> int:
@@ -52,11 +53,14 @@ def generate_random_string(length=12):
 
 
 def setup_dbs():
-    if not os.path.exists('honeypot.db'):
-        with sqlite3.connect('honeypot.db') as conn:
-            cursor = conn.cursor()
-            cursor.execute('''
-                           CREATE TABLE IF NOT EXISTS users
+
+    if not os.path.exists('db'):
+        os.makedirs('db')
+
+    with DatabaseManagerUser() as db:
+        db.create_db()
+        db.execute('''
+                        CREATE TABLE IF NOT EXISTS users
                            (
                                id INTEGER PRIMARY KEY,
                                username TEXT UNIQUE NOT NULL,
@@ -64,10 +68,21 @@ def setup_dbs():
                                otp_code TEXT UNIQUE,
                                otp_active INTEGER DEFAULT 0
                            )
-                           ''')
+        ''')
 
-            cursor.execute('''
-                           CREATE TABLE IF NOT EXISTS honey_agents
+        raw_password = generate_random_string(16)
+        password = hashlib.sha256(raw_password.encode()).hexdigest()
+
+        User = "Admin"
+
+        db.execute("INSERT INTO users (id, username, password) VALUES (?, ?, ?)",
+                       (generate_custom_snowflake(User), User, password))
+        print(f"Admin user created with password: {raw_password}")
+
+    with DatabaseManagerHoneypot() as db:
+        db.create_db()
+        db.execute('''
+                    CREATE TABLE IF NOT EXISTS honey_agents
                            (
                                id INTEGER PRIMARY KEY,
                                agent_name TEXT UNIQUE NOT NULL,
@@ -79,11 +94,9 @@ def setup_dbs():
                                updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
                                secret_token_sha256 TEXT UNIQUE NOT NULL
                            )
-                           ''')
-
-            # Table pour stocker les logs d'attaques
-            cursor.execute('''
-                           CREATE TABLE IF NOT EXISTS attack_logs
+                   ''')
+        db.execute('''
+                                   CREATE TABLE IF NOT EXISTS attack_logs
                            (
                                id               INTEGER PRIMARY KEY,
                                agent_id         INTEGER,
@@ -101,11 +114,10 @@ def setup_dbs():
                                country_name     TEXT,
                                FOREIGN KEY (agent_id) REFERENCES honey_agents (id)
                            )
-                           ''')
+        ''')
 
-            # Table pour les IP malveillantes classifie
-            cursor.execute('''
-                           CREATE TABLE IF NOT EXISTS malicious_ips
+        db.execute('''
+                    CREATE TABLE IF NOT EXISTS malicious_ips
                            (
                                id               INTEGER PRIMARY KEY,
                                ip_address       TEXT UNIQUE NOT NULL,
@@ -121,11 +133,10 @@ def setup_dbs():
                                classification   TEXT,
                                notes            TEXT
                            )
-                           ''')
+                   ''')
 
-            # Table pour les payloads et malwares
-            cursor.execute('''
-                           CREATE TABLE IF NOT EXISTS payloads
+        db.execute('''
+                    CREATE TABLE IF NOT EXISTS payloads
                            (
                                id              INTEGER PRIMARY KEY,
                                malicious_ip_id INTEGER,
@@ -142,11 +153,10 @@ def setup_dbs():
                                detection_count INTEGER  DEFAULT 1,
                                FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
                            )
-                           ''')
+        ''')
 
-            # Table pour les interactions SMTP mail spécifiques
-            cursor.execute('''
-                           CREATE TABLE IF NOT EXISTS smtp_interactions
+        db.execute('''
+                                   CREATE TABLE IF NOT EXISTS smtp_interactions
                            (
                                id              INTEGER PRIMARY KEY,
                                malicious_server_ip_id INTEGER,
@@ -158,12 +168,10 @@ def setup_dbs():
                                timestamp       DATETIME DEFAULT CURRENT_TIMESTAMP,
                                FOREIGN KEY (malicious_server_ip_id) REFERENCES malicious_ips (id)
                            )
-                           ''')
+        ''')
 
-
-            # Table pour les credentials compromis collectés par service
-            cursor.execute('''
-                           CREATE TABLE IF NOT EXISTS compromised_credentials
+        db.execute('''
+                                   CREATE TABLE IF NOT EXISTS compromised_credentials
                            (
                                id            INTEGER PRIMARY KEY,
                                malicious_ip_id INTEGER,
@@ -175,11 +183,10 @@ def setup_dbs():
                                attempt_count INTEGER  DEFAULT 1,
                                FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
                            )
-                           ''')
+        ''')
 
-            # Table de tout les mots de passe collecte et les plus teste
-            cursor.execute('''
-            CREATE TABLE IF NOT EXISTS password_attempted
+        db.execute('''
+                    CREATE TABLE IF NOT EXISTS password_attempted
             (
                 id INTEGER PRIMARY KEY,
                 password TEXT NOT NULL,
@@ -187,10 +194,9 @@ def setup_dbs():
                 first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
                 last_seen  DATETIME DEFAULT CURRENT_TIMESTAMP
             )
-            ''')
+        ''')
 
-            # Table pour les username les plus vues
-            cursor.execute('''
+        db.execute('''
             CREATE TABLE IF NOT EXISTS username_viewed
             (
                 id INTEGER PRIMARY KEY,
@@ -199,14 +205,4 @@ def setup_dbs():
                 first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
                 last_seen  DATETIME DEFAULT CURRENT_TIMESTAMP
             )
-            ''')
-
-
-            raw_password = generate_random_string(16)
-            password = hashlib.sha256(raw_password.encode()).hexdigest()
-
-            User = "Admin"
-
-            cursor.execute("INSERT INTO users (id, username, password) VALUES (?, ?, ?)",
-                           (generate_custom_snowflake(User), User, password))
-            print(f"Admin user created with password: {raw_password}")
+        ''')

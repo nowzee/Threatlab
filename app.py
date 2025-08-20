@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, jsonify, send_from_directory
+from flask import Flask, render_template, request, session, jsonify, send_from_directory
 import os
 from route.auth.login import auth_bp
 from route.config.security import config_account_bp

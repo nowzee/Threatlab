@@ -1,0 +1,222 @@
+import sqlite3
+import os
+
+honeypot_db = 'db/honeypot.db'
+users_db = 'db/user.db'
+
+class DatabaseManagerHoneypot:
+    def __init__(self):
+        self.conn = sqlite3.connect(honeypot_db)
+        self.cursor = self.conn.cursor()
+
+    def __enter__(self):
+        return self
+
+    def create_db(self):
+        if not os.path.exists(honeypot_db):
+            self.cursor.execute('''
+                                CREATE TABLE IF NOT EXISTS honey_agents
+                                (
+                                    id                  INTEGER PRIMARY KEY,
+                                    agent_name          TEXT UNIQUE NOT NULL,
+                                    ip_address          TEXT        NOT NULL,
+                                    country_name        TEXT,
+                                    service_type        TEXT        NOT NULL,
+                                    is_active           INTEGER  DEFAULT 0,
+                                    created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    secret_token_sha256 TEXT UNIQUE NOT NULL
+                                )
+                                ''')
+
+            # Table pour stocker les logs d'attaques
+            self.cursor.execute('''
+                                CREATE TABLE IF NOT EXISTS attack_logs
+                                (
+                                    id               INTEGER PRIMARY KEY,
+                                    agent_id         INTEGER,
+                                    source_ip        TEXT NOT NULL,
+                                    source_port      INTEGER,
+                                    target_port      INTEGER,
+                                    service_type     TEXT NOT NULL,
+                                    command          TEXT,
+                                    username_attempt TEXT,
+                                    password_attempt TEXT,
+                                    payload          TEXT,
+                                    malware_hash     TEXT,
+                                    attack_type      TEXT,
+                                    country_code     TEXT,
+                                    country_name     TEXT,
+                                    FOREIGN KEY (agent_id) REFERENCES honey_agents (id)
+                                )
+                                ''')
+
+            # Table pour les IP malveillantes classifie
+            self.cursor.execute('''
+                                CREATE TABLE IF NOT EXISTS malicious_ips
+                                (
+                                    id                INTEGER PRIMARY KEY,
+                                    ip_address        TEXT UNIQUE NOT NULL,
+                                    first_seen        DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    last_seen         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    attack_count      INTEGER  DEFAULT 1,
+                                    attack_types      TEXT,
+                                    services_attacked TEXT,
+                                    country_code      TEXT,
+                                    country_name      TEXT,
+                                    seen_in_agents    TEXT        NOT NULL,
+                                    reputation_score  INTEGER  DEFAULT 0,
+                                    classification    TEXT,
+                                    notes             TEXT
+                                )
+                                ''')
+
+            # Table pour les payloads et malwares
+            self.cursor.execute('''
+                                CREATE TABLE IF NOT EXISTS payloads
+                                (
+                                    id              INTEGER PRIMARY KEY,
+                                    malicious_ip_id INTEGER,
+                                    service_type    TEXT        NOT NULL,
+                                    payload_name    TEXT        NOT NULL,
+                                    payload_hash    TEXT UNIQUE NOT NULL,
+                                    file_extension  TEXT,
+                                    file_size       INTEGER,
+                                    payload_content TEXT,
+                                    payload_type    TEXT,
+                                    malware_family  TEXT,
+                                    first_seen      DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    last_seen       DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    detection_count INTEGER  DEFAULT 1,
+                                    FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
+                                )
+                                ''')
+
+            # Table pour les interactions SMTP mail spécifiques
+            self.cursor.execute('''
+                                CREATE TABLE IF NOT EXISTS smtp_interactions
+                                (
+                                    id                     INTEGER PRIMARY KEY,
+                                    malicious_server_ip_id INTEGER,
+                                    sender_email           TEXT,
+                                    recipient_email        TEXT,
+                                    subject                TEXT,
+                                    message_content        TEXT,
+                                    attachments            TEXT, -- JSON array des pièces jointes
+                                    timestamp              DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    FOREIGN KEY (malicious_server_ip_id) REFERENCES malicious_ips (id)
+                                )
+                                ''')
+
+            # Table pour les credentials compromis collectés par service
+            self.cursor.execute('''
+                                CREATE TABLE IF NOT EXISTS compromised_credentials
+                                (
+                                    id              INTEGER PRIMARY KEY,
+                                    malicious_ip_id INTEGER,
+                                    service_type    TEXT NOT NULL, -- 'smtp', 'ftp', 'iot', 'ssh', etc.
+                                    username        TEXT NOT NULL,
+                                    password        TEXT NOT NULL,
+                                    first_seen      DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    last_seen       DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    attempt_count   INTEGER  DEFAULT 1,
+                                    FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
+                                )
+                                ''')
+
+            # Table de tout les mots de passe collecte et les plus teste
+            self.cursor.execute('''
+                                CREATE TABLE IF NOT EXISTS password_attempted
+                                (
+                                    id         INTEGER PRIMARY KEY,
+                                    password   TEXT NOT NULL,
+                                    count      INTEGER  DEFAULT 1,
+                                    first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    last_seen  DATETIME DEFAULT CURRENT_TIMESTAMP
+                                )
+                                ''')
+
+            # Table pour les username les plus vues
+            self.cursor.execute('''
+                                CREATE TABLE IF NOT EXISTS username_viewed
+                                (
+                                    id         INTEGER PRIMARY KEY,
+                                    username   TEXT NOT NULL,
+                                    count      INTEGER  DEFAULT 1,
+                                    first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    last_seen  DATETIME DEFAULT CURRENT_TIMESTAMP
+                                )
+                                ''')
+
+    def execute(self, query, params=None):
+        if params is not None:
+            self.cursor.execute(query, params)
+        else:
+            self.cursor.execute(query)
+
+    def fetchall(self):
+        return self.cursor.fetchall()
+    def fetchone(self):
+        return self.cursor.fetchone()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Sortie du context manager - TOUJOURS appelée"""
+        try:
+            if exc_type is None:
+                # Pas d'erreur : on commit les changements
+                self.conn.commit()
+            else:
+                # Il y a eu une erreur : on rollback
+                print(f"erreur cote db honeypote : {exc_type.__name__}: {exc_val}")
+                self.conn.rollback()
+        finally:
+            # Dans tous les cas : on ferme la connexion
+            self.conn.close()
+
+class DatabaseManagerUser:
+    def __init__(self):
+        self.conn = sqlite3.connect(users_db)
+        self.cursor = self.conn.cursor()
+
+    def __enter__(self):
+        return self
+
+
+    def create_db(self):
+        if not os.path.exists(users_db):
+            self.cursor.execute('''
+                           CREATE TABLE IF NOT EXISTS users
+                           (
+                               id INTEGER PRIMARY KEY,
+                               username TEXT UNIQUE NOT NULL,
+                               password TEXT NOT NULL,
+                               otp_code TEXT UNIQUE,
+                               otp_active INTEGER DEFAULT 0
+                           )
+                           ''')
+
+    def execute(self, query, params=None):
+        if params is not None:
+            self.cursor.execute(query, params)
+        else:
+            self.cursor.execute(query)
+
+
+    def fetchall(self):
+        return self.cursor.fetchall()
+
+    def fetchone(self):
+        return self.cursor.fetchone()
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        try:
+            if exc_type is None:
+                # Pas d'erreur : on commit les changements
+                self.conn.commit()
+            else:
+                # Il y a eu une erreur : on rollback
+                print(f"erreur cote db cliente : {exc_type.__name__}: {exc_val}")
+                self.conn.rollback()
+        finally:
+            # Dans tous les cas : on ferme la connexion
+            self.conn.close()
