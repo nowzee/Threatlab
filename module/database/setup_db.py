@@ -89,6 +89,7 @@ def setup_dbs():
                                source_port      INTEGER,
                                target_port      INTEGER,
                                service_type     TEXT NOT NULL,
+                               command          TEXT,
                                username_attempt TEXT,
                                password_attempt TEXT,
                                payload          TEXT,
@@ -126,8 +127,11 @@ def setup_dbs():
                            (
                                id              INTEGER PRIMARY KEY,
                                malicious_ip_id INTEGER,
+                               service_type    TEXT NOT NULL,
                                payload_name    TEXT NOT NULL,
                                payload_hash    TEXT UNIQUE NOT NULL,
+                               file_extension  TEXT,
+                               file_size       INTEGER,
                                payload_content TEXT,
                                payload_type    TEXT,
                                malware_family  TEXT,
@@ -137,6 +141,64 @@ def setup_dbs():
                                FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
                            )
                            ''')
+
+            # Table pour les interactions SMTP mail spécifiques
+            cursor.execute('''
+                           CREATE TABLE IF NOT EXISTS smtp_interactions
+                           (
+                               id              INTEGER PRIMARY KEY,
+                               malicious_server_ip_id INTEGER,
+                               sender_email    TEXT,
+                               recipient_email TEXT,
+                               subject         TEXT,
+                               message_content TEXT,
+                               attachments     TEXT, -- JSON array des pièces jointes
+                               timestamp       DATETIME DEFAULT CURRENT_TIMESTAMP,
+                               FOREIGN KEY (malicious_server_ip_id) REFERENCES malicious_ips (id)
+                           )
+                           ''')
+
+
+            # Table pour les credentials compromis collectés par service
+            cursor.execute('''
+                           CREATE TABLE IF NOT EXISTS compromised_credentials
+                           (
+                               id            INTEGER PRIMARY KEY,
+                               malicious_ip_id INTEGER,
+                               service_type  TEXT NOT NULL, -- 'smtp', 'ftp', 'iot', 'ssh', etc.
+                               username      TEXT NOT NULL,
+                               password      TEXT NOT NULL,
+                               first_seen    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                               last_seen     DATETIME DEFAULT CURRENT_TIMESTAMP,
+                               attempt_count INTEGER  DEFAULT 1,
+                               FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
+                           )
+                           ''')
+
+            # Table de tout les mots de passe collecte et les plus teste
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS password_attempted
+            (
+                id INTEGER PRIMARY KEY,
+                password TEXT NOT NULL,
+                count INTEGER DEFAULT 1,
+                first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_seen  DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
+
+            # Table pour les username les plus vues
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS username_viewed
+            (
+                id INTEGER PRIMARY KEY,
+                username TEXT NOT NULL,
+                count INTEGER DEFAULT 1,
+                first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+                last_seen  DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
+
 
             raw_password = generate_random_string(16)
             password = hashlib.sha256(raw_password.encode()).hexdigest()
