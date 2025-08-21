@@ -3,7 +3,7 @@ import os
 from route.auth.login import auth_bp
 from route.config.security import config_account_bp
 from route.agent.api_agent import agent_create_bp
-from module.database.setup_db import setup_dbs
+from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser
 import secrets
 app = Flask(__name__, static_folder='./frontend/dist', static_url_path='')
 app.config['SECRET_KEY'] = secrets.token_hex(4096)
@@ -74,5 +74,15 @@ def server_error(e):
 
 if __name__ == '__main__':
     # Initialisation de la base de données
-    setup_dbs()
+    if not os.path.exists('db'):
+        os.makedirs('db')
+
+        with DatabaseManagerUser() as db:
+            db.create_db()
+
+        with DatabaseManagerHoneypot() as db:
+            db.create_db()
+
+
+
     app.run(host='0.0.0.0', port=5000, debug=False)

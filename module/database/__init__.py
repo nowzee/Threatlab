@@ -1,1 +1,1 @@
-from .setup_db import setup_dbs
+from .db_manager import DatabaseManagerHoneypot, DatabaseManagerUser
