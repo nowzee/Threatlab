@@ -3,7 +3,6 @@ import time
 import string
 import secrets
 import hashlib
-import os
 
 honeypot_db = 'db/honeypot.db'
 users_db = 'db/user.db'
