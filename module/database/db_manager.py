@@ -108,7 +108,6 @@ class DatabaseManagerHoneypot:
                                     first_seen        DATETIME DEFAULT CURRENT_TIMESTAMP,
                                     last_seen         DATETIME DEFAULT CURRENT_TIMESTAMP,
                                     attack_count      INTEGER  DEFAULT 1,
-                                    attack_types      TEXT,
                                     services_attacked TEXT,
                                     country_code      TEXT,
                                     country_name      TEXT,

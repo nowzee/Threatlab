@@ -34,6 +34,9 @@ def agent_create():
 def agent_report():
     data = request.json
 
+    source_ip = data.get('source_ip')
+    agent_id = data.get('agent_id')
+
     attack_data = {
         'agent_id': data.get('id'), # Obligatoire
         'source_ip': data.get('source_ip'), # Obligatoire
@@ -44,7 +47,24 @@ def agent_report():
         'password_attempt': data.get('password_attempt'),  # Peut être None
         'payload': data.get('payload'),  # Peut être None
         'malware_hash': data.get('malware_hash'),  # Peut être None
-        'attack_type': data.get('attack_type'),  # Peut être None
+        'classification': data.get('classification'),  # Peut être None
         'country_code': data.get('country_code'),  # Peut être None
         'country_name': data.get('country_name')  # Peut être None
     }
+    if data.get('service_type') == 'ssh':
+        malicious_server_ip_id = data.get('source_ip')
+        username_attempt = data.get('username_attempt')
+        password_attempt = data.get('password_attempt')
+        timestamp = data.get('timestamp')
+
+    elif data.get('service_type') == 'smtp':
+        malicious_server_ip_id = data.get('source_ip')
+        sender_email = data.get('sender_email')
+        recipient_email = data.get('recipient_email')
+        subject = data.get('subject')
+        message_content = data.get('message_content')
+        attachment = data.get('attachment')
+        timestamp = data.get('timestamp')
+
+
+    return jsonify({'success': True})
