@@ -5,6 +5,7 @@ from route.config.security import config_account_bp
 from route.agent.api_agent import agent_create_bp
 from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser
 import secrets
+
 app = Flask(__name__, static_folder='./frontend/dist', static_url_path='')
 app.config['SECRET_KEY'] = secrets.token_hex(4096)
 app.config['DATABASE'] = os.path.join(app.root_path, 'honeypot.db')
