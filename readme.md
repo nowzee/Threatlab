@@ -1,5 +1,5 @@
 # Threatlab — Plateforme de gestion de honeypots
-![Uploading Leonardo_Lightning_XL_genere_moi_une_image_style_cyberpunk_str_2.jpg…]()
+![Leonardo_Lightning_XL_genere_moi_une_image_style_cyberpunk_str_2](https://github.com/user-attachments/assets/4721f90b-7ea8-486c-a294-47e80a87ac41)
 
 Threatlab est une plateforme centralisée pour déployer, superviser et orchestrer des honeypots. Elle collecte les événements d’attaque en temps réel, fournit un tableau de bord pour l’analyse, et s’intègre de manière modulaire avec des systèmes externes d’ingestion et de CTI (ELK/Elastic, OpenCTI, etc.).
 
