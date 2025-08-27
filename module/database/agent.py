@@ -1,3 +1,4 @@
+from module.database.db_manager import DatabaseManagerHoneypot
 import sqlite3
 
 def create_agent_token(agent_name, secret_token):
@@ -9,3 +10,10 @@ def create_agent_token(agent_name, secret_token):
                            (agent_name, secret_token))
             return True
     finally:return False
+
+def add_malicious_ip_address(agent_id, ip_address, service_type, country_name=None, country_code=None, classification=None):
+    return True
+
+def add_compromised_credential(agent_id, username, password, service_type):
+
+    return True

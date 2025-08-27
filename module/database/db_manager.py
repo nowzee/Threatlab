@@ -8,7 +8,6 @@ honeypot_db = 'db/honeypot.db'
 users_db = 'db/user.db'
 
 
-
 def generate_custom_snowflake(username: str) -> int:
     # Paramètres fixes pour éviter des IDs trop grands
     SEQUENCE_BITS = 12
@@ -47,7 +46,6 @@ def generate_custom_snowflake(username: str) -> int:
     print(f"Snowflake ID generated for {username}: {snowflake}")
 
     return snowflake
-
 
 def generate_random_string(length=12):
     chars = string.ascii_letters + string.digits

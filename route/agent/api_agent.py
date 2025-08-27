@@ -3,7 +3,7 @@ import secrets
 import hashlib
 import time
 import uuid
-from module.database.agent import create_agent_token
+from module.database.agent import create_agent_token, add_malicious_ip_address
 
 agent_create_bp = Blueprint('agent_create', __name__, url_prefix='/api')
 
@@ -36,6 +36,8 @@ def agent_report():
 
     source_ip = data.get('source_ip')
     agent_id = data.get('agent_id')
+    service_type = data.get('service_type')
+    country_name = data.get('country_name')
 
     attack_data = {
         'agent_id': data.get('id'), # Obligatoire
@@ -51,14 +53,16 @@ def agent_report():
         'country_code': data.get('country_code'),  # Peut être None
         'country_name': data.get('country_name')  # Peut être None
     }
-    if data.get('service_type') == 'ssh':
-        malicious_server_ip_id = data.get('source_ip')
+
+
+    if service_type == 'ssh':
         username_attempt = data.get('username_attempt')
         password_attempt = data.get('password_attempt')
         timestamp = data.get('timestamp')
 
-    elif data.get('service_type') == 'smtp':
-        malicious_server_ip_id = data.get('source_ip')
+        add_malicious_ip_address(agent_id, source_ip, service_type, country_name, data.get('country_code'), data.get('classification'))
+
+    elif service_type == 'smtp':
         sender_email = data.get('sender_email')
         recipient_email = data.get('recipient_email')
         subject = data.get('subject')
