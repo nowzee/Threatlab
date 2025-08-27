@@ -3,7 +3,7 @@ import secrets
 import hashlib
 import time
 import uuid
-from module.database.agent import create_agent_token, add_malicious_ip_address
+from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential
 
 agent_create_bp = Blueprint('agent_create', __name__, url_prefix='/api')
 
@@ -58,9 +58,10 @@ def agent_report():
     if service_type == 'ssh':
         username_attempt = data.get('username_attempt')
         password_attempt = data.get('password_attempt')
-        timestamp = data.get('timestamp')
+        # timestamp = data.get('timestamp')
 
         add_malicious_ip_address(agent_id, source_ip, service_type, country_name, data.get('country_code'), data.get('classification'))
+        add_compromised_credential(agent_id, username_attempt, password_attempt, service_type)
 
     elif service_type == 'smtp':
         sender_email = data.get('sender_email')
