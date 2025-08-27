@@ -241,6 +241,17 @@ class DatabaseManagerUser:
                            )
                         ''')
 
+        self.cursor.execute('''
+                        CREATE TABLE IF NOT EXISTS api_keys
+                            (
+                                id INTEGER PRIMARY KEY,
+                                name TEXT UNIQUE NOT NULL,
+                                key TEXT UNIQUE NOT NULL,
+                                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+                            )
+        ''')
+
         User = "Admin"
         # Check if admin user already exists
         self.cursor.execute("SELECT id FROM users WHERE username = ?", (User,))
