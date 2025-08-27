@@ -13,3 +13,7 @@ def delete_api_key():
 @config_api_key_bp.route("/list", methods=['GET'])
 def list_api_key():
     return jsonify({'success': True}), 200
+
+@config_api_key_bp.route("/update", methods=['POST'])
+def update_api_key():
+    return jsonify({'success': True}), 200
