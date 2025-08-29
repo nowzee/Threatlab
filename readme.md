@@ -4,9 +4,8 @@
 Threatlab est une plateforme centralisée pour déployer, superviser et orchestrer des honeypots. Elle collecte les événements d’attaque en temps réel, fournit un tableau de bord pour l’analyse, et s’intègre de manière modulaire avec des systèmes externes d’ingestion et de CTI (ELK/Elastic, OpenCTI, etc.).
 
 - Supervision des honeypots (état, type, volume d’alertes)
-- Collecte d’alertes et événements d’attaque
-- Authentification avec session et second facteur (A2F) côté application
-- Architecture modulaire pensée pour l’export des données (ELK, OpenCTI…)
+- Collecte d’alertes et événements d’attaque et samples
+- Architecture modulaire pensée pour l’export des données (ELK, OpenCTI)
 ---
 
 ## Fonctionnalité
