@@ -29,7 +29,7 @@ Threatlab est une plateforme centralisée pour déployer, superviser et orchestr
 
 ---
 
-## 🚀 Démarrage rapide (développement)
+## Installation
 
 Prérequis:
 - Python 3.10+
@@ -56,9 +56,6 @@ Exemple de commandes (adaptées à votre environnement):
 - Backend:
   - cd ..
   - python app.py
-
-Astuce: En développement, vous pouvez lancer le frontend en mode dev (hot reload) et configurer un proxy vers l’API Flask si nécessaire.
-
 ---
 
 ## ⚙️ Configuration
@@ -94,23 +91,10 @@ Bonnes pratiques:
 
 ---
 
-## Endpoints API
-
-- GET /api/honeypots
-  - Retourne la liste des honeypots et leur statut
-- GET /api/alerts
-  - Retourne les dernières alertes collectées
----
-
-## 📬 Support & contact
-
-- Ouvrez une issue pour les bugs et demandes de fonctionnalités
----
-
 ## 📝 Licence
 
 Ce projet est sous licence [MIT](LICENSE).
 
 ## Me
 
-Développé avec ❤️ by Insomnia
+Dev with ❤️ by Insomnia
