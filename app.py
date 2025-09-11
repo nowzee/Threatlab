@@ -18,7 +18,7 @@ app.register_blueprint(config_account_bp)
 @app.before_request
 def before_request():
     # Liste des endpoints accessibles sans authentification
-    public_endpoints = ["static", "auth.login", 'serve_static_or_index', 'auth.session_state', 'serve_vue_app']
+    public_endpoints = ["static", "auth.login", 'serve_static_or_index', 'auth.session_state', 'serve_vue_app', 'agent_create.agent_report', 'agent_create.agent_create']
     a2f_endpoints = ['auth.a2f', 'static', 'serve_static_or_index', 'serve_vue_app']
 
     print(request.endpoint)
@@ -86,4 +86,4 @@ if __name__ == '__main__':
 
 
 
-    app.run(host='localhost', port=5000, debug=False)
+    app.run(host='localhost', port=6000, debug=False)

@@ -97,7 +97,7 @@ class DatabaseManagerHoneypot:
                                 )
                                 ''')
 
-            # Table pour les IP malveillantes classifie
+            # Table pour les IP malveillantes classifie (normalized)
             self.cursor.execute('''
                                 CREATE TABLE IF NOT EXISTS malicious_ips
                                 (
@@ -105,14 +105,43 @@ class DatabaseManagerHoneypot:
                                     ip_address        TEXT UNIQUE NOT NULL,
                                     first_seen        DATETIME DEFAULT CURRENT_TIMESTAMP,
                                     last_seen         DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    attack_count      INTEGER  DEFAULT 1,
-                                    services_attacked TEXT,
+                                    total_attack_count INTEGER  DEFAULT 1,
                                     country_code      TEXT,
                                     country_name      TEXT,
-                                    seen_in_agents    TEXT        NOT NULL,
                                     reputation_score  INTEGER  DEFAULT 0,
                                     classification    TEXT,
                                     notes             TEXT
+                                )
+                                ''')
+
+            # Table pour les relations IP-Agent (qui a vu quelle IP)
+            self.cursor.execute('''
+                                CREATE TABLE IF NOT EXISTS ip_agent_relations
+                                (
+                                    id           INTEGER PRIMARY KEY,
+                                    ip_id        INTEGER NOT NULL,
+                                    agent_id     INTEGER NOT NULL,
+                                    first_seen   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    last_seen    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    report_count INTEGER  DEFAULT 1,
+                                    FOREIGN KEY (ip_id) REFERENCES malicious_ips (id),
+                                    FOREIGN KEY (agent_id) REFERENCES honey_agents (id),
+                                    UNIQUE(ip_id, agent_id)
+                                )
+                                ''')
+
+            # Table pour les attaques par service (IP-Service avec compteurs)
+            self.cursor.execute('''
+                                CREATE TABLE IF NOT EXISTS ip_service_attacks
+                                (
+                                    id           INTEGER PRIMARY KEY,
+                                    ip_id        INTEGER NOT NULL,
+                                    service_type TEXT    NOT NULL,
+                                    attack_count INTEGER  DEFAULT 1,
+                                    first_seen   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    last_seen    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    FOREIGN KEY (ip_id) REFERENCES malicious_ips (id),
+                                    UNIQUE(ip_id, service_type)
                                 )
                                 ''')
 
