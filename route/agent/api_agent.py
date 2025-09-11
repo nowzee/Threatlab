@@ -61,7 +61,7 @@ def agent_report():
         # timestamp = data.get('timestamp')
 
         add_malicious_ip_address(agent_id, source_ip, service_type, country_name, data.get('country_code'), data.get('classification'))
-        add_compromised_credential(agent_id, username_attempt, password_attempt, service_type)
+        add_compromised_credential(source_ip, username_attempt, password_attempt, service_type)
 
     elif service_type == 'smtp':
         sender_email = data.get('sender_email')

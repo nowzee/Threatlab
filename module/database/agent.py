@@ -14,6 +14,10 @@ def create_agent_token(agent_name, secret_token):
 def add_malicious_ip_address(agent_id, ip_address, service_type, country_name=None, country_code=None, classification=None):
     return True
 
-def add_compromised_credential(agent_id, username, password, service_type):
-    print("test")
+def add_compromised_credential(malicious_ip, username, password, service_type):
+    with DatabaseManagerHoneypot() as db:
+        db.execute("SELECT id FROM honey_agents WHERE ip_address = ? ", (malicious_ip,))
+        ip_id = db.fetchone()[0]
+
+        print(ip_id)
     return True
