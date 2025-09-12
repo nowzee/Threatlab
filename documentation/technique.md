@@ -261,43 +261,9 @@ Commandes (exemples à adapter):
 
 ## 18. Stockage et données
 
-- Base de données: à préciser (ex: Postgres, MySQL, SQLite)
-- Migrations: outil recommandé (Alembic) si SQL
+- Base de données: à préciser (MySQL, SQLite)
 - Connexions: pool, timeouts, retries
 - Sauvegardes: stratégie et rétention
-
-## 19. Performance
-
-- Frontend:
-  - Code splitting, lazy loading, prefetching
-  - Optimisation images (Pillow côté backend si traitement)
-- Backend:
-  - Caching (ETag/Cache-Control côté HTTP, cache applicatif si nécessaire)
-  - Timeouts et limites de taille requêtes
-
-## 20. Check-list avant livraison
-
-- [ ] Tests verts et couverture suffisante
-- [ ] Lint/Type-check sans erreurs
-- [ ] Build prod vérifié (frontend/ backend)
-- [ ] Variables d’environnement définies
-- [ ] Endpoint health vérifié
-- [ ] Logs au bon niveau
-- [ ] Scans de vulnérabilités passés
-
-## 21. Annexes
-
-Exemple de .env.example (adapter aux besoins):
-
-- Backend:
-  - FLASK_ENV=production
-  - FLASK_DEBUG=0
-  - APP_HOST=0.0.0.0
-  - APP_PORT=5000
-  - SECRET_KEY=change-me
-  - API_BASE_PATH=/api
-  - EXTERNAL_API_BASE_URL=
-  - LOG_LEVEL=INFO
 
 - Frontend:
   - VITE_API_BASE_URL=http://localhost:5000/api
