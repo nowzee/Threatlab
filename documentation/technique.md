@@ -302,8 +302,3 @@ Exemple de .env.example (adapter aux besoins):
 - Frontend:
   - VITE_API_BASE_URL=http://localhost:5000/api
   - VITE_APP_ENV=development
-
-Contact/ownership:
-- Tech lead: à renseigner
-- Mainteneurs: à renseigner
-- Incidents: canal et SLO/SLA à renseigner
