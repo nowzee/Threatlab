@@ -287,6 +287,103 @@ Remarques sur l’authentification et l’A2F:
 
 
 ---
+
+@startuml
+left to right direction
+skinparam packageStyle rectangle
+skinparam usecase {
+  BackgroundColor<<Primary>> #E3F2FD
+  BorderColor<<Primary>> #1565C0
+}
+
+actor "Administrateur" as Admin
+actor "MOA/MOE\n(stakeholders)" as MOx
+actor "Agent Honeypot" as Agent
+actor "Services d'enrichissement\n(AbuseIPDB, Shodan...)" as Enrich
+actor "Systèmes externes\n(ELK, OpenCTI)" as ExtSys
+
+rectangle "Plateforme de Gestion Honeypots" {
+  (Se connecter [Login]) <<Primary>> as UC_Login
+  (2FA / OTP) as UC_2FA
+  (Configurer les honeypots\n(ports, services, alertes, logs)) <<Primary>> as UC_Config
+  (Visualiser attaques en temps réel\n(streaming)) <<Primary>> as UC_Stream
+  (Consulter historiques\npar IP, service, date) <<Primary>> as UC_History
+  (Classifier les IP\n(bruteforce, CVE, scan...)) as UC_Classify
+  (Visualiser IP par pays\n& pays les plus actifs) as UC_Geo
+  (Extraction credentials\nutilisés par les attaquants) as UC_Creds
+  (Générer rapports PDF/CSV) as UC_Report
+  (Créer alertes automatiques) as UC_Alerts
+  (Consommer/Exposer API REST\n(alerting personnalisé)) as UC_API
+  (Chiffrement TLS & stockage chiffré) as UC_SecTLS
+  (Protection XSS/CSRF/SQLi) as UC_SecApp
+}
+
+' Relations utilisateur
+Admin --> UC_Login
+Admin --> UC_2FA
+Admin --> UC_Config
+Admin --> UC_Stream
+Admin --> UC_History
+Admin --> UC_Classify
+Admin --> UC_Geo
+Admin --> UC_Creds
+Admin --> UC_Report
+Admin --> UC_Alerts
+Admin --> UC_API
+
+' Relations système externes
+ExtSys --> UC_API
+Enrich --> UC_Classify
+
+' Agents déclenchent ingestion/flux
+Agent --> UC_Stream
+Agent --> UC_History
+Agent --> UC_Classify
+Agent --> UC_Creds
+
+' Exigences techniques/sécurité comme contraintes globales
+UC_SecTLS .u. UC_Login
+UC_SecApp .u. UC_API
+
+' Stakeholders MOA/MOE (exigences, validation)
+MOx ..> UC_Report : valide livrables
+MOx ..> UC_Geo : exigences de visualisation
+MOx ..> UC_Alerts : règles d’alerting
+
+note right of UC_Stream
+EF 05: streaming en temps réel
+ET 02: HTTPS uniquement
+ES 03: TLS en transit
+end note
+
+note bottom of UC_Config
+EF 03: configuration des honeypots
+ET 01: déploiement multiplateforme
+end note
+
+note right of UC_Classify
+EF 12: classification automatique
+EF 14: enrichissement externe (I)
+end note
+
+note right of UC_Report
+EF 06: rapports PDF/CSV
+end note
+
+note right of UC_Geo
+EF 09 & EF 10: IP par pays & top pays
+end note
+
+note right of UC_Creds
+EF 11: extraction identifiants
+end note
+
+note left of UC_API
+EF 15: API REST pour accès données
+end note
+
+@enduml
+
 ## 📝 Licence
 
 Ce projet est sous licence [MIT](LICENSE).
