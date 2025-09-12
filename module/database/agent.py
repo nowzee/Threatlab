@@ -1,5 +1,4 @@
 from module.database.db_manager import DatabaseManagerHoneypot
-import sqlite3
 
 def create_agent_token(agent_name, secret_token):
     try:
