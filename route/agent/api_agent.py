@@ -67,7 +67,7 @@ def agent_report():
                                       data.get('country_code'), data.get('classification')):
             return jsonify({'success': False, 'error': 'Failed to add malicious IP'}), 500
 
-        # Insert attack log for all service types
+        # Insert attack log for all
         if not add_attack_log(attack_data):
             return jsonify({'success': False, 'error': 'Failed to add attack log'}), 500
 
@@ -85,7 +85,7 @@ def agent_report():
             recipient_email = data.get('recipient_email')
             subject = data.get('subject')
             message_content = data.get('message_content')
-            attachments = data.get('attachments')  # Changed from 'attachment' to 'attachments' for consistency
+            attachments = data.get('attachments')
             
             # Store SMTP-specific interaction data
             if not add_smtp_interaction(source_ip, sender_email, recipient_email, 
