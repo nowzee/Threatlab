@@ -286,19 +286,6 @@ Remarques sur l’authentification et l’A2F:
   - Design permettant d’ajouter facilement HMAC/token par agent, filtrage IP, rate limiting.
 
 ---
-
-## 9) Configuration et exécution
-
-- Variables importantes:
-  - SECRET_KEY: clé de session côté serveur.
-  - DATABASE: chemin du fichier de base (stocké sous l’arborescence de l’app).
-- Initialisation:
-  - Au premier lancement, création du dossier db et des schémas via les gestionnaires.
-- Lancement:
-  - Backend Flask en mode non debug pour production.
-  - Frontend buildé puis servi via le dossier dist.
-
----
 ## 📝 Licence
 
 Ce projet est sous licence [MIT](LICENSE).
