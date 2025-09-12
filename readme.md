@@ -288,53 +288,56 @@ Remarques sur l’authentification et l’A2F:
 
 ---
 
-usecaseDiagram
-title Plateforme de Gestion Honeypots - Cas d'utilisation (centré Administrateur)
+flowchart LR
+  %% Acteurs
+  Admin([Administrateur])
+  Agent([Agent Honeypot])
+  Enrich[[Services d'enrichissement\n(AbuseIPDB, Shodan...)]]
+  ExtSys[[Systèmes externes\n(ELK, OpenCTI)]]
 
-actor "Administrateur" as Admin
-actor "MOA/MOE\n(stakeholders)" as MOx
-actor "Agent Honeypot" as Agent
-actor "Services d'enrichissement\n(AbuseIPDB, Shodan...)" as Enrich
-actor "Systèmes externes\n(ELK, OpenCTI)" as ExtSys
+  %% Système (regroupement visuel)
+  subgraph Plateforme["Plateforme de Gestion Honeypots"]
+    UC_Login([Se connecter (Login)])
+    UC_2FA([2FA / OTP])
+    UC_Config([Configurer les honeypots\n(ports, services, alertes, logs)])
+    UC_Stream([Visualiser attaques en temps réel\n(streaming)])
+    UC_History([Consulter historiques\npar IP, service, date])
+    UC_Classify([Classifier les IP\n(bruteforce, CVE, scan...)])
+    UC_Geo([Visualiser IP par pays\n& pays les plus actifs])
+    UC_Creds([Extraction credentials\nutilisés par les attaquants])
+    UC_Report([Générer rapports PDF/CSV])
+    UC_Alerts([Créer alertes automatiques])
+    UC_API([API REST d'accès aux données])
+    UC_SecTLS([Chiffrement TLS & stockage chiffré])
+    UC_SecApp([Protection XSS / CSRF / SQLi])
+  end
 
-rectangle "Plateforme de Gestion Honeypots" {
-  (Se connecter [Login]) as UC_Login
-  (2FA / OTP) as UC_2FA
-  (Configurer les honeypots\n(ports, services, alertes, logs)) as UC_Config
-  (Visualiser attaques en temps réel\n(streaming)) as UC_Stream
-  (Consulter historiques\npar IP, service, date) as UC_History
-  (Classifier les IP\n(bruteforce, CVE, scan...)) as UC_Classify
-  (Visualiser IP par pays\n& pays les plus actifs) as UC_Geo
-  (Extraction credentials\nutilisés par les attaquants) as UC_Creds
-  (Générer rapports PDF/CSV) as UC_Report
-  (Créer alertes automatiques) as UC_Alerts
-  (API REST d’accès aux données) as UC_API
-  (Chiffrement TLS & stockage chiffré) as UC_SecTLS
-  (Protection XSS/CSRF/SQLi) as UC_SecApp
-}
+  %% Liaisons acteur -> UC
+  Admin --> UC_Login
+  Admin --> UC_2FA
+  Admin --> UC_Config
+  Admin --> UC_Stream
+  Admin --> UC_History
+  Admin --> UC_Classify
+  Admin --> UC_Geo
+  Admin --> UC_Creds
+  Admin --> UC_Report
+  Admin --> UC_Alerts
+  Admin --> UC_API
 
-Admin --> UC_Login
-Admin --> UC_2FA
-Admin --> UC_Config
-Admin --> UC_Stream
-Admin --> UC_History
-Admin --> UC_Classify
-Admin --> UC_Geo
-Admin --> UC_Creds
-Admin --> UC_Report
-Admin --> UC_Alerts
-Admin --> UC_API
+  %% Agents alimentent le système
+  Agent --> UC_Stream
+  Agent --> UC_History
+  Agent --> UC_Classify
+  Agent --> UC_Creds
 
-Agent --> UC_Stream
-Agent --> UC_History
-Agent --> UC_Classify
-Agent --> UC_Creds
+  %% Enrichissement et systèmes externes
+  Enrich --> UC_Classify
+  ExtSys --> UC_API
 
-Enrich --> UC_Classify
-ExtSys --> UC_API
-
-UC_SecTLS .. UC_Login
-UC_SecApp .. UC_API
+  %% Contraintes de sécurité transverses
+  UC_SecTLS -. protège .- UC_Login
+  UC_SecApp -. protège .- UC_API
 
 ## 📝 Licence
 
