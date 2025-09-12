@@ -285,7 +285,6 @@ Remarques sur l’authentification et l’A2F:
 - Sécurité progressive:
   - Design permettant d’ajouter facilement HMAC/token par agent, filtrage IP, rate limiting.
 
-
 ---
 ## 📝 Licence
 
