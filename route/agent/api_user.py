@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 from module.database.agent import get_default_metric_data
 
 agent_user_api_bp = Blueprint('agent_user_api', __name__, url_prefix='/api/agent/user')

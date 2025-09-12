@@ -3,6 +3,7 @@ import os
 from route.auth.login import auth_bp
 from route.config.security import config_account_bp
 from route.agent.api_agent import agent_create_bp
+from route.agent.api_user import agent_user_api_bp
 from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser
 import secrets
 
@@ -14,6 +15,7 @@ app.config['DATABASE'] = os.path.join(app.root_path, 'honeypot.db')
 app.register_blueprint(auth_bp)
 app.register_blueprint(agent_create_bp)
 app.register_blueprint(config_account_bp)
+app.register_blueprint(agent_user_api_bp)
 
 @app.before_request
 def before_request():
