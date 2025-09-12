@@ -5,7 +5,7 @@ import time
 import uuid
 from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction
 
-agent_create_bp = Blueprint('agent_create', __name__, url_prefix='/api')
+agent_create_bp = Blueprint('agent_create', __name__, url_prefix='/api/agent')
 
 def generer_apikey_agent(agent_name=""):
     prefixe = "agent"
@@ -19,7 +19,7 @@ def generer_apikey_agent(agent_name=""):
     hash_final = hashlib.sha256(donnees_combinees).hexdigest()
     return f"{prefixe}-{hash_final}"
 
-@agent_create_bp.route("/agent/create", methods=['POST'])
+@agent_create_bp.route("/create", methods=['POST'])
 def agent_create():
     agent_name = request.json.get('agent_name')
 
@@ -30,7 +30,7 @@ def agent_create():
     else:
         return jsonify({'success': False}), 500
 
-@agent_create_bp.route("/agent/report", methods=['POST'])
+@agent_create_bp.route("/report", methods=['POST'])
 def agent_report():
     try:
         data = request.json
