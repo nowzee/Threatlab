@@ -223,3 +223,17 @@ def add_smtp_interaction(malicious_ip, sender_email, recipient_email, subject, m
     except Exception as e:
         print(f"Error adding SMTP interaction: {e}")
         return False
+
+def get_default_metric_data():
+    with DatabaseManagerHoneypot() as db:
+        db.execute("SELECT COUNT(id) FROM malicious_ips")
+        ip_count = db.fetchone()
+
+        data = {
+            "ip_count": ip_count[0],
+            "Sample_downloaded": 0,
+            "tentative_access": 0,
+            "active_honeypot": 1
+        }
+
+        return data

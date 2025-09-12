@@ -96,4 +96,4 @@ def agent_report():
     
     except Exception as e:
         print(f"Error in agent_report: {e}")
-        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+        return jsonify({'success': False, 'error': 'Internal server error'}), 200
