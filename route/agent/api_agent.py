@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, request, current_app, session
 import secrets
 import hashlib
 import time
@@ -32,6 +32,12 @@ def agent_create():
 
 @agent_create_bp.route("/report", methods=['POST'])
 def agent_report():
+
+    agent_id = session.get('agent_id')
+
+    if not agent_id:
+        return jsonify({'success': False, 'error': 'Agent not authenticated'}), 401
+
     try:
         data = request.json
         
@@ -42,7 +48,6 @@ def agent_report():
                 return jsonify({'success': False, 'error': f'Missing required field: {field}'}), 400
 
         source_ip = data.get('source_ip')
-        agent_id = data.get('agent_id')
         service_type = data.get('service_type')
         country_name = data.get('country_name')
 
