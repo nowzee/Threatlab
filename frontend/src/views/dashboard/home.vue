@@ -1,5 +1,5 @@
 <script lang="ts">
-import {defineComponent, onMounted, onUnmounted, ref} from 'vue'
+import {defineComponent, ref} from 'vue'
 
 interface MetricData {
   ip_count: number
