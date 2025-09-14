@@ -15,8 +15,8 @@ export default defineComponent({
                             <thead>
                                 <tr>
                                     <th>Nom</th>
-                                    <th>Créée le</th>
-                                    <th>Dernière utilisation</th>
+                                    <th>Ajouté le</th>
+                                    <th>Intégration</th>
                                     <th>Actions</th>
                                 </tr>
                             </thead>
@@ -24,18 +24,18 @@ export default defineComponent({
                                 <tr>
                                     <td>Clé de production</td>
                                     <td>10/06/2023</td>
-                                    <td>Il y a 2 heures</td>
+                                    <td>Elastic Search</td>
                                     <td>
-                                        <button class="btn btn-secondary btn-sm">Régénérer</button>
+                                        <button class="btn btn-secondary btn-sm">Modifier</button>
                                         <button class="btn btn-danger btn-sm">Supprimer</button>
                                     </td>
                                 </tr>
                                 <tr>
                                     <td>Clé de test</td>
                                     <td>05/07/2023</td>
-                                    <td>Jamais utilisée</td>
+                                    <td>Opencti</td>
                                     <td>
-                                        <button class="btn btn-secondary btn-sm">Régénérer</button>
+                                        <button class="btn btn-secondary btn-sm">Modifier</button>
                                         <button class="btn btn-danger btn-sm">Supprimer</button>
                                     </td>
                                 </tr>
@@ -45,7 +45,7 @@ export default defineComponent({
                 </div>
 
                 <div class="form-group">
-                    <button class="btn btn-primary">Créer une nouvelle clé API</button>
+                    <button class="btn btn-primary">Ajouter une nouvelle clé API</button>
                 </div>
             </div>
 </template>
