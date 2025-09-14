@@ -228,12 +228,18 @@ def get_default_metric_data():
     with DatabaseManagerHoneypot() as db:
         db.execute("SELECT COUNT(*) FROM malicious_ips")
         ip_count = db.fetchone()
-        print(ip_count)
+
+        db.execute("SELECT COUNT(payload_hash) FROM payloads")
+        unique_sample_count = db.fetchone()
+
+        db.execute("SELECT COUNT(*) FROM honey_agents WHERE is_active = 1;")
+        active_agents = db.fetchone()
+
         data = {
             "ip_count": ip_count[0],
-            "Sample_downloaded": 0,
+            "Sample_downloaded": unique_sample_count[0],
             "tentative_access": 0,
-            "active_honeypot": 1
+            "active_honeypot": active_agents[0]
         }
 
         return data
