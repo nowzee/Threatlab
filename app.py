@@ -23,8 +23,6 @@ def before_request():
     public_endpoints = ["static", "auth.login", 'serve_static_or_index', 'auth.session_state', 'serve_vue_app']
     a2f_endpoints = ['auth.a2f', 'static', 'serve_static_or_index', 'serve_vue_app']
 
-    print(request.endpoint)
-
     # Redirection vers login si non connecté et endpoint non public
     if not session.get('logged_in') and request.endpoint not in public_endpoints:
         return jsonify({'auth_required': False}), 200
