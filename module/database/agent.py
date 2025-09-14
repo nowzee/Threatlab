@@ -226,9 +226,9 @@ def add_smtp_interaction(malicious_ip, sender_email, recipient_email, subject, m
 
 def get_default_metric_data():
     with DatabaseManagerHoneypot() as db:
-        db.execute("SELECT COUNT(id) FROM malicious_ips")
+        db.execute("SELECT COUNT(*) FROM malicious_ips")
         ip_count = db.fetchone()
-
+        print(ip_count)
         data = {
             "ip_count": ip_count[0],
             "Sample_downloaded": 0,

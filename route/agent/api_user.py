@@ -8,5 +8,5 @@ agent_user_api_bp = Blueprint('agent_user_api', __name__, url_prefix='/api/agent
 def get_default_metric_data_agent():
 
     data = get_default_metric_data()
-
+    print(data)
     return jsonify(data)

@@ -1,8 +1,64 @@
 <script lang="ts">
-import {defineComponent} from 'vue'
+import {defineComponent, onMounted, ref} from 'vue'
+
+interface MetricData {
+  ip_count: number
+  Sample_downloaded: number
+  tentative_access: number
+  active_honeypot: number
+}
 
 export default defineComponent({
-  name: "home"
+  name: "home",
+  setup() {
+    const metrics = ref<MetricData>({
+      ip_count: 0,
+      Sample_downloaded: 0,
+      tentative_access: 0,
+      active_honeypot: 0
+    })
+    
+    const isLoading = ref(true)
+    const error = ref<string | null>(null)
+
+    const fetchMetrics = async () => {
+      try {
+        isLoading.value = true
+        error.value = null
+        
+        const response = await fetch('/api/agent/user/metric_dashboard', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+          credentials: 'include',
+        })
+
+        if (!response.ok) {
+          throw new Error('Erreur lors du chargement des données')
+        }
+
+        metrics.value = await response.json()
+        
+      } catch (e: any) {
+        error.value = e?.message || 'Erreur inconnue'
+        console.error('Error fetching metrics:', e)
+      } finally {
+        isLoading.value = false
+      }
+    }
+
+    onMounted(() => {
+      fetchMetrics()
+    })
+
+    return {
+      metrics,
+      isLoading,
+      error,
+      fetchMetrics
+    }
+  }
 })
 </script>
 
@@ -31,7 +87,7 @@ export default defineComponent({
                         </svg>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value">3</div>
+                        <div class="stat-value">{{ isLoading ? '...' : metrics.active_honeypot }}</div>
                         <div class="stat-label">Honeypots actifs</div>
                     </div>
                 </div>
@@ -47,7 +103,7 @@ export default defineComponent({
                         </svg>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value">89</div>
+                        <div class="stat-value">{{ isLoading ? '...' : metrics.tentative_access }}</div>
                         <div class="stat-label">Tentatives d'accès</div>
                     </div>
                 </div>
@@ -66,7 +122,7 @@ export default defineComponent({
                         </svg>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value">12</div>
+                        <div class="stat-value">{{ isLoading ? '...' : metrics.ip_count }}</div>
                         <div class="stat-label">IP collectées</div>
                     </div>
                 </div>
@@ -85,7 +141,7 @@ export default defineComponent({
                         </svg>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value">14</div>
+                        <div class="stat-value">{{ isLoading ? '...' : metrics.Sample_downloaded }}</div>
                         <div class="stat-label">Samples téléchargés</div>
                     </div>
                 </div>
