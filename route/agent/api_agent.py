@@ -4,11 +4,10 @@ from module.database.agent import create_agent_token, add_malicious_ip_address, 
 
 agent_create_bp = Blueprint('agent_create', __name__, url_prefix='/api/agent')
 
-def generate_jwt(payload, agent_id):
+def generate_jwt(agent_name, agent_id):
     secret_key = current_app.config['SECRET_KEY']
 
-    payload_to_encode = payload.copy()
-    payload_to_encode['agent_id'] = agent_id
+    payload_to_encode = {'agent_id': agent_id, 'agent_name': agent_name}
 
     token = jwt.encode(payload_to_encode, secret_key, algorithm='HS256')
     return token
