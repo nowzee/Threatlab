@@ -288,6 +288,7 @@ class DatabaseManagerUser:
                             account_id INTEGER,
                             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                             ip_address TEXT,
+                            status TEXT,
                             FOREIGN KEY (account_id) REFERENCES users (id)
                         )
         ''')
