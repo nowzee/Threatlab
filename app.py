@@ -40,8 +40,6 @@ def serve_vue_app():
 def serve_static_or_index(path):
     return send_from_directory(app.static_folder, 'index.html')
 
-
-
 # API Routes
 @app.route("/api/honeypots", methods=["GET"])
 def get_honeypots():
