@@ -9,11 +9,11 @@ interface MetricData {
 }
 
 interface LogData {
-  agent_id: string
+  agent_id: number
   agent_name: string
   country_name: string
   source_ip: string
-  target_port: string
+  target_port: number
   service_type: string
 }
 
