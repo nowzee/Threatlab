@@ -285,8 +285,8 @@ class DatabaseManagerUser:
                         CREATE TABLE IF NOT EXISTS log_attempt_account 
                         (
                             id INTEGER PRIMARY KEY,
-                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                             account_id INTEGER,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                             ip_address TEXT,
                             FOREIGN KEY (account_id) REFERENCES users (id)
                         )
