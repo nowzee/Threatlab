@@ -26,13 +26,9 @@ def agent_create():
 @agent_create_bp.route("/report", methods=['POST'])
 def agent_report():
 
-    agent_id = session.get('agent_id')
-
-    if not agent_id:
-        return jsonify({'success': False, 'error': 'Agent not authenticated'}), 401
-
     try:
         data = request.json
+        agent_id = data.get('agent_id')
         
         # Validate required fields
         required_fields = ['source_ip', 'service_type']

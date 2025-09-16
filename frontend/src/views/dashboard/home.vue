@@ -1,11 +1,20 @@
 <script lang="ts">
-import {defineComponent, ref} from 'vue'
+import { defineComponent, ref } from 'vue'
 
 interface MetricData {
   ip_count: number
   Sample_downloaded: number
   tentative_access: number
   active_honeypot: number
+}
+
+interface LogData {
+  agent_id: string
+  agent_name: string
+  country_name: string
+  source_ip: string
+  target_port: string
+  service_type: string
 }
 
 export default defineComponent({
@@ -18,6 +27,7 @@ export default defineComponent({
       active_honeypot: 0
     })
 
+    const logs = ref<LogData[]>([])
     const isLoading = ref(true)
     const error = ref<string | null>(null)
 
@@ -48,10 +58,32 @@ export default defineComponent({
       }
     }
 
+    const fetchLog = async () => {
+      try {
+        const response = await fetch('/api/agent/user/new_logs', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+          credentials: 'include',
+        })
+
+        if (!response.ok) {
+          throw new Error('Erreur lors du chargement des logs')
+        }
+
+        logs.value = await response.json()
+      } catch (e: any) {
+        console.error('Error fetching log:', e)
+      }
+    }
+
     fetchMetrics()
+    fetchLog()
 
     return {
       metrics,
+      logs,
       isLoading,
       error
     }
@@ -188,54 +220,32 @@ export default defineComponent({
             <a href="#" class="view-all-link">Voir tout</a>
         </div>
 
-        <div class="table-container">
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Timestamp</th>
-                        <th>Honeypot</th>
-                        <th>Type d'attaque</th>
-                        <th>IP Source</th>
-                        <th>Sévérité</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>2023-07-10 15:42</td>
-                        <td>Web-Honeypot-1</td>
-                        <td>SQL Injection</td>
-                        <td>198.51.100.32</td>
-                        <td><span class="badge badge-danger">Élevée</span></td>
-                        <td><button class="btn btn-sm btn-secondary">Détails</button></td>
-                    </tr>
-                    <tr>
-                        <td>2023-07-10 14:28</td>
-                        <td>SSH-Trap</td>
-                        <td>Brute Force</td>
-                        <td>203.0.113.45</td>
-                        <td><span class="badge badge-warning">Moyenne</span></td>
-                        <td><button class="btn btn-sm btn-secondary">Détails</button></td>
-                    </tr>
-                    <tr>
-                        <td>2023-07-10 12:15</td>
-                        <td>Web-Honeypot-1</td>
-                        <td>XSS</td>
-                        <td>192.0.2.18</td>
-                        <td><span class="badge badge-warning">Moyenne</span></td>
-                        <td><button class="btn btn-sm btn-secondary">Détails</button></td>
-                    </tr>
-                    <tr>
-                        <td>2023-07-09 23:51</td>
-                        <td>FTP-Decoy</td>
-                        <td>Directory Traversal</td>
-                        <td>203.0.113.112</td>
-                        <td><span class="badge badge-info">Faible</span></td>
-                        <td><button class="btn btn-sm btn-secondary">Détails</button></td>
-                    </tr>
-                </tbody>
-            </table>
-        </div>
+      <div class="table-container">
+        <table class="table">
+          <thead>
+          <tr>
+            <th>Agent ID</th>
+            <th>Nom de l'agent</th>
+            <th>IP Source</th>
+            <th>Port cible</th>
+            <th>Service</th>
+            <th>Pays</th>
+            <th>Action</th>
+          </tr>
+          </thead>
+          <tbody>
+          <tr v-for="log in logs" :key="log.agent_id">
+            <td>{{ log.agent_id }}</td>
+            <td>{{ log.agent_name }}</td>
+            <td>{{ log.source_ip }}</td>
+            <td>{{ log.target_port }}</td>
+            <td>{{ log.service_type }}</td>
+            <td>{{ log.country_name }}</td>
+            <td><button class="btn btn-sm btn-secondary">Détails</button></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
 </div>
 

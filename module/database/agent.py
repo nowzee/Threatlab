@@ -243,3 +243,28 @@ def get_default_metric_data():
         }
 
         return data
+
+def get_agent_details():
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT country_name, source_ip, target_port, service_type, agent_id 
+            FROM attack_logs 
+            ORDER BY id DESC 
+            LIMIT 5
+        ''')
+        logs = db.fetchall()
+
+        agent_name = "ssh-honeypot-test"
+
+        data = []
+        for log in logs:
+            data.append({
+                "agent_id": log[4],
+                "agent_name": agent_name,
+                "country_name": log[0],
+                "source_ip": log[1],
+                "target_port": log[2],
+                "service_type": log[3]
+            })
+
+    return data

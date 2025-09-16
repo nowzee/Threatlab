@@ -20,7 +20,7 @@ app.register_blueprint(agent_user_api_bp)
 @app.before_request
 def before_request():
     # Liste des endpoints accessibles sans authentification
-    public_endpoints = ["static", "auth.login", 'serve_static_or_index', 'auth.session_state', 'serve_vue_app']
+    public_endpoints = ["static", "auth.login", 'serve_static_or_index', 'auth.session_state', 'serve_vue_app', 'agent_create.agent_report']
     a2f_endpoints = ['auth.a2f', 'static', 'serve_static_or_index', 'serve_vue_app']
 
     # Redirection vers login si non connecté et endpoint non public

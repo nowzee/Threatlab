@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify
-from module.database.agent import get_default_metric_data
+from module.database.agent import get_default_metric_data, get_agent_details
 
 agent_user_api_bp = Blueprint('agent_user_api', __name__, url_prefix='/api/agent/user')
 
@@ -8,5 +8,13 @@ agent_user_api_bp = Blueprint('agent_user_api', __name__, url_prefix='/api/agent
 def get_default_metric_data_agent():
 
     data = get_default_metric_data()
-    print(data)
+
+    return jsonify(data)
+
+
+@agent_user_api_bp.route("/new_logs", methods=['GET'])
+def get_new_logs_agent():
+
+    data = get_agent_details()
+
     return jsonify(data)
