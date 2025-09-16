@@ -254,7 +254,7 @@ export default defineComponent({
 </template>
 
 <style src="@/assets/css/dashboard/notifications.css"></style>
-<style>
+<style scoped>
     /* Styles spécifiques à la page dashboard */
     .stat-card {
         display: flex;
