@@ -250,7 +250,7 @@ def get_default_metric_data():
 def get_agent_details():
     with DatabaseManagerHoneypot() as db:
         db.execute('''
-            SELECT country_name, source_ip, target_port, service_type, agent_id 
+            SELECT country_name, source_ip, target_port, service_type, agent_id, created_at 
             FROM attack_logs 
             ORDER BY id DESC 
             LIMIT 5
@@ -267,7 +267,8 @@ def get_agent_details():
                 "country_name": log[0],
                 "source_ip": log[1],
                 "target_port": log[2],
-                "service_type": log[3]
+                "service_type": log[3],
+                "created_at": log[5]
             })
 
     return data

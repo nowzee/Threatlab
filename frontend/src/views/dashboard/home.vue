@@ -15,6 +15,7 @@ interface LogData {
   source_ip: string
   target_port: number
   service_type: string
+  created_at: string
 }
 
 export default defineComponent({
@@ -224,6 +225,7 @@ export default defineComponent({
         <table class="table">
           <thead>
           <tr>
+            <th>Date</th>
             <th>Agent ID</th>
             <th>Nom de l'agent</th>
             <th>IP Source</th>
@@ -235,6 +237,7 @@ export default defineComponent({
           </thead>
           <tbody>
           <tr v-for="log in logs" :key="log.agent_id">
+            <td>{{log.created_at}}</td>
             <td>{{ log.agent_id }}</td>
             <td>{{ log.agent_name }}</td>
             <td>{{ log.source_ip }}</td>
