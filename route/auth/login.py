@@ -34,7 +34,6 @@ def login():
             return jsonify({"error": "Invalid username or password"}), 401
 
 
-        log_attempt_account(username, request.remote_addr, 'Successful login')
         session['logged_in'] = True
         session['username'] = username
 
@@ -42,6 +41,8 @@ def login():
             session['a2f_validate'] = False
             log_attempt_account(username, request.remote_addr, 'A2F required')
             return jsonify({"authenticated": True, "requires_a2f": True}), 200
+
+        log_attempt_account(username, request.remote_addr, 'Successful login')
         return jsonify({"authenticated": True}), 200
 
 
