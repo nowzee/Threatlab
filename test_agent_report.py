@@ -19,7 +19,7 @@ def test_ssh_attack():
     
     ssh_attack_data = {
         "agent_id": 2,
-        "source_ip": "192.168.1.200",
+        "source_ip": "192.168.1.120",
         "service_type": "ssh",
         "source_port": 45123,
         "target_port": 22,

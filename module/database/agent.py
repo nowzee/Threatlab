@@ -229,13 +229,13 @@ def get_default_metric_data():
         db.execute("SELECT COUNT(*) FROM malicious_ips")
         ip_count = db.fetchone()
 
-        db.execute("SELECT COUNT(payload_hash) FROM payloads")
+        db.execute("SELECT COUNT(*) FROM payloads")
         unique_sample_count = db.fetchone()
 
         db.execute("SELECT COUNT(*) FROM honey_agents WHERE is_active = 1;")
         active_agents = db.fetchone()
 
-        db.execute("SELECT COUNT(id) FROM attack_logs")
+        db.execute("SELECT COUNT(*) FROM attack_logs")
         tentative_attacks = db.fetchone()
 
         data = {
