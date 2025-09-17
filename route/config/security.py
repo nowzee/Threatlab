@@ -140,7 +140,6 @@ def check_a2f_status():
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 
-
 @config_account_bp.route("/validation_a2f", methods=['POST'])
 def valide_a2f():
     """

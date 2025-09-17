@@ -235,10 +235,13 @@ def get_default_metric_data():
         db.execute("SELECT COUNT(*) FROM honey_agents WHERE is_active = 1;")
         active_agents = db.fetchone()
 
+        db.execute("SELECT COUNT(id) FROM attack_logs")
+        tentative_attacks = db.fetchone()
+
         data = {
             "ip_count": ip_count[0],
             "Sample_downloaded": unique_sample_count[0],
-            "tentative_access": 0,
+            "tentative_access": tentative_attacks[0],
             "active_honeypot": active_agents[0]
         }
 
