@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, session, request
 from module.database.auth import auth_user, a2f_active, get_otp_secret
+from module.database.account import log_attempt_account
 import pyotp
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -29,13 +30,17 @@ def login():
         if not username or not password or len(username) > 140 or len(password) > 140:
             return jsonify({"error": "Invalid username or password"}), 401
         if not auth_user(username, password):
+            log_attempt_account(username, request.remote_addr, 'Failed login')
             return jsonify({"error": "Invalid username or password"}), 401
 
+
+        log_attempt_account(username, request.remote_addr, 'Successful login')
         session['logged_in'] = True
         session['username'] = username
 
         if a2f_active(username):
             session['a2f_validate'] = False
+            log_attempt_account(username, request.remote_addr, 'A2F required')
             return jsonify({"authenticated": True, "requires_a2f": True}), 200
         return jsonify({"authenticated": True}), 200
 
@@ -63,8 +68,6 @@ def a2f():
 
             # Récupérer la clé secrète de l'utilisateur depuis la base de données
             secret = get_otp_secret(session['username'])
-            if not secret:
-                return jsonify({"error": "Erreur de configuration A2F. Contactez l'administrateur."}), 500
 
             # Créer un objet TOTP pour vérification
             totp = pyotp.TOTP(secret)
@@ -72,8 +75,10 @@ def a2f():
             # Vérifier le code
             if totp.verify(code):
                 session['a2f_validate'] = True
+                log_attempt_account(session['username'], request.remote_addr, 'A2F validated')
                 return jsonify({"authenticated": True, "requires_a2f": False}), 200
             else:
+                log_attempt_account(session['username'], request.remote_addr, 'A2F failed')
                 return jsonify({"error": "Code de vérification invalide"}), 400
 
 

@@ -286,9 +286,9 @@ class DatabaseManagerUser:
                         (
                             id INTEGER PRIMARY KEY,
                             account_id INTEGER,
-                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                            ip_address TEXT,
-                            status TEXT,
+                            created_at DATETIME DEFAULT CURRENT_TIMESTAMP NOT NULL ,
+                            ip_address TEXT NOT NULL,
+                            status TEXT NOT NULL ,
                             FOREIGN KEY (account_id) REFERENCES users (id)
                         )
         ''')
