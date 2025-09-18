@@ -1,5 +1,5 @@
 # Threatlab
-![Status](https://img.shields.io/badge/Status-In_Development-purple.svg)
+![Status](https://img.shields.io/badge/Status-In_Development-orange.svg)
 
 ![image_banner](https://github.com/user-attachments/assets/4721f90b-7ea8-486c-a294-47e80a87ac41)
 
