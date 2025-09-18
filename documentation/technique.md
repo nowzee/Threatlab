@@ -261,7 +261,7 @@ Commandes (exemples à adapter):
 
 ## 18. Stockage et données
 
-- Base de données: à préciser (MySQL, SQLite)
+- Base de données: Sqlite (Temporaire)
 - Connexions: pool, timeouts, retries
 - Sauvegardes: stratégie et rétention
 
