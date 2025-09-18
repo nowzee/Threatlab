@@ -1,10 +1,10 @@
 from module.database.db_manager import DatabaseManagerHoneypot
+import hashlib
 
 def create_agent_token(agent_name, secret_token):
     try:
         with DatabaseManagerHoneypot() as db:
-            # Hash the secret token for security
-            import hashlib
+
             secret_token_sha256 = hashlib.sha256(secret_token.encode()).hexdigest()
             
             db.execute("INSERT INTO honey_agents (agent_name, ip_address, service_type, secret_token_sha256) VALUES (?, ?, ?, ?)",
