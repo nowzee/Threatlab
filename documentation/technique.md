@@ -1,6 +1,6 @@
 # Documentation technique
 
-Ce document décrit l’architecture, l’environnement, les dépendances, les conventions et les procédures pour développer, tester, construire, déployer et exploiter le projet. Enregistrez-le sous: docs/documentation-technique.md
+Ce document décrit l’architecture, l’environnement, les dépendances, les conventions et les procédures pour développer, tester, construire, déployer et exploiter le projet.
 
 ## 1. Vue d’ensemble
 
