@@ -5,7 +5,7 @@ Ce document décrit l’architecture, l’environnement, les dépendances, les c
 ## 1. Vue d’ensemble
 
 - Pile applicative principale:
-  - Backend: Python 3.13.7 (virtualenv)
+  - Backend: Python 3.13.7 (virtualenv) (rust soon ;))
   - Web: TypeScript 5.8, Vue 3, Vite, Pinia, Vue Router
 - Gestion des paquets:
   - Python: virtualenv + pip
