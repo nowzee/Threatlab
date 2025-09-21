@@ -23,10 +23,6 @@ export default defineComponent({
                 <line x1="12" y1="8" x2="12.01" y2="8"></line>
             </svg>
         </div>
-        <div class="alert-content">
-            <div class="alert-title">Information</div>
-            <div class="alert-message">Les honeypots sont des systèmes conçus pour attirer les attaquants et surveiller leurs activités. Choisissez le type qui correspond le mieux à vos besoins.</div>
-        </div>
     </div>
 
     <!-- Options de déploiement -->
