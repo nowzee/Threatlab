@@ -1,8 +1,23 @@
 <script lang="ts">
-import {defineComponent} from 'vue'
+import { defineComponent } from 'vue'
+import { useRouter } from 'vue-router'
 
 export default defineComponent({
-  name: "deploy"
+  name: "deploy",
+  setup() {
+    const router = useRouter()
+
+    const deployHoneypot = (type: string) => {
+      if (type === 'SSH') {
+        // Rediriger vers la page de création d'agent pour SSH, Modifier pour plus tard apres pour adapter en fonction du type
+        router.push({ name: 'agent-creation' })
+      }
+    }
+
+    return {
+      deployHoneypot
+    }
+  }
 })
 </script>
 
@@ -70,7 +85,7 @@ export default defineComponent({
                 </div>
             </div>
             <div class="card-footer">
-                <button class="btn btn-primary deploy-honeypot-btn" data-type="SSH">Déployer</button>
+                <button class="btn btn-primary deploy-honeypot-btn" @click="deployHoneypot('SSH')">Déployer</button>
                 <button class="btn btn-secondary">Détails</button>
             </div>
         </div>

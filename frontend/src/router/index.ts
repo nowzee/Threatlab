@@ -7,6 +7,7 @@ import A2FView from '@/views/auth/a2f.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import home from '@/views/dashboard/home.vue'
 import deploy from '@/views/dashboard/deploy.vue'
+import agentCreation from '@/views/dashboard/agent-creation.vue'
 import settings from '@/views/dashboard/settings/settings.vue'
 import security_settings from "@/views/dashboard/settings/security.vue";
 import api_settings from "@/views/dashboard/settings/api.vue";
@@ -24,6 +25,7 @@ const routes = [
       { path: '', redirect: { name: 'home' } },
       { path: 'home', name: 'home', component: home },
       { path: 'deploy', name: 'deploy', component: deploy },
+      { path: 'agent-creation', name: 'agent-creation', component: agentCreation },
       { path: 'settings', name: 'settings', component: settings,
       children: [
           { path: '', redirect: { name: 'security_settings' } },
