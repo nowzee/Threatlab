@@ -496,22 +496,20 @@ export default defineComponent({
 
 .integration-card {
   border: 2px solid #2a2a2a;
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 18px;
   background-color: #1a1a1a;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
   cursor: pointer;
 }
 
 .integration-card:hover {
-  border-color: var(--accent-color);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(156, 77, 255, 0.1);
+  background-color: rgba(156, 77, 255, 0.05);
 }
 
 .integration-card.selected {
   border-color: var(--accent-color);
-  background-color: rgba(156, 77, 255, 0.05);
+  background-color: rgba(142, 63, 255, 0.08);
 }
 
 .integration-header {
