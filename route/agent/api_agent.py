@@ -23,13 +23,13 @@ def agent_create():
     else:
         return jsonify({'success': False}), 500
 
+
 @agent_create_bp.route("/report", methods=['POST'])
 def agent_report():
-
     try:
         data = request.json
         agent_id = data.get('agent_id')
-        
+
         # Validate required fields
         required_fields = ['source_ip', 'service_type']
         for field in required_fields:
@@ -57,8 +57,8 @@ def agent_report():
         }
 
         # Add malicious IP to database
-        if not add_malicious_ip_address(agent_id, source_ip, service_type, country_name, 
-                                      data.get('country_code'), data.get('classification')):
+        if not add_malicious_ip_address(agent_id, source_ip, service_type, country_name,
+                                        data.get('country_code'), data.get('classification')):
             return jsonify({'success': False, 'error': 'Failed to add malicious IP'}), 500
 
         # Insert attack log for all
@@ -69,7 +69,7 @@ def agent_report():
         if service_type == 'ssh':
             username_attempt = data.get('username_attempt')
             password_attempt = data.get('password_attempt')
-            
+
             if username_attempt and password_attempt:
                 if not add_compromised_credential(source_ip, username_attempt, password_attempt, service_type):
                     return jsonify({'success': False, 'error': 'Failed to add compromised credential'}), 500
@@ -80,21 +80,20 @@ def agent_report():
             subject = data.get('subject')
             message_content = data.get('message_content')
             attachments = data.get('attachments')
-            
+
             # Store SMTP-specific interaction data
-            if not add_smtp_interaction(source_ip, sender_email, recipient_email, 
-                                      subject, message_content, attachments):
+            if not add_smtp_interaction(source_ip, sender_email, recipient_email,
+                                        subject, message_content, attachments):
                 return jsonify({'success': False, 'error': 'Failed to add SMTP interaction'}), 500
 
         return jsonify({'success': True, 'message': f'{service_type.upper()} attack data processed successfully'})
-    
+
     except Exception as e:
         print(f"Error in agent_report: {e}")
         return jsonify({'success': False, 'error': 'Internal server error'}), 200
 
 @agent_create_bp.route("/config", methods=['GET'])
 def agent_config():
-
     data = request.json
     agent_id = data.get('agent_id')
 

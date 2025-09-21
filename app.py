@@ -20,7 +20,7 @@ app.register_blueprint(agent_user_api_bp)
 @app.before_request
 def before_request():
     # Liste des endpoints accessibles sans authentification
-    public_endpoints = ["static", "auth.login", 'serve_static_or_index', 'auth.session_state', 'serve_vue_app', 'agent_create.agent_report']
+    public_endpoints = ["static", "auth.login", "serve_static_or_index", "auth.session_state", "serve_vue_app", "agent_create.agent_report"]
     a2f_endpoints = ['auth.a2f', 'static', 'serve_static_or_index', 'serve_vue_app']
 
     # Redirection vers login si non connecté et endpoint non public
@@ -62,6 +62,5 @@ if __name__ == '__main__':
         with DatabaseManagerHoneypot() as db:
             db.create_db()
 
-
-
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    # Lancement via SocketIO (WebSocket si eventlet/gevent installé)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
