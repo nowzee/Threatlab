@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request, current_app, session
+from flask import Blueprint, jsonify, request, current_app
 import jwt
 from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction
 
@@ -91,10 +91,3 @@ def agent_report():
     except Exception as e:
         print(f"Error in agent_report: {e}")
         return jsonify({'success': False, 'error': 'Internal server error'}), 200
-
-@agent_create_bp.route("/config", methods=['GET'])
-def agent_config():
-    data = request.json
-    agent_id = data.get('agent_id')
-
-    return jsonify({'success': True, 'config': 'test'})
