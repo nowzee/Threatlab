@@ -47,7 +47,7 @@ const onPaste = async (index: number, event: ClipboardEvent) => {
 
   // Remplir les champs à partir du champ actuel
   for (let j = 0; j < digits.length && (index + j) < 6; j++) {
-    codeInputs.value[index + j] = digits[j]
+    codeInputs.value[index + j] = digits[j] || ''
   }
 
   // Déplacer le focus au dernier champ rempli ou au suivant

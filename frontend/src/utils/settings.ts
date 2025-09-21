@@ -115,9 +115,9 @@ export class SettingsManager {
       return;
     }
 
-    const oldPassword = passwordInputs[0].value;
-    const newPassword = passwordInputs[1].value;
-    const confirmPassword = passwordInputs[2].value;
+    const oldPassword = passwordInputs[0]?.value || '';
+    const newPassword = passwordInputs[1]?.value || '';
+    const confirmPassword = passwordInputs[2]?.value || '';
 
     // Validation côté client
     const validationError = this.validatePasswordChange({ old_password: oldPassword, new_password: newPassword, confirm_password: confirmPassword });
@@ -224,7 +224,10 @@ export class SettingsManager {
     }
 
     strengthMeter.className = 'password-strength-meter';
-    strengthMeter.classList.add(this.passwordStrengthConfig.levels[strength - 1]);
+    const level = this.passwordStrengthConfig.levels[strength - 1];
+    if (level) {
+      strengthMeter.classList.add(level);
+    }
   }
 
   /**

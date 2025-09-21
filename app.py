@@ -62,5 +62,4 @@ if __name__ == '__main__':
         with DatabaseManagerHoneypot() as db:
             db.create_db()
 
-    # Lancement via SocketIO (WebSocket si eventlet/gevent installé)
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False)
