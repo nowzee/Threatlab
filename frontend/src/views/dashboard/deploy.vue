@@ -32,34 +32,6 @@ export default defineComponent({
 
     <!-- Options de déploiement -->
     <div class="grid-container">
-        <!-- Web Server Honeypot -->
-        <div class="honeypot-template card">
-            <div class="card-header">
-                <h3 class="card-title">Serveur Web</h3>
-                <span class="badge badge-primary">Populaire</span>
-            </div>
-            <div class="card-body">
-                <div class="template-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                        <line x1="8" y1="21" x2="16" y2="21"></line>
-                        <line x1="12" y1="17" x2="12" y2="21"></line>
-                    </svg>
-                </div>
-                <div class="template-description">
-                    <p>Simule un serveur web avec des vulnérabilités connues pour détecter les tentatives d'exploitation.</p>
-                    <ul class="feature-list">
-                        <li>Détection de SQL Injection</li>
-                        <li>Détection de XSS</li>
-                        <li>Surveillance des tentatives de brute force</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="card-footer">
-                <button class="btn btn-primary deploy-honeypot-btn" data-type="Web Server">Déployer</button>
-                <button class="btn btn-secondary">Détails</button>
-            </div>
-        </div>
 
         <!-- SSH Honeypot -->
         <div class="honeypot-template card">
@@ -86,6 +58,35 @@ export default defineComponent({
             </div>
             <div class="card-footer">
                 <button class="btn btn-primary deploy-honeypot-btn" @click="deployHoneypot('SSH')">Déployer</button>
+                <button class="btn btn-secondary">Détails</button>
+            </div>
+        </div>
+
+        <!-- Web Server Honeypot -->
+        <div class="honeypot-template card">
+            <div class="card-header">
+                <h3 class="card-title">Serveur Web</h3>
+                <span class="badge badge-primary">Populaire</span>
+            </div>
+            <div class="card-body">
+                <div class="template-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                </div>
+                <div class="template-description">
+                    <p>Simule un serveur web avec des vulnérabilités connues pour détecter les tentatives d'exploitation.</p>
+                    <ul class="feature-list">
+                        <li>Détection de SQL Injection</li>
+                        <li>Détection de XSS</li>
+                        <li>Surveillance des tentatives de brute force</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-primary deploy-honeypot-btn" data-type="Web Server">Déployer</button>
                 <button class="btn btn-secondary">Détails</button>
             </div>
         </div>
