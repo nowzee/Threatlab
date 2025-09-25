@@ -95,7 +95,6 @@ export default defineComponent({
                     <line x1="12" y1="17" x2="12.01" y2="17"></line>
                 </svg>
                 <span>Alertes</span>
-                <span class="badge badge-danger" style="margin-left: auto; padding: 2px 6px;">17</span>
             </a>
             <a 
                 class="btn-sidebar"

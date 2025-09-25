@@ -407,7 +407,7 @@ export default defineComponent({
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
-        <h3>Analyseur de menaces</h3>
+        <h3>Analyse de menaces</h3>
         <p>Recherchez une adresse IP, un hash ou une CVE pour obtenir des informations détaillées depuis notre base de donnée.</p>
         <div class="search-examples">
           <span class="example-tag">192.168.1.1</span>
