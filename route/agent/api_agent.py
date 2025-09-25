@@ -15,6 +15,7 @@ def generate_jwt(agent_id):
 @agent_create_bp.route("/create", methods=['POST'])
 def agent_create():
     agent_name = request.json.get('agent_name')
+    agent_type = request.json.get('agent_type')
 
     secret_token = generate_jwt(1)
 
