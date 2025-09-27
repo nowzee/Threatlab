@@ -278,7 +278,7 @@ class DatabaseManagerUser:
                                 name TEXT UNIQUE NOT NULL,
                                 key TEXT UNIQUE NOT NULL,
                                 integration TEXT,
-                                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                created_at DATETIME,
                                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                             )
         ''')

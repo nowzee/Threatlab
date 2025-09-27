@@ -231,7 +231,6 @@ export default defineComponent({
   <div class="settings-pane">
     <!-- Messages d'erreur et de succès -->
     <div v-if="error" class="alert alert-danger">
-      <div class="alert-icon">⚠</div>
       <div class="alert-content">
         <div class="alert-message">{{ error }}</div>
       </div>
@@ -239,7 +238,6 @@ export default defineComponent({
     </div>
 
     <div v-if="success" class="alert alert-success">
-      <div class="alert-icon">✓</div>
       <div class="alert-content">
         <div class="alert-message">{{ success }}</div>
       </div>

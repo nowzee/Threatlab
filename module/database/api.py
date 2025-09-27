@@ -1,4 +1,5 @@
 from module.database.db_manager import DatabaseManagerUser
+from datetime import datetime
 
 
 def verify_api_key(api_key):
@@ -14,10 +15,12 @@ class ManageApiKey:
         if verify_api_key(api_key):
             return False
 
+        now = datetime.now()
+
         with DatabaseManagerUser() as db:
             db.execute(
-                "INSERT INTO api_keys (key, name, integration) VALUES (?, ?, ?)",
-                (api_key, name, integration)
+                "INSERT INTO api_keys (key, name, integration, created_at) VALUES (?, ?, ?, ?)",
+                (api_key, name, integration, now)
             )
         return True
 
