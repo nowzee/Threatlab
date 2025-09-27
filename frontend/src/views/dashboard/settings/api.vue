@@ -64,7 +64,6 @@ export default defineComponent({
     // Ajouter une clé API
     const addApiKey = async () => {
       if (!formData.value.name || !formData.value.api_key || !formData.value.integration) {
-        error.value = 'Tous les champs sont requis'
         return
       }
 
@@ -101,7 +100,6 @@ export default defineComponent({
     // Modifier une clé API
     const updateApiKey = async () => {
       if (!formData.value.name || !formData.value.api_key || !formData.value.integration) {
-        error.value = 'Tous les champs sont requis'
         return
       }
 
@@ -137,7 +135,7 @@ export default defineComponent({
 
     // Supprimer une clé API
     const deleteApiKey = async (apiKey: string) => {
-      if (!confirm('Êtes-vous sûr de vouloir supprimer cette clé API ?')) {
+      if (!confirm('Etes-vous sûr de vouloir supprimer cette clé API ?')) {
         return
       }
 
@@ -423,8 +421,8 @@ export default defineComponent({
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* Styles spécifiques pour ce composant */
