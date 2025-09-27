@@ -277,6 +277,7 @@ class DatabaseManagerUser:
                                 id INTEGER PRIMARY KEY,
                                 name TEXT UNIQUE NOT NULL,
                                 key TEXT UNIQUE NOT NULL,
+                                integration TEXT,
                                 created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
                                 updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
                             )

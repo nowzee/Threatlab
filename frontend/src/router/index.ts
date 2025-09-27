@@ -12,7 +12,6 @@ import threatIntel from '@/views/dashboard/threat-intel.vue'
 import settings from '@/views/dashboard/settings/settings.vue'
 import security_settings from "@/views/dashboard/settings/security.vue";
 import api_settings from "@/views/dashboard/settings/api.vue";
-import advanced from "@/views/dashboard/settings/advanced.vue";
 
 
 const routes = [
@@ -32,8 +31,7 @@ const routes = [
       children: [
           { path: '', redirect: { name: 'security_settings' } },
           { path: 'security', name: 'security_settings', component: security_settings },
-          { path: 'api', name: 'api_settings', component: api_settings},
-          { path: 'advanced', name: 'advanced_settings', component: advanced},
+          { path: 'api', name: 'api_settings', component: api_settings}
       ]},
     ],
   },

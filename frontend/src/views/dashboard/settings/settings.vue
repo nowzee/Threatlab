@@ -44,12 +44,6 @@ export default defineComponent({
                 @click="navigateTo('/dashboard/settings/api')">
                 API
             </button>
-            <button
-                class="settings-tab"
-                :class="{ active: route.path === '/dashboard/settings/advanced' || route.name === 'advanced_settings' }"
-                @click="navigateTo('/dashboard/settings/advanced')">
-                Avancé
-            </button>
         </div>
 
         <div class="settings-content">
