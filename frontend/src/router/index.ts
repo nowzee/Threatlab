@@ -9,6 +9,8 @@ import home from '@/views/dashboard/home.vue'
 import deploy from '@/views/dashboard/deploy.vue'
 import agentCreation from '@/views/dashboard/agent-creation.vue'
 import threatIntel from '@/views/dashboard/threat-intel.vue'
+import alerts from '@/views/dashboard/alerts.vue'
+import alertDetails from '@/views/dashboard/alert-details.vue'
 import settings from '@/views/dashboard/settings/settings.vue'
 import security_settings from "@/views/dashboard/settings/security.vue";
 import api_settings from "@/views/dashboard/settings/api.vue";
@@ -27,6 +29,8 @@ const routes = [
       { path: 'deploy', name: 'deploy', component: deploy },
       { path: 'agent-creation', name: 'agent-creation', component: agentCreation },
       { path: 'threat-intel', name: 'threat-intel', component: threatIntel },
+      { path: 'alerts', name: 'alerts', component: alerts },
+      { path: 'alert-details/:id', name: 'alert-details', component: alertDetails },
       { path: 'settings', name: 'settings', component: settings,
       children: [
           { path: '', redirect: { name: 'security_settings' } },
