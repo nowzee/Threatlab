@@ -11,6 +11,7 @@ import agentCreation from '@/views/dashboard/agent-creation.vue'
 import threatIntel from '@/views/dashboard/threat-intel.vue'
 import alerts from '@/views/dashboard/alerts.vue'
 import alertDetails from '@/views/dashboard/alert-details.vue'
+import honeypotManagement from '@/views/dashboard/honeypot-management.vue'
 import settings from '@/views/dashboard/settings/settings.vue'
 import security_settings from "@/views/dashboard/settings/security.vue";
 import api_settings from "@/views/dashboard/settings/api.vue";
@@ -28,6 +29,7 @@ const routes = [
       { path: 'home', name: 'home', component: home },
       { path: 'deploy', name: 'deploy', component: deploy },
       { path: 'agent-creation', name: 'agent-creation', component: agentCreation },
+      { path: 'honeypot-management', name: 'honeypot-management', component: honeypotManagement },
       { path: 'threat-intel', name: 'threat-intel', component: threatIntel },
       { path: 'alerts', name: 'alerts', component: alerts },
       { path: 'alert-details/:id', name: 'alert-details', component: alertDetails },
