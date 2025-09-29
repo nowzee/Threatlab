@@ -263,7 +263,7 @@ def main():
     print(f"Success Rate: {(tests_passed/total_tests)*100:.1f}%")
     
     if tests_passed == total_tests:
-        print("🎉 ALL TESTS PASSED!")
+        print("ALL TESTS PASSED!")
         sys.exit(0)
     else:
         print("❌ SOME TESTS FAILED!")
