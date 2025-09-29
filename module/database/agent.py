@@ -279,10 +279,10 @@ class ManagerAgent:
     def remove(agent_id: int) -> bool:
         with DatabaseManagerHoneypot() as db:
             
-            db.execute('''SELECT id FROM honey_agents WHERE id = ?''', (agent_id,))
+            db.execute('''SELECT id FROM honey_agents WHERE id = ?''', (int(agent_id),))
             agent = db.fetchone()
             if agent:
-                db.execute("DELETE FROM honey_agents WHERE id = ?", (agent_id,))
+                db.execute("DELETE FROM honey_agents WHERE id = ?", (int(agent_id),))
                 return True
             return False
 
@@ -321,3 +321,15 @@ class ManagerAgent:
                 agents.append(agent)
 
             return agents
+
+    @staticmethod
+    def create_group(group_name) -> bool:
+        with DatabaseManagerHoneypot() as db:
+            db.execute("SELECT id FROM honey_agents WHERE groupe = ?", (str(group_name),))
+            result = db.fetchone()
+            if result:
+                return False
+
+            db.execute("INSERT INTO honey_agents (groupe) VALUES (?)", (str(group_name),))
+            return True
+

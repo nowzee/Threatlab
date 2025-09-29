@@ -25,3 +25,14 @@ def list_agent():
     agents = manager.list()
 
     return jsonify(agents), 200
+
+@agent_manage_bp.route("/create_group", methods=['POST'])
+def create_group():
+    data = request.json
+    group_name = data.get('group_name')
+
+    manager = ManagerAgent()
+    if manager.create_group(group_name):
+        return jsonify({'success': True}), 200
+
+    return jsonify({'success': False}), 400
