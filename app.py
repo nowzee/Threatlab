@@ -44,17 +44,6 @@ def serve_vue_app():
 def serve_static_or_index(path):
     return send_from_directory(app.static_folder, 'index.html')
 
-# API Routes
-@app.route("/api/honeypots", methods=["GET"])
-def get_honeypots():
-    # Data simulé
-    honeypots = [
-        {"id": 1, "name": "Web-Honeypot-1", "type": "Web Server", "status": "online", "alerts": 12},
-        {"id": 2, "name": "SSH-Trap", "type": "SSH", "status": "online", "alerts": 5},
-        {"id": 3, "name": "FTP-Decoy", "type": "FTP", "status": "offline", "alerts": 0}
-    ]
-    return jsonify({"honeypots": honeypots})
-
 if __name__ == '__main__':
     # Initialisation de la base de données
     if not os.path.exists('db'):
