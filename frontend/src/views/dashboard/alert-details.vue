@@ -170,7 +170,7 @@ export default defineComponent({
 
 <template>
   <div class="content-wrapper">
-    <!-- En-tête professionnel -->
+    <!-- En-tête -->
     <div class="page-header">
       <div class="header-navigation">
         <button @click="goBack" class="back-button">
