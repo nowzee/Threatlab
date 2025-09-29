@@ -192,11 +192,37 @@ export default defineComponent({
       }
     }
 
-    const deleteSelected = () => {
-      honeypots.value = honeypots.value.filter(h => !selectedHoneypots.value.includes(h.id))
-      selectedHoneypots.value = []
-      showDeleteConfirm.value = false
+    const deleteSelected = async () => {
+    try {
+    for (const id of selectedHoneypots.value) {
+      const response = await fetch('/api/agent/manage/delete', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ agent_id: id })
+      })
+
+      if (!response.ok) {
+        console.error(`Erreur lors de la suppression de l'agent ${id}`)
+      } else {
+        const result = await response.json()
+        if (!result.success) {
+          console.error(`Suppression échouée pour l'agent ${id}`)
+        }
+      }
     }
+
+    // Mise à jour locale de la liste
+    honeypots.value = honeypots.value.filter(h => !selectedHoneypots.value.includes(h.id))
+    selectedHoneypots.value = []
+    showDeleteConfirm.value = false
+
+  } catch (error) {
+    console.error("Erreur lors de la suppression :", error)
+  }
+}
+
 
     const selectAll = () => {
       if (selectedHoneypots.value.length === filteredHoneypots.value.length) {

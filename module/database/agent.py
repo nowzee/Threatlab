@@ -279,7 +279,7 @@ class ManagerAgent:
     def remove(agent_id: int) -> bool:
         with DatabaseManagerHoneypot() as db:
             
-            db.execute('''SELECT FROM honey_agents WHERE id = ?''', (agent_id,))
+            db.execute('''SELECT id FROM honey_agents WHERE id = ?''', (agent_id,))
             agent = db.fetchone()
             if agent:
                 db.execute("DELETE FROM honey_agents WHERE id = ?", (agent_id,))

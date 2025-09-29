@@ -24,5 +24,4 @@ def list_agent():
     manager = ManagerAgent()
     agents = manager.list()
 
-    print(agents)
     return jsonify(agents), 200
