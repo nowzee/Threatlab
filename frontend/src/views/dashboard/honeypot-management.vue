@@ -20,10 +20,7 @@ interface Honeypot {
 }
 
 interface HoneypotGroup {
-  id: number
   name: string
-  description: string
-  honeypots_count: number
 }
 
 export default defineComponent({
@@ -83,6 +80,17 @@ export default defineComponent({
             opencti_url: ''
           }
         }))
+        const names = new Set<string>()
+
+        data.forEach((item: any) => {
+        names.add(item.groupe || "default")
+        })
+
+        groups.value = []
+        names.forEach((name: string) => {
+          groups.value.push({name})
+        })
+
       } catch (error) {
         console.error("Erreur lors du chargement des honeypots:", error)
       }
@@ -156,10 +164,7 @@ export default defineComponent({
 
     const createGroup = async () => {
       const newGroup: HoneypotGroup = {
-        id: Date.now(),
         name: groupForm.value.name,
-        description: groupForm.value.description,
-        honeypots_count: 0
       }
       const response = await fetch('api/agent/manage/create_group', {
         method: 'POST',
@@ -396,7 +401,7 @@ export default defineComponent({
 
         <select v-model="filterGroup" class="filter-select">
           <option value="all">Tous les groupes</option>
-          <option v-for="group in groups" :key="group.id" :value="group.name">
+          <option v-for="group in groups" :value="group.name">
             {{ group.name }}
           </option>
         </select>
@@ -869,11 +874,6 @@ export default defineComponent({
   justify-content: flex-end;
 }
 
-/* Formulaires */
-.form-group {
-  margin-bottom: 20px;
-}
-
 .form-group label {
   display: block;
   color: var(--white);
@@ -885,7 +885,7 @@ export default defineComponent({
 .form-group input,
 .form-group select,
 .form-group textarea {
-  width: 100%;
+  width: 80%;
   padding: 12px 16px;
   background: var(--container-background);
   border: 1px solid var(--container-border-color);
