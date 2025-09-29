@@ -999,30 +999,4 @@ input:checked + .slider {
 input:checked + .slider:before {
   transform: translateX(26px);
 }
-
-/* Responsive */
-@media (max-width: 768px) {
-  .honeypot-management-page {
-    padding: 16px;
-  }
-
-  .controls-section {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .controls-left,
-  .controls-right {
-    flex-wrap: wrap;
-  }
-
-  .search-input {
-    width: 100%;
-  }
-
-  .modal-container {
-    width: 95vw;
-    margin: 16px;
-  }
-}
 </style>
