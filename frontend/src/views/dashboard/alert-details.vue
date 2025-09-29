@@ -169,7 +169,7 @@ export default defineComponent({
 </script>
 
 <template>
-  <div class="alert-details-page">
+  <div class="content-wrapper">
     <!-- En-tête professionnel -->
     <div class="page-header">
       <div class="header-navigation">
@@ -185,21 +185,12 @@ export default defineComponent({
       <div class="header-content" v-if="alertDetails">
         <div class="header-main">
           <h1 class="page-title">
-            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-              <line x1="12" y1="9" x2="12" y2="13"></line>
-              <line x1="12" y1="17" x2="12.01" y2="17"></line>
-            </svg>
             Alerte #{{ alertDetails.id }}
           </h1>
           <p class="page-subtitle">{{ alertDetails.message }}</p>
         </div>
 
         <div class="header-badges">
-          <div class="severity-badge" :class="'severity-' + alertDetails.severity">
-            <span class="severity-dot"></span>
-            <span class="severity-text">{{ getSeverityText(alertDetails.severity) }}</span>
-          </div>
           <div class="timestamp-badge">
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <circle cx="12" cy="12" r="10"></circle>
@@ -444,7 +435,6 @@ export default defineComponent({
 .back-button:hover {
   background: rgba(255, 255, 255, 0.08);
   color: var(--white);
-  transform: translateX(-2px);
 }
 
 .header-content {
@@ -484,42 +474,6 @@ export default defineComponent({
   flex-direction: column;
   gap: 12px;
   align-items: flex-end;
-}
-
-.severity-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-weight: 600;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.severity-badge.severity-high {
-  background: rgba(255, 58, 94, 0.2);
-  color: #ff3a5e;
-  border: 1px solid rgba(255, 58, 94, 0.3);
-}
-
-.severity-badge.severity-medium {
-  background: rgba(255, 183, 77, 0.2);
-  color: #ffb74d;
-  border: 1px solid rgba(255, 183, 77, 0.3);
-}
-
-.severity-badge.severity-low {
-  background: rgba(41, 182, 246, 0.2);
-  color: #29b6f6;
-  border: 1px solid rgba(41, 182, 246, 0.3);
-}
-
-.severity-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
 }
 
 .severity-high .severity-dot {
@@ -625,7 +579,6 @@ export default defineComponent({
 }
 
 .info-card:hover, .threat-card:hover {
-  transform: translateY(-4px);
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
 }
 
