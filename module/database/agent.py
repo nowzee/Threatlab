@@ -275,11 +275,25 @@ def get_agent_details():
 
 
 class ManagerAgent:
-    def remove(self, agent_id):
-        pass
+    @staticmethod
+    def remove(agent_id: int) -> bool:
+        with DatabaseManagerHoneypot() as db:
+            
+            db.execute('''SELECT FROM honey_agents WHERE id = ?''', (agent_id,))
+            agent = db.fetchone()
+            if agent:
+                db.execute("DELETE FROM honey_agents WHERE id = ?", (agent_id,))
+                return True
+            return False
 
     def update(self, agent_id, agent_name, is_active):
         pass
 
-    def list(self):
-        pass
+    @staticmethod
+    def list() -> list:
+
+        with DatabaseManagerHoneypot() as db:
+            db.execute('''SELECT id, agent_name, ip_address, service_type, updated_at FROM honey_agents''')
+            result = db.fetchall()
+
+            return result

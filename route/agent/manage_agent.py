@@ -6,9 +6,12 @@ agent_manage_bp = Blueprint('agent_manage', __name__, url_prefix='/api/agent/man
 @agent_manage_bp.route("/delete", methods=['POST'])
 def delete_agent():
     data = request.json
-    agent_id = data.get('agent_id')
+    agent_id: int = data.get('agent_id')
 
-    return jsonify({'success': True}), 200
+    manager = ManagerAgent()
+    if manager.remove(agent_id):
+        return jsonify({'success': True}), 200
+    return jsonify({'success': False}), 400
 
 @agent_manage_bp.route("/update", methods=['POST'])
 def update_agent():
@@ -20,4 +23,5 @@ def update_agent():
 def list_agent():
     manager = ManagerAgent()
     agents = manager.list()
+
     return jsonify(agents), 200

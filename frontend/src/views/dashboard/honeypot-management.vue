@@ -8,7 +8,6 @@ interface Honeypot {
   type: 'SSH' | 'HTTP' | 'FTP' | 'SMTP' | 'Telnet'
   status: 'active' | 'inactive' | 'error'
   ip: string
-  port: number
   group: string
   created_at: string
   last_activity: string
@@ -82,7 +81,6 @@ export default defineComponent({
           type: 'SSH',
           status: 'active',
           ip: '10.0.1.100',
-          port: 22,
           group: 'Production',
           created_at: '2024-03-15 10:30:00',
           last_activity: '2024-03-15 14:25:12',
@@ -100,7 +98,6 @@ export default defineComponent({
           type: 'HTTP',
           status: 'active',
           ip: '10.0.1.101',
-          port: 80,
           group: 'Production',
           created_at: '2024-03-15 09:15:00',
           last_activity: '2024-03-15 14:20:45',
@@ -118,7 +115,6 @@ export default defineComponent({
           type: 'FTP',
           status: 'inactive',
           ip: '10.0.2.100',
-          port: 21,
           group: 'Test',
           created_at: '2024-03-14 16:45:00',
           last_activity: '2024-03-14 18:30:22',
@@ -136,7 +132,6 @@ export default defineComponent({
           type: 'SMTP',
           status: 'error',
           ip: '172.16.1.100',
-          port: 25,
           group: 'DMZ',
           created_at: '2024-03-13 11:20:00',
           last_activity: '2024-03-13 15:10:33',
@@ -240,7 +235,6 @@ export default defineComponent({
         type: honeypotForm.value.type as 'SSH' | 'HTTP' | 'FTP' | 'SMTP' | 'Telnet',
         status: 'inactive',
         ip: honeypotForm.value.ip,
-        port: honeypotForm.value.port,
         group: honeypotForm.value.group,
         created_at: new Date().toLocaleString(),
         last_activity: 'Jamais',
@@ -500,7 +494,6 @@ export default defineComponent({
                 <th>Type</th>
                 <th>Statut</th>
                 <th>Adresse IP</th>
-                <th>Port</th>
                 <th>Groupe</th>
                 <th>Alertes</th>
                 <th>Dernière Activité</th>
@@ -542,9 +535,6 @@ export default defineComponent({
                   <code class="ip-address">{{ honeypot.ip }}</code>
                 </td>
                 <td>
-                  <code class="port-number">{{ honeypot.port }}</code>
-                </td>
-                <td>
                   <span class="group-badge">{{ honeypot.group }}</span>
                 </td>
                 <td class="alerts-cell">
@@ -555,17 +545,6 @@ export default defineComponent({
                 </td>
                 <td class="actions-cell">
                   <div class="action-buttons">
-                    <button 
-                      class="action-btn toggle" 
-                      @click="toggleHoneypot(honeypot)"
-                      :title="honeypot.status === 'active' ? 'Désactiver' : 'Activer'">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                        <circle cx="12" cy="16" r="1"></circle>
-                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-                      </svg>
-                    </button>
-
                     <button 
                       class="action-btn integration" 
                       @click="openIntegrationModal(honeypot)"
@@ -924,16 +903,6 @@ export default defineComponent({
 
 .ip-address {
   padding: 6px 10px;
-  font-family: 'Courier New', monospace;
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.port-number {
-  background: rgba(255, 183, 77, 0.15);
-  color: #ffb74d;
-  padding: 6px 10px;
-  border-radius: 6px;
   font-family: 'Courier New', monospace;
   font-weight: 600;
   font-size: 13px;
