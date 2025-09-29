@@ -77,6 +77,15 @@ class DatabaseManagerHoneypot:
                                 )
                                 ''')
 
+            # Table des groupes pour les agents
+            self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS groups_agent
+            (
+                id INTEGER PRIMARY KEY,
+                group_name TEXT NOT NULL
+            )
+                                ''')
+
             # Table pour stocker les logs d'attaques
             self.cursor.execute('''
                                 CREATE TABLE IF NOT EXISTS attack_logs

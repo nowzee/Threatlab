@@ -154,15 +154,27 @@ export default defineComponent({
       showGroupModal.value = true
     }
 
-    const createGroup = () => {
+    const createGroup = async () => {
       const newGroup: HoneypotGroup = {
         id: Date.now(),
         name: groupForm.value.name,
         description: groupForm.value.description,
         honeypots_count: 0
       }
-      groups.value.push(newGroup)
-      showGroupModal.value = false
+      const response = await fetch('api/agent/manage/create_group', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({group_name: groupForm.value.name})
+      })
+
+      const result = await response.json()
+      if (result.success) {
+
+        groups.value.push(newGroup)
+        showGroupModal.value = false
+      }
     }
 
     const uniqueGroupsCount = computed(() => {
@@ -365,7 +377,7 @@ export default defineComponent({
             <polyline points="3 6 5 6 21 6"></polyline>
             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
           </svg>
-          Supprimer ({{ selectedHoneypots.length }})
+          Supprimer
         </button>
       </div>
 

@@ -325,11 +325,11 @@ class ManagerAgent:
     @staticmethod
     def create_group(group_name) -> bool:
         with DatabaseManagerHoneypot() as db:
-            db.execute("SELECT id FROM honey_agents WHERE groupe = ?", (str(group_name),))
+            db.execute("SELECT id FROM groups_agent WHERE group_name = ?", (str(group_name),))
             result = db.fetchone()
             if result:
                 return False
 
-            db.execute("INSERT INTO honey_agents (groupe) VALUES (?)", (str(group_name),))
+            db.execute("INSERT INTO groups_agent (group_name) VALUES (?)", (str(group_name),))
             return True
 
