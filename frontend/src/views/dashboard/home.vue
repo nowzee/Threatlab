@@ -230,38 +230,6 @@ export default defineComponent({
 
 <style src="@/assets/css/dashboard/notifications.css"></style>
 <style scoped>
-    /* Styles spécifiques à la page dashboard */
-    .stat-card {
-        display: flex;
-        align-items: center;
-        gap: 16px;
-    }
-
-    .stat-icon {
-        width: 48px;
-        height: 48px;
-        background-color: rgba(0, 0, 0, 0.2);
-        border-radius: 12px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-    }
-
-    .stat-content {
-        flex: 1;
-    }
-
-    .stat-value {
-        font-size: 28px;
-        font-weight: 700;
-        color: var(--white);
-        margin-bottom: 4px;
-    }
-
-    .stat-label {
-        font-size: 14px;
-        color: var(--text-color-muted);
-    }
 
     .view-all-link {
         color: var(--accent-color);

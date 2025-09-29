@@ -296,21 +296,21 @@ export default defineComponent({
     </h1>
 
     <!-- Statistiques rapides -->
-    <div class="stats-grid">
-      <div class="stat-card active">
-        <div class="stat-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="12" cy="12" r="10"></circle>
-            <polyline points="8 12 12 16 16 12"></polyline>
-          </svg>
+      <div class="stats-grid">
+        <div class="card active card-body stat-card">
+          <div class="stat-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <polyline points="8 12 12 16 16 12"></polyline>
+            </svg>
+          </div>
+          <div class="stat-content">
+            <div class="stat-value">{{ honeypots.filter(h => h.status === 'active').length }}</div>
+            <div class="stat-label">Honeypots Actifs</div>
+          </div>
         </div>
-        <div class="stat-content">
-          <div class="stat-number">{{ honeypots.filter(h => h.status === 'active').length }}</div>
-          <div class="stat-label">Honeypots Actifs</div>
-        </div>
-      </div>
 
-      <div class="stat-card total">
+      <div class="card active card-body stat-card total">
         <div class="stat-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 11V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6"></path>
@@ -320,12 +320,12 @@ export default defineComponent({
           </svg>
         </div>
         <div class="stat-content">
-          <div class="stat-number">{{ honeypots.length }}</div>
+          <div class="stat-value">{{ honeypots.length }}</div>
           <div class="stat-label">Total Honeypots</div>
         </div>
       </div>
 
-      <div class="stat-card groups">
+      <div class="card active card-body stat-card groups">
         <div class="stat-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -335,12 +335,12 @@ export default defineComponent({
           </svg>
         </div>
         <div class="stat-content">
-          <div class="stat-number">{{ uniqueGroupsCount }}</div>
+          <div class="stat-value">{{ uniqueGroupsCount }}</div>
           <div class="stat-label">Groupes</div>
         </div>
       </div>
 
-      <div class="stat-card alerts">
+      <div class="card active card-body stat-card alerts">
         <div class="stat-icon">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
@@ -349,7 +349,7 @@ export default defineComponent({
           </svg>
         </div>
         <div class="stat-content">
-          <div class="stat-number">{{ honeypots.reduce((sum, h) => sum + h.alerts_count, 0) }}</div>
+          <div class="stat-value">{{ honeypots.reduce((sum, h) => sum + h.alerts_count, 0) }}</div>
           <div class="stat-label">Alertes Générées</div>
         </div>
       </div>
@@ -507,16 +507,12 @@ export default defineComponent({
       <div class="modal-container" @click.stop>
         <div class="modal-header">
           <h3>Créer un Nouveau Groupe</h3>
-          <button class="modal-close" @click="closeModals">×</button>
+          <button class="modal-close-btn" @click="closeModals">×</button>
         </div>
         <div class="modal-content">
           <div class="form-group">
             <label>Nom du groupe</label>
             <input type="text" v-model="groupForm.name" placeholder="Ex: Production">
-          </div>
-          <div class="form-group">
-            <label>Description</label>
-            <textarea v-model="groupForm.description" placeholder="Description du groupe"></textarea>
           </div>
         </div>
         <div class="modal-actions">
@@ -531,7 +527,7 @@ export default defineComponent({
       <div class="modal-container large" @click.stop>
         <div class="modal-header">
           <h3>Configurer les Intégrations - {{ currentHoneypot?.name }}</h3>
-          <button class="modal-close" @click="closeModals">×</button>
+          <button class="modal-close-btn" @click="closeModals">×</button>
         </div>
         <div class="modal-content">
           <div class="integration-section">
@@ -595,7 +591,7 @@ export default defineComponent({
       <div class="modal-container danger" @click.stop>
         <div class="modal-header">
           <h3>Confirmer la Suppression</h3>
-          <button class="modal-close" @click="closeModals">×</button>
+          <button class="modal-close-btn" @click="closeModals">×</button>
         </div>
         <div class="modal-content">
           <p>Êtes-vous sûr de vouloir supprimer {{ selectedHoneypots.length }} honeypot(s) ?</p>
@@ -627,28 +623,6 @@ export default defineComponent({
   margin-bottom: 32px;
 }
 
-.stat-card {
-  background: var(--container-background-lighter);
-  border: 1px solid var(--container-border-color);
-  border-radius: 16px;
-  padding: 24px;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.stat-icon {
-  width: 56px;
-  height: 56px;
-  border-radius: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
 .active .stat-icon {
   background: rgba(0, 230, 118, 0.2);
   color: #00e676;
@@ -667,24 +641,6 @@ export default defineComponent({
 .alerts .stat-icon {
   background: rgba(255, 58, 94, 0.2);
   color: #ff3a5e;
-}
-
-.stat-content {
-  flex: 1;
-}
-
-.stat-number {
-  font-size: 36px;
-  font-weight: 800;
-  color: var(--white);
-  line-height: 1;
-  margin-bottom: 8px;
-}
-
-.stat-label {
-  font-size: 16px;
-  color: var(--text-color-muted);
-  font-weight: 500;
 }
 
 /* Contrôles */
@@ -782,11 +738,10 @@ export default defineComponent({
 }
 
 .honeypots-table thead th {
-  background: rgba(255, 255, 255, 0.05);
+  background: var(--table-header-bg);
   color: var(--text-color-muted);
-  font-weight: 600;
+  font-weight: 500;
   font-size: 14px;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
   padding: 16px 24px;
   text-align: left;
@@ -794,12 +749,12 @@ export default defineComponent({
 }
 
 .honeypot-row {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  transition: all 0.2s ease;
+  border-bottom: 1px solid var(--table-border);
+  transition: all 0.1s ease;
 }
 
 .honeypot-row:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: var(--table-row-hover);
 }
 
 .honeypots-table td {
@@ -902,68 +857,6 @@ export default defineComponent({
   background: rgba(30, 84, 229, 0.3);
 }
 
-/* Modales */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.modal-container {
-  background: var(--container-background-lighter);
-  border: 1px solid var(--container-border-color);
-  border-radius: 16px;
-  width: 500px;
-  max-width: 90vw;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-container.large {
-  width: 700px;
-}
-
-.modal-header {
-  padding: 24px 32px;
-  border-bottom: 1px solid var(--container-border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.modal-header h3 {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--white);
-  margin: 0;
-}
-
-.modal-close {
-  background: none;
-  border: none;
-  color: var(--text-color-muted);
-  font-size: 24px;
-  cursor: pointer;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-}
-
-.modal-close:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--white);
-}
-
 .modal-content {
   padding: 32px;
 }
@@ -979,12 +872,6 @@ export default defineComponent({
 /* Formulaires */
 .form-group {
   margin-bottom: 20px;
-}
-
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 120px;
-  gap: 16px;
 }
 
 .form-group label {

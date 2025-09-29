@@ -116,6 +116,37 @@ body {
     flex-wrap: wrap;
 }
 
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: var(--text-color-muted);
+}
+
+.stat-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+ .stat-icon {
+     width: 48px;
+     height: 48px;
+     background-color: rgba(0, 0, 0, 0.2);
+     border-radius: 12px;
+     display: flex;
+     align-items: center;
+     justify-content: center;
+ }
+
+.stat-content {
+    flex: 1;
+}
+
 @media (max-width: 768px) {
     body {
         flex-direction: column;
@@ -130,3 +161,4 @@ body {
         grid-template-columns: 1fr;
     }
 }
+
