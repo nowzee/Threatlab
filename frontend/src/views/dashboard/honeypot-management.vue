@@ -26,7 +26,6 @@ interface HoneypotGroup {
   name: string
   description: string
   honeypots_count: number
-  color: string
 }
 
 export default defineComponent({
@@ -59,7 +58,6 @@ export default defineComponent({
     const groupForm = ref({
       name: '',
       description: '',
-      color: '#1e54e5'
     })
 
     const integrationForm = ref({
@@ -72,9 +70,9 @@ export default defineComponent({
     // Données factices
     const loadMockData = () => {
       groups.value = [
-        { id: 1, name: 'Production', description: 'Honeypots de production', honeypots_count: 5, color: '#ff3a5e' },
-        { id: 2, name: 'Test', description: 'Honeypots de test', honeypots_count: 3, color: '#ffb74d' },
-        { id: 3, name: 'DMZ', description: 'Honeypots en zone démilitarisée', honeypots_count: 2, color: '#29b6f6' }
+        { id: 1, name: 'Production', description: 'Honeypots de production', honeypots_count: 5 },
+        { id: 2, name: 'Test', description: 'Honeypots de test', honeypots_count: 3},
+        { id: 3, name: 'DMZ', description: 'Honeypots en zone démilitarisée', honeypots_count: 2 }
       ]
 
       honeypots.value = [
@@ -231,7 +229,7 @@ export default defineComponent({
     }
 
     const openGroupModal = () => {
-      groupForm.value = { name: '', description: '', color: '#1e54e5' }
+      groupForm.value = { name: '', description: ''}
       showGroupModal.value = true
     }
 
@@ -263,8 +261,7 @@ export default defineComponent({
         id: Date.now(),
         name: groupForm.value.name,
         description: groupForm.value.description,
-        honeypots_count: 0,
-        color: groupForm.value.color
+        honeypots_count: 0
       }
       groups.value.push(newGroup)
       showGroupModal.value = false
@@ -361,27 +358,11 @@ export default defineComponent({
 </script>
 
 <template>
-  <div class="honeypot-management-page">
+  <div class="content-wrapper">
     <!-- En-tête -->
-    <div class="page-header">
-      <div class="header-content">
-        <h1 class="page-title">
-          <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 11V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6"></path>
-            <path d="M12 16H7"></path>
-            <path d="M12 12H7"></path>
-            <path d="M12 8H7"></path>
-            <path d="M16 16v6"></path>
-            <path d="M19 19l-3-3-3 3"></path>
-          </svg>
-          Gestion des Honeypots
-        </h1>
-        <div class="status-indicator">
-          <span class="status-dot status-active"></span>
-          <span class="status-text">{{ filteredHoneypots.length }} honeypot(s) trouvé(s)</span>
-        </div>
-      </div>
-    </div>
+    <h1 class="page-title">
+        Gestion des Honeypots
+    </h1>
 
     <!-- Statistiques rapides -->
     <div class="stats-grid">
@@ -446,13 +427,6 @@ export default defineComponent({
     <!-- Contrôles et filtres -->
     <div class="controls-section">
       <div class="controls-left">
-        <button class="btn btn-primary" @click="openCreateModal">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19"></line>
-            <line x1="5" y1="12" x2="19" y2="12"></line>
-          </svg>
-          Nouveau Honeypot
-        </button>
 
         <button class="btn btn-secondary" @click="openGroupModal">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -510,9 +484,6 @@ export default defineComponent({
       <div class="table-container">
         <div class="table-header">
           <h2 class="table-title">Honeypots</h2>
-          <button class="btn btn-secondary btn-sm" @click="selectAll">
-            {{ selectedHoneypots.length === filteredHoneypots.length ? 'Désélectionner tout' : 'Sélectionner tout' }}
-          </button>
         </div>
 
         <div class="modern-table">
@@ -549,11 +520,6 @@ export default defineComponent({
                 </td>
                 <td class="name-cell">
                   <div class="honeypot-name">
-                    <div class="type-icon">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path :d="getTypeIcon(honeypot.type)"></path>
-                      </svg>
-                    </div>
                     <div class="name-info">
                       <div class="name-primary">{{ honeypot.name }}</div>
                       <div class="name-secondary">ID: {{ honeypot.id }}</div>
@@ -568,7 +534,6 @@ export default defineComponent({
                 <td>
                   <div class="status-cell">
                     <span class="status-indicator" :class="getStatusClass(honeypot.status)">
-                      <span class="status-dot"></span>
                       {{ getStatusText(honeypot.status) }}
                     </span>
                   </div>
@@ -621,54 +586,6 @@ export default defineComponent({
       </div>
     </div>
 
-    <!-- Modal Création Honeypot -->
-    <div v-if="showCreateModal" class="modal-overlay" @click="closeModals">
-      <div class="modal-container" @click.stop>
-        <div class="modal-header">
-          <h3>Créer un Nouveau Honeypot</h3>
-          <button class="modal-close" @click="closeModals">×</button>
-        </div>
-        <div class="modal-content">
-          <div class="form-group">
-            <label>Nom du honeypot</label>
-            <input type="text" v-model="honeypotForm.name" placeholder="Ex: SSH-Prod-01">
-          </div>
-          <div class="form-group">
-            <label>Type</label>
-            <select v-model="honeypotForm.type">
-              <option value="SSH">SSH</option>
-              <option value="HTTP">HTTP</option>
-              <option value="FTP">FTP</option>
-              <option value="SMTP">SMTP</option>
-              <option value="Telnet">Telnet</option>
-            </select>
-          </div>
-          <div class="form-row">
-            <div class="form-group">
-              <label>Adresse IP</label>
-              <input type="text" v-model="honeypotForm.ip" placeholder="192.168.1.100">
-            </div>
-            <div class="form-group">
-              <label>Port</label>
-              <input type="number" v-model="honeypotForm.port">
-            </div>
-          </div>
-          <div class="form-group">
-            <label>Groupe</label>
-            <select v-model="honeypotForm.group">
-              <option v-for="group in groups" :key="group.id" :value="group.name">
-                {{ group.name }}
-              </option>
-            </select>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" @click="closeModals">Annuler</button>
-          <button class="btn btn-primary" @click="createHoneypot">Créer</button>
-        </div>
-      </div>
-    </div>
-
     <!-- Modal Création Groupe -->
     <div v-if="showGroupModal" class="modal-overlay" @click="closeModals">
       <div class="modal-container" @click.stop>
@@ -684,10 +601,6 @@ export default defineComponent({
           <div class="form-group">
             <label>Description</label>
             <textarea v-model="groupForm.description" placeholder="Description du groupe"></textarea>
-          </div>
-          <div class="form-group">
-            <label>Couleur</label>
-            <input type="color" v-model="groupForm.color">
           </div>
         </div>
         <div class="modal-actions">
@@ -782,64 +695,12 @@ export default defineComponent({
 </template>
 
 <style scoped>
-.honeypot-management-page {
-  padding: 24px 32px;
-  background: var(--container-background);
-  min-height: 100vh;
-}
-
-/* Réutilisation du CSS global d'alerts.vue */
-.page-header {
-  margin-bottom: 32px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid var(--container-border-color);
-}
-
-.header-content {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.page-title {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  font-size: 32px;
-  font-weight: 700;
-  color: var(--white);
-  margin: 0;
-}
-
-.page-title svg {
-  color: var(--accent-color);
-}
 
 .status-indicator {
   display: flex;
   align-items: center;
   gap: 12px;
   padding: 12px 20px;
-  background: rgba(30, 84, 229, 0.15);
-  border: 1px solid rgba(30, 84, 229, 0.3);
-  border-radius: 12px;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.status-active {
-  background-color: #00e676;
-  box-shadow: 0 0 8px rgba(0, 230, 118, 0.4);
-}
-
-.status-text {
-  color: var(--white);
-  font-weight: 500;
-  font-size: 14px;
 }
 
 /* Stats grid */
@@ -861,36 +722,6 @@ export default defineComponent({
   display: flex;
   align-items: center;
   gap: 16px;
-}
-
-.stat-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
-}
-
-.stat-card::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-}
-
-.stat-card.active::before {
-  background: linear-gradient(90deg, #00e676, #64ffda);
-}
-
-.stat-card.total::before {
-  background: linear-gradient(90deg, #1e54e5, #3f7cff);
-}
-
-.stat-card.groups::before {
-  background: linear-gradient(90deg, #ffb74d, #ffd54f);
-}
-
-.stat-card.alerts::before {
-  background: linear-gradient(90deg, #ff3a5e, #ff6b8a);
 }
 
 .stat-icon {
@@ -1055,18 +886,6 @@ export default defineComponent({
   background: rgba(255, 255, 255, 0.03);
 }
 
-.honeypot-row.status-active {
-  border-left: 4px solid #00e676;
-}
-
-.honeypot-row.status-inactive {
-  border-left: 4px solid #666;
-}
-
-.honeypot-row.status-error {
-  border-left: 4px solid #ff3a5e;
-}
-
 .honeypots-table td {
   padding: 20px 24px;
   vertical-align: middle;
@@ -1080,17 +899,6 @@ export default defineComponent({
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.type-icon {
-  width: 32px;
-  height: 32px;
-  background: rgba(30, 84, 229, 0.2);
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--accent-color);
 }
 
 .name-primary {
@@ -1114,84 +922,8 @@ export default defineComponent({
   letter-spacing: 0.3px;
 }
 
-.type-ssh {
-  background: rgba(255, 58, 94, 0.2);
-  color: #ff3a5e;
-}
-
-.type-http {
-  background: rgba(0, 230, 118, 0.2);
-  color: #00e676;
-}
-
-.type-ftp {
-  background: rgba(255, 183, 77, 0.2);
-  color: #ffb74d;
-}
-
-.type-smtp {
-  background: rgba(41, 182, 246, 0.2);
-  color: #29b6f6;
-}
-
-.type-telnet {
-  background: rgba(156, 39, 176, 0.2);
-  color: #9c27b0;
-}
-
-.status-cell .status-indicator {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.status-indicator.status-active {
-  background: rgba(0, 230, 118, 0.2);
-  color: #00e676;
-  border: 1px solid rgba(0, 230, 118, 0.3);
-}
-
-.status-indicator.status-inactive {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--text-color-muted);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.status-indicator.status-error {
-  background: rgba(255, 58, 94, 0.2);
-  color: #ff3a5e;
-  border: 1px solid rgba(255, 58, 94, 0.3);
-}
-
-.status-indicator .status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.status-active .status-dot {
-  background: #00e676;
-}
-
-.status-inactive .status-dot {
-  background: #666;
-}
-
-.status-error .status-dot {
-  background: #ff3a5e;
-}
-
 .ip-address {
-  background: rgba(30, 84, 229, 0.15);
-  color: #1e54e5;
   padding: 6px 10px;
-  border-radius: 6px;
   font-family: 'Courier New', monospace;
   font-weight: 600;
   font-size: 13px;
@@ -1218,7 +950,7 @@ export default defineComponent({
 
 .alerts-count {
   font-size: 18px;
-  font-weight: 700;
+  font-weight: 400;
   color: #ff3a5e;
   text-align: center;
 }
@@ -1290,10 +1022,6 @@ export default defineComponent({
 
 .modal-container.large {
   width: 700px;
-}
-
-.modal-container.danger {
-  border-color: rgba(255, 58, 94, 0.3);
 }
 
 .modal-header {
@@ -1376,11 +1104,6 @@ export default defineComponent({
 .form-group textarea {
   resize: vertical;
   min-height: 80px;
-}
-
-.warning-text {
-  color: #ff3a5e;
-  font-weight: 600;
 }
 
 /* Intégrations */
