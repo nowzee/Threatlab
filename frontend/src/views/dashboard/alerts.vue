@@ -142,30 +142,10 @@ export default defineComponent({
         labels,
         datasets: [
           {
-            label: 'Alertes Critiques',
-            data: attackWaves.value.map(wave => wave.severity_high),
-            borderColor: '#ff3a5e',
-            backgroundColor: 'rgba(255, 58, 94, 0.1)',
-            fill: true,
-            tension: 0.4,
-            pointRadius: 4,
-            pointHoverRadius: 6
-          },
-          {
             label: 'Alertes Moyennes',
             data: attackWaves.value.map(wave => wave.severity_medium),
             borderColor: '#ffb74d',
             backgroundColor: 'rgba(255, 183, 77, 0.1)',
-            fill: true,
-            tension: 0.4,
-            pointRadius: 4,
-            pointHoverRadius: 6
-          },
-          {
-            label: 'Alertes Faibles',
-            data: attackWaves.value.map(wave => wave.severity_low),
-            borderColor: '#29b6f6',
-            backgroundColor: 'rgba(41, 182, 246, 0.1)',
             fill: true,
             tension: 0.4,
             pointRadius: 4,
@@ -192,7 +172,7 @@ export default defineComponent({
         },
         title: {
           display: true,
-          text: 'Évolution des Attaques (24 dernières heures)',
+          text: 'Analyse des attaques',
           color: '#ffffff',
           font: {
             size: 16,

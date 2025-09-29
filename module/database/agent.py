@@ -272,3 +272,14 @@ def get_agent_details():
             })
 
     return data
+
+
+class ManagerAgent:
+    def remove(self, agent_id):
+        pass
+
+    def update(self, agent_id, agent_name, is_active):
+        pass
+
+    def list(self):
+        pass

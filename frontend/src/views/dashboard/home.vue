@@ -179,34 +179,6 @@ export default defineComponent({
         </div>
     </div>
 
-    <!-- Liste des honeypots -->
-    <div class="section-card" style="margin-top: 1.5%;">
-        <div class="card-header" style="padding: 0 0 16px 0; margin-bottom: 16px;">
-            <h3 class="card-title">
-                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M21 11V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6"></path>
-                    <path d="M12 16H7"></path>
-                    <path d="M12 12H7"></path>
-                    <path d="M12 8H7"></path>
-                    <path d="M16 16v6"></path>
-                    <path d="M19 19l-3-3-3 3"></path>
-                </svg>
-                Honeypots déployés
-            </h3>
-            <button class="btn btn-primary btn-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                </svg>
-                Nouveau honeypot
-            </button>
-        </div>
-
-        <div id="honeypot-list" class="grid-container">
-            <!-- Contenu généré dynamiquement par le script -->
-        </div>
-    </div>
-
     <!-- Alertes récentes -->
     <div class="section-card">
         <div class="card-header" style="padding: 0 0 16px 0; margin-bottom: 16px;">

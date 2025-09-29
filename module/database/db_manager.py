@@ -68,6 +68,8 @@ class DatabaseManagerHoneypot:
                                     ip_address          TEXT        NOT NULL,
                                     country_name        TEXT,
                                     service_type        TEXT        NOT NULL,
+                                    groupe              TEXT,
+                                    alert_generated     INTEGER DEFAULT 0,
                                     is_active           INTEGER  DEFAULT 0,
                                     created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
                                     updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
