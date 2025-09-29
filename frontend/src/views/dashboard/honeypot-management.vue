@@ -165,6 +165,11 @@ export default defineComponent({
       showGroupModal.value = false
     }
 
+    const uniqueGroupsCount = computed(() => {
+    const groupsSet = new Set(honeypots.value.map(h => h.group))
+        return groupsSet.size
+    })
+
     const saveIntegrations = () => {
       if (currentHoneypot.value) {
         const index = honeypots.value.findIndex(h => h.id === currentHoneypot.value!.id)
@@ -213,6 +218,7 @@ export default defineComponent({
     })
 
     return {
+      uniqueGroupsCount,
       honeypots,
       groups,
       selectedHoneypots,
@@ -291,7 +297,7 @@ export default defineComponent({
           </svg>
         </div>
         <div class="stat-content">
-          <div class="stat-number">{{ groups.length }}</div>
+          <div class="stat-number">{{ uniqueGroupsCount }}</div>
           <div class="stat-label">Groupes</div>
         </div>
       </div>
