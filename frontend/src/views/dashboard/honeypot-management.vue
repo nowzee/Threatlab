@@ -1,6 +1,5 @@
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 
 interface Honeypot {
   id: number
@@ -30,7 +29,6 @@ interface HoneypotGroup {
 export default defineComponent({
   name: "HoneypotManagementView",
   setup() {
-    const router = useRouter()
 
     // États réactifs
     const honeypots = ref<Honeypot[]>([])
@@ -45,15 +43,6 @@ export default defineComponent({
     const filterStatus = ref<string>('all')
     const searchQuery = ref('')
 
-    // Formulaires
-    const honeypotForm = ref({
-      name: '',
-      type: 'SSH',
-      ip: '',
-      port: 22,
-      group: 'default'
-    })
-
     const groupForm = ref({
       name: '',
       description: '',
@@ -66,107 +55,56 @@ export default defineComponent({
       opencti_url: ''
     })
 
-    // Données factices
-    const loadMockData = () => {
-      groups.value = [
-        { id: 1, name: 'Production', description: 'Honeypots de production', honeypots_count: 5 },
-        { id: 2, name: 'Test', description: 'Honeypots de test', honeypots_count: 3},
-        { id: 3, name: 'DMZ', description: 'Honeypots en zone démilitarisée', honeypots_count: 2 }
-      ]
+    const loadHoneypots = async () => {
+      try {
+        const response = await fetch('/api/agent/manage/list', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        })
+        if (!response.ok) {
+          throw new Error("Erreur API")
+        }
+        const data = await response.json()
 
-      honeypots.value = [
-        {
-          id: 1,
-          name: 'SSH-Honeypot-01',
-          type: 'SSH',
-          status: 'active',
-          ip: '10.0.1.100',
-          group: 'Production',
-          created_at: '2024-03-15 10:30:00',
-          last_activity: '2024-03-15 14:25:12',
-          alerts_count: 127,
-          integrations: {
-            elk_enabled: true,
-            elk_url: 'https://elk.company.com:9200',
-            opencti_enabled: false,
-            opencti_url: ''
-          }
-        },
-        {
-          id: 2,
-          name: 'Web-Honeypot-01',
-          type: 'HTTP',
-          status: 'active',
-          ip: '10.0.1.101',
-          group: 'Production',
-          created_at: '2024-03-15 09:15:00',
-          last_activity: '2024-03-15 14:20:45',
-          alerts_count: 89,
-          integrations: {
-            elk_enabled: true,
-            elk_url: 'https://elk.company.com:9200',
-            opencti_enabled: true,
-            opencti_url: 'https://opencti.company.com'
-          }
-        },
-        {
-          id: 3,
-          name: 'FTP-Test-01',
-          type: 'FTP',
-          status: 'inactive',
-          ip: '10.0.2.100',
-          group: 'Test',
-          created_at: '2024-03-14 16:45:00',
-          last_activity: '2024-03-14 18:30:22',
-          alerts_count: 23,
+        honeypots.value = data.map((item: any) => ({
+          id: item.id,
+          name: item.agent_name,
+          type: (item.service_type || 'SSH') as 'SSH' | 'HTTP' | 'FTP' | 'SMTP' | 'Telnet',
+          status: item.is_active ? 'active' : 'inactive',
+          ip: item.ip_address,
+          group: item.groupe || 'default',
+          created_at: item.created_at || '',
+          last_activity: item.updated_at || '',
+          alerts_count: item.alert_generated || 0,
           integrations: {
             elk_enabled: false,
             elk_url: '',
             opencti_enabled: false,
             opencti_url: ''
           }
-        },
-        {
-          id: 4,
-          name: 'SMTP-DMZ-01',
-          type: 'SMTP',
-          status: 'error',
-          ip: '172.16.1.100',
-          group: 'DMZ',
-          created_at: '2024-03-13 11:20:00',
-          last_activity: '2024-03-13 15:10:33',
-          alerts_count: 45,
-          integrations: {
-            elk_enabled: true,
-            elk_url: 'https://elk.company.com:9200',
-            opencti_enabled: false,
-            opencti_url: ''
-          }
-        }
-      ]
+        }))
+      } catch (error) {
+        console.error("Erreur lors du chargement des honeypots:", error)
+      }
     }
 
     // Honeypots filtrés
     const filteredHoneypots = computed(() => {
       let filtered = honeypots.value
-
       if (filterGroup.value !== 'all') {
         filtered = filtered.filter(h => h.group === filterGroup.value)
       }
-
       if (filterStatus.value !== 'all') {
         filtered = filtered.filter(h => h.status === filterStatus.value)
       }
-
       if (searchQuery.value.trim()) {
         const query = searchQuery.value.toLowerCase()
-        filtered = filtered.filter(h => 
+        filtered = filtered.filter(h =>
           h.name.toLowerCase().includes(query) ||
           h.type.toLowerCase().includes(query) ||
           h.ip.includes(query)
         )
       }
-
       return filtered
     })
 
@@ -200,18 +138,6 @@ export default defineComponent({
       }
     }
 
-    // Actions
-    const openCreateModal = () => {
-      honeypotForm.value = {
-        name: '',
-        type: 'SSH',
-        ip: '',
-        port: 22,
-        group: groups.value[0]?.name || 'default'
-      }
-      showCreateModal.value = true
-    }
-
     const openIntegrationModal = (honeypot: Honeypot) => {
       currentHoneypot.value = honeypot
       integrationForm.value = {
@@ -226,28 +152,6 @@ export default defineComponent({
     const openGroupModal = () => {
       groupForm.value = { name: '', description: ''}
       showGroupModal.value = true
-    }
-
-    const createHoneypot = () => {
-      const newHoneypot: Honeypot = {
-        id: Date.now(),
-        name: honeypotForm.value.name,
-        type: honeypotForm.value.type as 'SSH' | 'HTTP' | 'FTP' | 'SMTP' | 'Telnet',
-        status: 'inactive',
-        ip: honeypotForm.value.ip,
-        group: honeypotForm.value.group,
-        created_at: new Date().toLocaleString(),
-        last_activity: 'Jamais',
-        alerts_count: 0,
-        integrations: {
-          elk_enabled: false,
-          elk_url: '',
-          opencti_enabled: false,
-          opencti_url: ''
-        }
-      }
-      honeypots.value.push(newHoneypot)
-      showCreateModal.value = false
     }
 
     const createGroup = () => {
@@ -305,41 +209,29 @@ export default defineComponent({
     }
 
     onMounted(() => {
-      loadMockData()
+      loadHoneypots()
     })
 
     return {
-      // Données
       honeypots,
       groups,
       selectedHoneypots,
       filteredHoneypots,
-
-      // États des modales
       showCreateModal,
       showGroupModal,
       showDeleteConfirm,
       showIntegrationModal,
       currentHoneypot,
-
-      // Filtres
       filterGroup,
       filterStatus,
       searchQuery,
-
-      // Formulaires
-      honeypotForm,
       groupForm,
       integrationForm,
-
-      // Méthodes
       getStatusClass,
       getStatusText,
       getTypeIcon,
-      openCreateModal,
       openIntegrationModal,
       openGroupModal,
-      createHoneypot,
       createGroup,
       saveIntegrations,
       toggleHoneypot,
@@ -350,6 +242,7 @@ export default defineComponent({
   }
 })
 </script>
+
 
 <template>
   <div class="content-wrapper">
@@ -432,8 +325,8 @@ export default defineComponent({
           Nouveau Groupe
         </button>
 
-        <button 
-          class="btn btn-danger" 
+        <button
+          class="btn btn-danger"
           @click="showDeleteConfirm = true"
           :disabled="selectedHoneypots.length === 0">
           <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -450,8 +343,8 @@ export default defineComponent({
             <circle cx="11" cy="11" r="8"></circle>
             <path d="M21 21l-4.35-4.35"></path>
           </svg>
-          <input 
-            type="text" 
+          <input
+            type="text"
             placeholder="Rechercher un honeypot..."
             v-model="searchQuery"
             class="search-input">
@@ -485,8 +378,8 @@ export default defineComponent({
             <thead>
               <tr>
                 <th width="40">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     @change="selectAll"
                     :checked="selectedHoneypots.length === filteredHoneypots.length && filteredHoneypots.length > 0">
                 </th>
@@ -501,13 +394,13 @@ export default defineComponent({
               </tr>
             </thead>
             <tbody>
-              <tr v-for="honeypot in filteredHoneypots" 
-                  :key="honeypot.id" 
+              <tr v-for="honeypot in filteredHoneypots"
+                  :key="honeypot.id"
                   class="honeypot-row"
                   :class="'status-' + honeypot.status">
                 <td>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     :value="honeypot.id"
                     v-model="selectedHoneypots">
                 </td>
@@ -545,8 +438,8 @@ export default defineComponent({
                 </td>
                 <td class="actions-cell">
                   <div class="action-buttons">
-                    <button 
-                      class="action-btn integration" 
+                    <button
+                      class="action-btn integration"
                       @click="openIntegrationModal(honeypot)"
                       title="Configurer les intégrations">
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

@@ -291,9 +291,33 @@ class ManagerAgent:
 
     @staticmethod
     def list() -> list:
-
         with DatabaseManagerHoneypot() as db:
-            db.execute('''SELECT id, agent_name, ip_address, service_type, updated_at FROM honey_agents''')
+            db.execute('''SELECT id,
+                                 agent_name,
+                                 ip_address,
+                                 service_type,
+                                 updated_at,
+                                 is_active,
+                                 groupe,
+                                 alert_generated,
+                                 created_at
+                          FROM honey_agents''')
             result = db.fetchall()
 
-            return result
+            # Convertir les tuples en dictionnaires
+            agents = []
+            for row in result:
+                agent = {
+                    'id': row[0],
+                    'agent_name': row[1],
+                    'ip_address': row[2],
+                    'service_type': row[3],
+                    'updated_at': row[4],
+                    'is_active': row[5] if len(row) > 5 else 1,  # Valeur par défaut
+                    'groupe': row[6] if len(row) > 6 else 'default',  # Valeur par défaut
+                    'alert_generated': row[7] if len(row) > 7 else 0,  # Valeur par défaut
+                    'created_at': row[8] if len(row) > 8 else row[4]  # Utiliser updated_at si created_at n'existe pas
+                }
+                agents.append(agent)
+
+            return agents
