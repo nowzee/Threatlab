@@ -5,7 +5,7 @@ from module.database.detail_log_analyse import last_log_analyse
 
 log_analyse_bp = Blueprint("log_analyse_bp", __name__, url_prefix="/log-analyse")
 
-@log_analyse_bp.route("/get_data", methods=["POST"])
+@log_analyse_bp.route("/get_data_chart", methods=["POST"])
 def get_data():
     req_data = request.get_json()
     timeline = req_data.get("time", "24h")

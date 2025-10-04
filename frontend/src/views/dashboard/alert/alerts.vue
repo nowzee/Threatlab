@@ -109,7 +109,7 @@ export default defineComponent({
     const selectedTimeline = ref('24h')
 const generateTimelineData = async (timeline: string = '24h') => {
   try {
-    const response = await fetch(`/log-analyse/get_data`, {
+    const response = await fetch(`/log-analyse/get_data_chart`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
