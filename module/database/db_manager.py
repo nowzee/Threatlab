@@ -91,7 +91,7 @@ class DatabaseManagerHoneypot:
                                 CREATE TABLE IF NOT EXISTS attack_logs
                                 (
                                     id               INTEGER PRIMARY KEY,
-                                    created_at       DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                    created_at       DATETIME,
                                     agent_id         INTEGER,
                                     source_ip        TEXT NOT NULL,
                                     source_port      INTEGER,

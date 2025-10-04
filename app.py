@@ -6,6 +6,7 @@ from route.agent.api_agent import agent_create_bp
 from route.agent.api_user import agent_user_api_bp
 from route.config.api_key import config_api_key_bp
 from route.agent.manage_agent import agent_manage_bp
+from route.log_analyse.alerte_dashboard import log_analyse_bp
 from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser
 import secrets
 
@@ -14,6 +15,7 @@ app.config['SECRET_KEY'] = secrets.token_hex(4096)
 app.config['DATABASE'] = os.path.join(app.root_path, 'honeypot.db')
 
 # Register blueprints
+app.register_blueprint(log_analyse_bp)
 app.register_blueprint(auth_bp)
 app.register_blueprint(agent_manage_bp)
 app.register_blueprint(agent_create_bp)

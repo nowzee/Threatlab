@@ -40,9 +40,6 @@ interface AttackWave {
   time: string
   label: string
   count: number
-  severity_high: number
-  severity_medium: number
-  severity_low: number
 }
 
 export default defineComponent({
@@ -109,29 +106,32 @@ export default defineComponent({
 
     // Générer des données temporelles pour le graphique
     const attackWaves = ref<AttackWave[]>([])
+    const selectedTimeline = ref('24h')
+const generateTimelineData = async (timeline: string = '24h') => {
+  try {
+    const response = await fetch(`/log-analyse/get_data`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ time: timeline })
+    })
 
-    const generateTimelineData = () => {
-      const data: AttackWave[] = []
-      const now = new Date()
-
-      // Générer des données pour les dernières 24 heures
-      for (let i = 23; i >= 0; i--) {
-        const time = new Date(now.getTime() - i * 60 * 60 * 1000)
-        const baseCount = Math.floor(Math.random() * 15) + 5
-        const highCount = Math.floor(Math.random() * 5)
-        const mediumCount = Math.floor(Math.random() * 8)
-        const lowCount = baseCount - highCount - mediumCount
-
-        data.push({
-          time: time.toISOString(),
-          label: time.getHours().toString().padStart(2, '0') + ':00',
-          count: baseCount,
-          severity_high: Math.max(0, highCount),
-          severity_medium: Math.max(0, mediumCount),
-          severity_low: Math.max(0, lowCount)
-        })
-      }
+    if (response.ok) {
+      const data = await response.json()
       attackWaves.value = data
+      console.log('Timeline data loaded:', data)
+    } else {
+      console.error('Error fetching timeline data:', response.statusText)
+    }
+  } catch (error) {
+    console.error('Error fetching timeline data:', error)
+  }
+}
+
+    const setTimeline = (timeline: string) => {
+      selectedTimeline.value = timeline
+      generateTimelineData(timeline)
     }
 
     // Configuration du graphique
@@ -142,8 +142,8 @@ export default defineComponent({
         labels,
         datasets: [
           {
-            label: 'Alertes Moyennes',
-            data: attackWaves.value.map(wave => wave.severity_medium),
+            label: 'TimeLIne',
+            data: attackWaves.value.map(wave => wave.count),
             borderColor: '#ffb74d',
             backgroundColor: 'rgba(255, 183, 77, 0.1)',
             fill: true,
@@ -160,19 +160,10 @@ export default defineComponent({
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          position: 'top' as const,
-          labels: {
-            color: '#ffffff',
-            usePointStyle: true,
-            padding: 20,
-            font: {
-              size: 14
-            }
-          }
-        },
+        display: false
+      },
         title: {
           display: true,
-          text: 'Analyse des attaques',
           color: '#ffffff',
           font: {
             size: 16,
@@ -251,7 +242,9 @@ export default defineComponent({
       chartOptions,
       getSeverityClass,
       getSeverityText,
-      viewDetails
+      viewDetails,
+      selectedTimeline,
+      setTimeline
     }
   }
 })
@@ -269,9 +262,27 @@ export default defineComponent({
         <div class="chart-header">
           <h2 class="chart-title">Timeline des Attaques</h2>
           <div class="chart-controls">
-            <button class="btn btn-secondary btn-sm active">24h</button>
-            <button class="btn btn-secondary btn-sm">7j</button>
-            <button class="btn btn-secondary btn-sm">30j</button>
+            <button
+              class="btn btn-secondary btn-sm"
+              :class="{ active: selectedTimeline === '24h' }"
+              @click="setTimeline('24h')"
+            >
+              24h
+            </button>
+            <button
+              class="btn btn-secondary btn-sm"
+              :class="{ active: selectedTimeline === '7d' }"
+              @click="setTimeline('7d')"
+            >
+              7j
+            </button>
+            <button
+              class="btn btn-secondary btn-sm"
+              :class="{ active: selectedTimeline === '30d' }"
+              @click="setTimeline('30d')"
+            >
+              30j
+            </button>
           </div>
         </div>
         <div class="chart-wrapper">
