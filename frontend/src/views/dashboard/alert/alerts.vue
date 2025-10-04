@@ -209,24 +209,6 @@ const generateTimelineData = async (timeline: string = '24h') => {
       }
     }
 
-    const getSeverityClass = (severity: string) => {
-      switch (severity) {
-        case 'high': return 'badge-danger'
-        case 'medium': return 'badge-warning'
-        case 'low': return 'badge-info'
-        default: return 'badge-primary'
-      }
-    }
-
-    const getSeverityText = (severity: string) => {
-      switch (severity) {
-        case 'high': return 'Élevée'
-        case 'medium': return 'Moyenne'
-        case 'low': return 'Faible'
-        default: return 'Inconnue'
-      }
-    }
-
     const viewDetails = (alertId: number) => {
       router.push({ name: 'alert-details', params: { id: alertId.toString() } })
     }
@@ -240,8 +222,6 @@ const generateTimelineData = async (timeline: string = '24h') => {
       attackWaves,
       chartData,
       chartOptions,
-      getSeverityClass,
-      getSeverityText,
       viewDetails,
       selectedTimeline,
       setTimeline
@@ -320,36 +300,24 @@ const generateTimelineData = async (timeline: string = '24h') => {
               <tr>
                 <th>Date/Heure</th>
                 <th>Source</th>
-                <th>Gravité</th>
                 <th>Type</th>
                 <th>IP Source</th>
-                <th>Description</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="alert in alerts" :key="alert.id" class="alert-row" :class="'severity-' + alert.severity">
+              <tr v-for="alert in alerts" :key="alert.id" class="alert-row">
                 <td class="timestamp-cell">
                   <time class="timestamp">{{ alert.timestamp }}</time>
                 </td>
                 <td class="source-cell">
                   <div class="source-info">
                     <div class="source-name">{{ alert.source }}</div>
-                    <div class="honeypot-name">{{ alert.honeypot }}</div>
                   </div>
-                </td>
-                <td class="severity-cell">
-                  <span class="severity-badge" :class="getSeverityClass(alert.severity)">
-                    <span class="severity-dot"></span>
-                    {{ getSeverityText(alert.severity) }}
-                  </span>
                 </td>
                 <td class="type-cell">{{ alert.type }}</td>
                 <td class="ip-cell">
                   <code class="ip-address">{{ alert.ip }}</code>
-                </td>
-                <td class="message-cell">
-                  <span class="alert-message">{{ alert.message }}</span>
                 </td>
                 <td class="actions-cell">
                   <button class="action-btn primary" @click="viewDetails(alert.id)">
@@ -481,18 +449,6 @@ const generateTimelineData = async (timeline: string = '24h') => {
   background: rgba(255, 255, 255, 0.03);
 }
 
-.alert-row.severity-high {
-  border-left: 4px solid #ff3a5e;
-}
-
-.alert-row.severity-medium {
-  border-left: 4px solid #ffb74d;
-}
-
-.alert-row.severity-low {
-  border-left: 4px solid #29b6f6;
-}
-
 .alerts-table td {
   padding: 20px 24px;
   vertical-align: middle;
@@ -517,60 +473,6 @@ const generateTimelineData = async (timeline: string = '24h') => {
   font-size: 14px;
 }
 
-.honeypot-name {
-  font-size: 12px;
-  color: var(--text-color-muted);
-  font-family: 'Courier New', monospace;
-}
-
-.severity-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.severity-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-}
-
-.badge-danger {
-  background: rgba(255, 58, 94, 0.2);
-  color: #ff3a5e;
-  border: 1px solid rgba(255, 58, 94, 0.3);
-}
-
-.badge-danger .severity-dot {
-  background: #ff3a5e;
-}
-
-.badge-warning {
-  background: rgba(255, 183, 77, 0.2);
-  color: #ffb74d;
-  border: 1px solid rgba(255, 183, 77, 0.3);
-}
-
-.badge-warning .severity-dot {
-  background: #ffb74d;
-}
-
-.badge-info {
-  background: rgba(41, 182, 246, 0.2);
-  color: #29b6f6;
-  border: 1px solid rgba(41, 182, 246, 0.3);
-}
-
-.badge-info .severity-dot {
-  background: #29b6f6;
-}
-
 .type-cell {
   color: var(--white);
   font-weight: 500;
@@ -584,11 +486,6 @@ const generateTimelineData = async (timeline: string = '24h') => {
   font-size: 13px;
   color: var(--accent-color);
   font-weight: 600;
-}
-
-.alert-message {
-  color: var(--white);
-  line-height: 1.4;
 }
 
 .action-btn {
@@ -614,31 +511,11 @@ const generateTimelineData = async (timeline: string = '24h') => {
   transform: translateY(-1px);
 }
 
-/* Responsive */
-@media (max-width: 1200px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
 @media (max-width: 768px) {
-  .alerts-page {
-    padding: 16px;
-  }
-
-  .stats-grid {
-    grid-template-columns: 1fr;
-  }
 
   .chart-wrapper {
     height: 300px;
     padding: 16px;
-  }
-
-  .header-content {
-    flex-direction: column;
-    gap: 16px;
-    align-items: flex-start;
   }
 }
 </style>
