@@ -69,13 +69,21 @@ class DatabaseManagerHoneypot:
                                     country_name        TEXT,
                                     service_type        TEXT        NOT NULL,
                                     groupe              TEXT,
+                                    banner              TEXT,
                                     alert_generated     INTEGER DEFAULT 0,
                                     is_active           INTEGER  DEFAULT 0,
                                     created_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
                                     updated_at          DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    secret_token_sha256 TEXT UNIQUE NOT NULL
+                                    secret_token_sha256 TEXT UNIQUE
                                 )
                                 ''')
+
+            # Add banner column to existing tables if it doesn't exist
+            try:
+                self.cursor.execute("ALTER TABLE honey_agents ADD COLUMN banner TEXT")
+            except sqlite3.OperationalError:
+                # Column already exists
+                pass
 
             # Table des groupes pour les agents
             self.cursor.execute('''

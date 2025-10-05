@@ -1,19 +1,59 @@
 from module.database.db_manager import DatabaseManagerHoneypot
 from datetime import datetime
-import hashlib
+import jwt, os, hashlib
+from flask import current_app
 
-def create_agent_token(agent_name, secret_token):
+def generate_jwt(agent_id: int) -> str:
+    """
+    Génère un JWT unique pour un agent spécifique.
+    """
+    secret_key = current_app.config['SECRET_KEY']
+    payload_to_encode = {
+        'agent_id': agent_id,
+        'nonce': os.urandom(16).hex()  # Ajoute de l'aléatoire pour garantir l'unicité
+    }
+    token = jwt.encode(payload_to_encode, secret_key, algorithm='HS256')
+    return token
+
+
+def create_agent_token(agent_name: str,
+                       ip_address: str = "0.0.0.0",
+                       country_name: str = None,
+                       service_type: str = "ssh",
+                       groupe: str = None,
+                       banner: str = None):
+    """
+    Crée un enregistrement pour un nouvel agent honeypot et génère un token unique.
+    Retourne (agent_id, secret_token) si succès, sinon (None, None).
+    """
     try:
         with DatabaseManagerHoneypot() as db:
+            # 1. Insérer un nouvel agent sans token
+            db.execute("""
+                INSERT INTO honey_agents (agent_name, ip_address, country_name, service_type, groupe, banner)
+                VALUES (?, ?, ?, ?, ?, ?)
+            """, (agent_name, ip_address, country_name, service_type, groupe, banner))
 
+            # 2. Récupérer l'ID de l'agent inséré
+            db.execute("SELECT last_insert_rowid()")
+            agent_id = db.fetchone()[0]
+
+            # 3. Générer un token unique et son hash
+            secret_token = generate_jwt(agent_id)
             secret_token_sha256 = hashlib.sha256(secret_token.encode()).hexdigest()
-            
-            db.execute("INSERT INTO honey_agents (agent_name, ip_address, service_type, secret_token_sha256) VALUES (?, ?, ?, ?)",
-                      (agent_name, "0.0.0.0", "honeypot", secret_token_sha256))
-            return True
+
+            # 4. Mettre à jour l'agent avec le hash du token
+            db.execute("""
+                UPDATE honey_agents
+                SET secret_token_sha256 = ?
+                WHERE id = ?
+            """, (secret_token_sha256, agent_id))
+
+            return agent_id, secret_token
+
     except Exception as e:
         print(f"Error creating agent token: {e}")
-        return False
+        return None, None
 
 def add_malicious_ip_address(agent_id, ip_address, service_type, country_name=None, country_code=None, classification=None):
     """

@@ -1,28 +1,50 @@
-from flask import Blueprint, jsonify, request, current_app
+from flask import Blueprint, jsonify, request, current_app, send_file
 import jwt
+import os
 from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction
+from module.database.db_manager import DatabaseManagerHoneypot
+from string import Template
 
 agent_create_bp = Blueprint('agent_create', __name__, url_prefix='/api/agent')
 
-def generate_jwt(agent_id):
+def generate_jwt(agent_id: int) -> str:
+    """
+    Génère un JWT unique pour un agent spécifique.
+    """
     secret_key = current_app.config['SECRET_KEY']
-
-    payload_to_encode = {'agent_id': agent_id}
-
+    payload_to_encode = {
+        'agent_id': agent_id,
+        'nonce': os.urandom(16).hex()  # Ajoute de l'aléatoire pour garantir l'unicité
+    }
     token = jwt.encode(payload_to_encode, secret_key, algorithm='HS256')
     return token
 
 @agent_create_bp.route("/create", methods=['POST'])
 def agent_create():
     agent_name = request.json.get('agent_name')
-    agent_type = request.json.get('agent_type')
+    agent_type = request.json.get('agent_type', 'ssh')
+    ip_address = request.json.get('ip_address', '0.0.0.0')
+    country_name = request.json.get('country_name')
+    groupe = request.json.get('groupe')
+    banner = request.json.get('banner', 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
 
-    secret_token = generate_jwt(1)
+    agent_id, secret_token = create_agent_token(
+        agent_name,
+        ip_address=ip_address,
+        country_name=country_name,
+        service_type=agent_type,
+        groupe=groupe,
+        banner=banner
+    )
 
-    if create_agent_token(agent_name, secret_token):
-        return jsonify({'success': True, 'secret_token': secret_token}), 200
+    if agent_id:
+        return jsonify({
+            'success': True,
+            'secret_token': secret_token,
+            'agent_id': agent_id
+        }), 200
     else:
-        return jsonify({'success': False}), 500
+        return jsonify({'success': False, 'error': 'Failed to create agent'}), 500
 
 
 @agent_create_bp.route("/report", methods=['POST'])
@@ -92,3 +114,74 @@ def agent_report():
     except Exception as e:
         print(f"Error in agent_report: {e}")
         return jsonify({'success': False, 'error': 'Internal server error'}), 200
+
+
+@agent_create_bp.route("/download/<int:agent_id>", methods=['GET'])
+def download_agent(agent_id):
+    """Generate and download the Python honeypot agent for the specified agent_id"""
+    try:
+        # Get agent details from database
+        with DatabaseManagerHoneypot() as db:
+            db.execute("""SELECT agent_name, ip_address, secret_token_sha256, banner, service_type
+                         FROM honey_agents
+                         WHERE id = ?""", (agent_id,))
+            result = db.fetchone()
+
+            if not result:
+                return jsonify({'error': 'Agent not found'}), 404
+
+            agent_name, ip_address, secret_token_sha256, banner, service_type = result
+
+        # Read the template file
+        template_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            'module', 'templates', 'ssh_honeypot_agent.py'
+        )
+
+        with open(template_path, 'r') as f:
+            template_content = f.read()
+
+        # Retrieve the actual JWT token for this agent
+        # Since we can't reverse the SHA256, we'll generate a new JWT token
+        secret_token = generate_jwt(agent_id)
+
+        # Get server URL from request
+        server_url = request.host_url.rstrip('/')
+
+        # Default values
+        ssh_port = 22
+        if not banner:
+            banner = "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5"
+
+        # Replace placeholders in template
+        with open(template_path, 'r') as f:
+            template_content = f.read()
+
+        t = Template(template_content)
+        agent_content = t.substitute(
+            agent_id=agent_id,
+            agent_token=secret_token,
+            server_url=server_url,
+            ssh_port=ssh_port,
+            ssh_banner=banner
+        )
+
+        # Write to temporary file
+        import tempfile
+        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False)
+        temp_file.write(agent_content)
+        temp_file.close()
+
+        # Send file as download
+        filename = f"agent_{agent_name.replace(' ', '_')}.py"
+
+        return send_file(
+            temp_file.name,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='text/x-python'
+        )
+
+    except Exception as e:
+        print(f"Error generating agent download: {e}")
+        return jsonify({'error': 'Failed to generate agent file'}), 500

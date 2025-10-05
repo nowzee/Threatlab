@@ -6,6 +6,10 @@ interface AgentConfig {
   name: string
   description: string
   honeypotType: string
+  ipAddress: string
+  country: string
+  group: string
+  banner: string
   integrations: {
     elk: boolean
     opencti: boolean
@@ -35,6 +39,10 @@ export default defineComponent({
       name: '',
       description: '',
       honeypotType: 'SSH',
+      ipAddress: '',
+      country: '',
+      group: '',
+      banner: 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5',
       integrations: {
         elk: false,
         opencti: false,
@@ -56,6 +64,7 @@ export default defineComponent({
 
     const isSubmitting = ref(false)
     const showAdvanced = ref(false)
+    const createdAgentId = ref<number | null>(null)
 
     const integrationOptions = [
       {
@@ -102,31 +111,47 @@ export default defineComponent({
 
     const createAgent = async () => {
       if (!validateForm()) return
-      
+
       isSubmitting.value = true
-      
+
       try {
-        // Simulation de la création d'agent
-        console.log('Configuration de l\'agent:', agentConfig)
-        
-        // Ici, vous ajouterez l'appel API réel
-        // const response = await fetch('/api/agents', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify(agentConfig)
-        // })
-        
-        // Simulation d'un délai
-        await new Promise(resolve => setTimeout(resolve, 2000))
-        
-        alert('Agent créé avec succès!')
-        router.push({ name: 'home' })
-        
+        const response = await fetch('/api/agent/create', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            agent_name: agentConfig.name,
+            agent_type: agentConfig.honeypotType.toLowerCase(),
+            ip_address: agentConfig.ipAddress || '0.0.0.0',
+            country_name: agentConfig.country,
+            groupe: agentConfig.group,
+            banner: agentConfig.banner
+          })
+        })
+
+        const data = await response.json()
+
+        if (response.ok && data.success) {
+          createdAgentId.value = data.agent_id
+          alert('Agent créé avec succès! Vous pouvez maintenant télécharger le fichier agent.')
+        } else {
+          alert('Erreur lors de la création de l\'agent: ' + (data.error || 'Erreur inconnue'))
+        }
+
       } catch (error) {
         console.error('Erreur lors de la création de l\'agent:', error)
         alert('Erreur lors de la création de l\'agent')
       } finally {
         isSubmitting.value = false
+      }
+    }
+
+    const downloadAgent = () => {
+      if (createdAgentId.value) {
+        window.location.href = `/api/agent/download/${createdAgentId.value}`
       }
     }
 
@@ -139,7 +164,9 @@ export default defineComponent({
       isSubmitting,
       integrationOptions,
       showAdvanced,
+      createdAgentId,
       createAgent,
+      downloadAgent,
       goBack
     }
   }
@@ -177,7 +204,40 @@ export default defineComponent({
                     required
                   />
                 </div>
-                
+
+                <div class="form-group">
+                  <label for="agent-ip">Adresse IP / Domaine</label>
+                  <input
+                    id="agent-ip"
+                    v-model="agentConfig.ipAddress"
+                    type="text"
+                    class="form-input"
+                    placeholder="Ex: 203.0.113.50"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label for="agent-country">Pays de déploiement</label>
+                  <input
+                    id="agent-country"
+                    v-model="agentConfig.country"
+                    type="text"
+                    class="form-input"
+                    placeholder="Ex: France"
+                  />
+                </div>
+
+                <div class="form-group">
+                  <label for="agent-group">Groupe</label>
+                  <input
+                    id="agent-group"
+                    v-model="agentConfig.group"
+                    type="text"
+                    class="form-input"
+                    placeholder="Ex: Production"
+                  />
+                </div>
+
                 <div class="form-group full-width">
                   <label for="agent-description">Description *</label>
                   <textarea
@@ -188,6 +248,20 @@ export default defineComponent({
                     placeholder="Description de l'agent et de son rôle"
                     required
                   ></textarea>
+                </div>
+
+                <div class="form-group full-width">
+                  <label for="agent-banner">Bannière SSH</label>
+                  <input
+                    id="agent-banner"
+                    v-model="agentConfig.banner"
+                    type="text"
+                    class="form-input"
+                    placeholder="SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5"
+                  />
+                  <small style="color: #888; font-size: 12px; margin-top: 4px;">
+                    Bannière SSH affichée aux attaquants pour simuler un serveur spécifique
+                  </small>
                 </div>
               </div>
             </div>
@@ -374,7 +448,7 @@ export default defineComponent({
 
           <!-- Actions - Fixed in sidebar -->
           <div class="sidebar-actions">
-            <button type="submit" class="btn btn-primary btn-block" :disabled="isSubmitting">
+            <button type="submit" class="btn btn-primary btn-block" :disabled="isSubmitting || createdAgentId !== null">
               <svg v-if="isSubmitting" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spinner">
                 <line x1="12" y1="2" x2="12" y2="6"></line>
                 <line x1="12" y1="18" x2="12" y2="22"></line>
@@ -385,13 +459,23 @@ export default defineComponent({
                 <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
                 <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
               </svg>
-              {{ isSubmitting ? 'Création...' : 'Créer l\'agent' }}
+              {{ isSubmitting ? 'Création...' : (createdAgentId ? 'Agent créé ✓' : 'Créer l\'agent') }}
             </button>
+
+            <button v-if="createdAgentId" type="button" class="btn btn-primary btn-block" @click="downloadAgent">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="7 10 12 15 17 10"></polyline>
+                <line x1="12" y1="15" x2="12" y2="3"></line>
+              </svg>
+              Télécharger l'agent
+            </button>
+
             <button type="button" class="btn btn-secondary btn-block" @click="goBack">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M19 12H5M12 19l-7-7 7-7"/>
               </svg>
-              Annuler
+              {{ createdAgentId ? 'Retour' : 'Annuler' }}
             </button>
           </div>
         </div>
