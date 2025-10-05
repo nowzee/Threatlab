@@ -302,7 +302,8 @@ def get_agent_details():
         ''')
         logs = db.fetchall()
 
-        agent_name = "ssh-honeypot-test"
+        db.execute("SELECT agent_name FROM honey_agents WHERE id = ?", (logs[0][4],))
+        agent_name = db.fetchone()[0]
 
         data = []
         for log in logs:
