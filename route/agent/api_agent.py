@@ -4,6 +4,7 @@ import os
 from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction
 from module.database.db_manager import DatabaseManagerHoneypot
 from string import Template
+from module.auth.decorator import agent_jwt_required
 
 agent_create_bp = Blueprint('agent_create', __name__, url_prefix='/api/agent')
 
@@ -14,7 +15,7 @@ def generate_jwt(agent_id: int) -> str:
     secret_key = current_app.config['SECRET_KEY']
     payload_to_encode = {
         'agent_id': agent_id,
-        'nonce': os.urandom(16).hex()  # Ajoute de l'aléatoire pour garantir l'unicité
+        'nonce': os.urandom(16).hex()
     }
     token = jwt.encode(payload_to_encode, secret_key, algorithm='HS256')
     return token
@@ -48,6 +49,7 @@ def agent_create():
 
 
 @agent_create_bp.route("/report", methods=['POST'])
+@agent_jwt_required
 def agent_report():
     try:
         data = request.json
