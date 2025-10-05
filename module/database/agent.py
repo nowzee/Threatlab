@@ -1,4 +1,5 @@
 from module.database.db_manager import DatabaseManagerHoneypot
+from datetime import datetime
 import hashlib
 
 def create_agent_token(agent_name, secret_token):
@@ -170,15 +171,19 @@ def add_compromised_credential(malicious_ip, username, password, service_type):
         return False
 
 def add_attack_log(attack_data):
-    """Insert attack log data into the database"""
+    """Insert attack log data into the database with current timestamp"""
     try:
         with DatabaseManagerHoneypot() as db:
+            now = datetime.now()  # heure locale du serveur
+            # ou datetime.utcnow() si tu veux UTC
+
             db.execute("""INSERT INTO attack_logs 
-                         (agent_id, source_ip, source_port, target_port, service_type, 
+                         (created_at, agent_id, source_ip, source_port, target_port, service_type, 
                           username_attempt, password_attempt, payload, malware_hash, 
                           attack_type, country_code, country_name) 
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                      (attack_data.get('agent_id'),
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                      (now,
+                       attack_data.get('agent_id'),
                        attack_data.get('source_ip'),
                        attack_data.get('source_port'),
                        attack_data.get('target_port'),
@@ -272,6 +277,30 @@ def get_agent_details():
             })
 
     return data
+
+def get_country_ranking():
+    """
+    Get the top countries by attack count for dashboard visualization
+    """
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT country_name, COUNT(*) as attack_count
+            FROM attack_logs
+            WHERE country_name IS NOT NULL AND country_name != ''
+            GROUP BY country_name
+            ORDER BY attack_count DESC
+            LIMIT 10
+        ''')
+        countries = db.fetchall()
+
+        data = []
+        for country in countries:
+            data.append({
+                "country_name": country[0],
+                "attack_count": country[1]
+            })
+
+        return data
 
 
 class ManagerAgent:

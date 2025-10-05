@@ -1,5 +1,8 @@
 <script lang="ts">
-import { defineComponent, ref } from 'vue'
+import { defineComponent, ref, onMounted, nextTick } from 'vue'
+import { Chart, registerables } from 'chart.js'
+
+Chart.register(...registerables)
 
 interface MetricData {
   ip_count: number
@@ -18,6 +21,11 @@ interface LogData {
   created_at: string
 }
 
+interface CountryData {
+  country_name: string
+  attack_count: number
+}
+
 export default defineComponent({
   name: "home",
   setup() {
@@ -29,8 +37,10 @@ export default defineComponent({
     })
 
     const logs = ref<LogData[]>([])
+    const countryRanking = ref<CountryData[]>([])
     const isLoading = ref(true)
     const error = ref<string | null>(null)
+    let chartInstance: Chart | null = null
 
     const fetchMetrics = async () => {
       try {
@@ -79,12 +89,112 @@ export default defineComponent({
       }
     }
 
-    fetchMetrics()
-    fetchLog()
+    const fetchCountryRanking = async () => {
+      try {
+        const response = await fetch('/api/agent/user/country_ranking', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+          credentials: 'include',
+        })
+
+        if (!response.ok) {
+          throw new Error('Erreur lors du chargement du classement des pays')
+        }
+
+        countryRanking.value = await response.json()
+        await nextTick()
+        createChart()
+      } catch (e: any) {
+        console.error('Error fetching country ranking:', e)
+      }
+    }
+
+    const createChart = () => {
+      const canvas = document.getElementById('countryChart') as HTMLCanvasElement
+      if (!canvas) return
+
+      // Destroy existing chart if it exists
+      if (chartInstance) {
+        chartInstance.destroy()
+      }
+
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return
+
+      const countries = countryRanking.value.map(c => c.country_name)
+      const counts = countryRanking.value.map(c => c.attack_count)
+
+      chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: countries,
+          datasets: [{
+            label: 'Nombre d\'attaques',
+            data: counts,
+            backgroundColor: '#9c4dff',
+            borderWidth: 1,
+            borderRadius: 4
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: {
+              display: false
+            },
+            tooltip: {
+              backgroundColor: 'rgba(26, 29, 41, 0.95)',
+              titleColor: '#ffffff',
+              bodyColor: '#8b92a7',
+              borderColor: 'rgba(62, 69, 88, 1)',
+              borderWidth: 1,
+              padding: 12,
+              displayColors: false
+            }
+          },
+          scales: {
+            x: {
+              beginAtZero: true,
+              ticks: {
+                color: '#8b92a7',
+                font: {
+                  size: 12
+                }
+              },
+              grid: {
+                color: 'rgba(62, 69, 88, 0.5)'
+              }
+            },
+            y: {
+              ticks: {
+                color: '#ffffff',
+                font: {
+                  size: 13
+                }
+              },
+              grid: {
+                display: false
+              }
+            }
+          }
+        }
+      })
+    }
+
+    onMounted(() => {
+      fetchMetrics()
+      fetchLog()
+      fetchCountryRanking()
+    })
 
     return {
       metrics,
       logs,
+      countryRanking,
       isLoading,
       error
     }
@@ -179,6 +289,24 @@ export default defineComponent({
         </div>
     </div>
 
+    <!-- Classement des pays -->
+    <div class="section-card">
+        <div class="card-header" style="padding: 0 0 16px 0; margin-bottom: 16px;">
+            <h3 class="card-title">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 3v18h18"></path>
+                    <path d="M18 17V9"></path>
+                    <path d="M13 17V5"></path>
+                    <path d="M8 17v-3"></path>
+                </svg>
+                Classement des pays
+            </h3>
+        </div>
+        <div class="chart-container">
+            <canvas id="countryChart"></canvas>
+        </div>
+    </div>
+
     <!-- Alertes récentes -->
     <div class="section-card">
         <div class="card-header" style="padding: 0 0 16px 0; margin-bottom: 16px;">
@@ -242,64 +370,9 @@ export default defineComponent({
         text-decoration: underline;
     }
 
-    .honeypot-details {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .detail-item {
-        display: flex;
-        justify-content: space-between;
-    }
-
-    .detail-label {
-        color: var(--text-color-muted);
-        font-size: 14px;
-    }
-
-    .detail-value {
-        color: var(--text-color);
-        font-size: 14px;
-        font-weight: 500;
-    }
-
-    .threat-item {
-        display: flex;
-        align-items: center;
-        margin-bottom: 12px;
-    }
-
-    .threat-label {
-        width: 100px;
-        font-size: 14px;
-        color: var(--text-color);
-    }
-
-    .threat-bar-container {
-        flex: 1;
-        height: 8px;
-        background-color: var(--container-background-lighter);
-        border-radius: 4px;
-        overflow: hidden;
-        margin: 0 10px;
-    }
-
-    .threat-bar {
-        height: 100%;
-        background-color: var(--accent-color);
-        border-radius: 4px;
-    }
-
-    .threat-value {
-        width: 40px;
-        font-size: 14px;
-        color: var(--text-color-muted);
-        text-align: right;
-    }
-
-    .card-actions {
-        display: flex;
-        gap: 8px;
+    .chart-container {
+        position: relative;
+        height: 30vh;
+        width: 100%;
     }
 </style>

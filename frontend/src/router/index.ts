@@ -6,12 +6,12 @@ import A2FView from '@/views/auth/a2f.vue'
 
 import DashboardView from '@/views/DashboardView.vue'
 import home from '@/views/dashboard/home.vue'
-import deploy from '@/views/dashboard/deploy.vue'
-import agentCreation from '@/views/dashboard/agent-creation.vue'
-import threatIntel from '@/views/dashboard/threat-intel.vue'
-import alerts from '@/views/dashboard/alerts.vue'
-import alertDetails from '@/views/dashboard/alert-details.vue'
-import honeypotManagement from '@/views/dashboard/honeypot-management.vue'
+import deploy from '@/views/dashboard/honeypot/deploy.vue'
+import agentCreation from '@/views/dashboard/honeypot/agent-creation.vue'
+import threatIntel from '@/views/dashboard/CTI/threat-intel.vue'
+import alerts from '@/views/dashboard/alert/alerts.vue'
+import alertDetails from '@/views/dashboard/alert/alert-details.vue'
+import honeypotManagement from '@/views/dashboard/honeypot/honeypot-management.vue'
 import settings from '@/views/dashboard/settings/settings.vue'
 import security_settings from "@/views/dashboard/settings/security.vue";
 import api_settings from "@/views/dashboard/settings/api.vue";
