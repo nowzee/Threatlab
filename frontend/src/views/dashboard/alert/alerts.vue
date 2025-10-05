@@ -28,12 +28,11 @@ ChartJS.register(
 interface LogAlert {
   id: number
   timestamp: string
-  source: string
-  severity: 'high' | 'medium' | 'low'
-  type: string
-  message: string
-  ip: string
-  honeypot: string
+  agent_id: number
+  source_ip: string
+  target_port: number
+  service_type: string
+  country_name: string
 }
 
 interface AttackWave {
@@ -50,59 +49,106 @@ export default defineComponent({
   setup() {
     const router = useRouter()
 
-    // Données factices pour les alertes
-    const alerts = ref<LogAlert[]>([
-      {
-        id: 1,
-        timestamp: '2024-03-15 14:32:45',
-        source: 'SSH Honeypot',
-        severity: 'high',
-        type: 'Tentative de connexion',
-        message: 'Tentative de brute force détectée',
-        ip: '192.168.1.100',
-        honeypot: 'ssh-honeypot-01'
-      },
-      {
-        id: 2,
-        timestamp: '2024-03-15 14:28:12',
-        source: 'Web Honeypot',
-        severity: 'medium',
-        type: 'Scan de vulnérabilités',
-        message: 'Scan SQL injection détecté',
-        ip: '203.0.113.45',
-        honeypot: 'web-honeypot-02'
-      },
-      {
-        id: 3,
-        timestamp: '2024-03-15 14:15:33',
-        source: 'FTP Honeypot',
-        severity: 'low',
-        type: 'Connexion anonyme',
-        message: 'Tentative de connexion FTP anonyme',
-        ip: '198.51.100.78',
-        honeypot: 'ftp-honeypot-03'
-      },
-      {
-        id: 4,
-        timestamp: '2024-03-15 14:10:21',
-        source: 'SSH Honeypot',
-        severity: 'high',
-        type: 'Commande malicieuse',
-        message: 'Exécution de commandes système suspectes',
-        ip: '192.168.1.100',
-        honeypot: 'ssh-honeypot-01'
-      },
-      {
-        id: 5,
-        timestamp: '2024-03-15 14:05:07',
-        source: 'Web Honeypot',
-        severity: 'medium',
-        type: 'Upload de fichier',
-        message: 'Tentative d\'upload de shell malveillant',
-        ip: '203.0.113.45',
-        honeypot: 'web-honeypot-02'
+    // Données réelles des alertes
+    const alerts = ref<LogAlert[]>([])
+
+    // Variables de pagination
+    const currentPage = ref(1)
+    const itemsPerPage = ref(10)
+
+    // Computed: Nombre total de pages
+    const totalPages = computed(() => {
+      return Math.ceil(alerts.value.length / itemsPerPage.value)
+    })
+
+    // Computed: Alertes paginées (seulement celles de la page actuelle)
+    const paginatedAlerts = computed(() => {
+      const start = (currentPage.value - 1) * itemsPerPage.value
+      const end = start + itemsPerPage.value
+      return alerts.value.slice(start, end)
+    })
+
+    // Computed: Numéros de pages à afficher
+    const pageNumbers = computed(() => {
+      const pages: (number | string)[] = []
+      const total = totalPages.value
+      const current = currentPage.value
+
+      if (total <= 7) {
+        // Afficher toutes les pages si <= 7
+        for (let i = 1; i <= total; i++) {
+          pages.push(i)
+        }
+      } else {
+        // Logique intelligente pour beaucoup de pages
+        pages.push(1)
+
+        if (current > 3) {
+          pages.push('...')
+        }
+
+        const start = Math.max(2, current - 1)
+        const end = Math.min(total - 1, current + 1)
+
+        for (let i = start; i <= end; i++) {
+          if (!pages.includes(i)) {
+            pages.push(i)
+          }
+        }
+
+        if (current < total - 2) {
+          pages.push('...')
+        }
+
+        if (total > 1) {
+          pages.push(total)
+        }
       }
-    ])
+
+      return pages
+    })
+
+    // Méthodes de navigation
+    const goToPage = (page: number) => {
+      if (page >= 1 && page <= totalPages.value) {
+        currentPage.value = page
+      }
+    }
+
+    const nextPage = () => {
+      if (currentPage.value < totalPages.value) {
+        currentPage.value++
+      }
+    }
+
+    const prevPage = () => {
+      if (currentPage.value > 1) {
+        currentPage.value--
+      }
+    }
+
+    // Récupérer la liste des alertes depuis l'API
+    const fetchAlerts = async () => {
+      try {
+        const response = await fetch('/log-analyse/alerts', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json'
+          },
+          credentials: 'include'
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          alerts.value = data
+          console.log('Alerts loaded:', data)
+        } else {
+          console.error('Error fetching alerts:', response.statusText)
+        }
+      } catch (error) {
+        console.error('Error fetching alerts:', error)
+      }
+    }
 
     // Générer des données temporelles pour le graphique
     const attackWaves = ref<AttackWave[]>([])
@@ -215,16 +261,25 @@ const generateTimelineData = async (timeline: string = '24h') => {
 
     onMounted(() => {
       generateTimelineData()
+      fetchAlerts()
     })
 
     return {
       alerts,
+      paginatedAlerts,
       attackWaves,
       chartData,
       chartOptions,
       viewDetails,
       selectedTimeline,
-      setTimeline
+      setTimeline,
+      currentPage,
+      totalPages,
+      pageNumbers,
+      goToPage,
+      nextPage,
+      prevPage,
+      itemsPerPage
     }
   }
 })
@@ -276,33 +331,29 @@ const generateTimelineData = async (timeline: string = '24h') => {
       <div class="table-container">
         <div class="table-header">
           <h2 class="table-title">Dernières Alertes</h2>
-          <div class="table-actions">
-            <button class="btn btn-secondary">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
-              </svg>
-              Filtres
-            </button>
-          </div>
         </div>
 
         <div class="table-container">
           <table class="table">
             <thead>
               <tr>
+                <th>ID</th>
                 <th>Date/Heure</th>
-                <th>Source</th>
-                <th>Type</th>
                 <th>IP Source</th>
+                <th>Service</th>
+                <th>Port</th>
+                <th>Pays</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
-              <tr v-for="alert in alerts" :key="alert.id" class="alert-row">
+              <tr v-for="alert in paginatedAlerts" :key="alert.id" class="alert-row">
+                <td>{{ alert.id }}</td>
                 <td class="timestamp">{{ alert.timestamp }}</td>
-                <td>{{ alert.source }}</td>
-                <td>{{ alert.type }}</td>
-                <td>{{ alert.ip }}</td>
+                <td>{{ alert.source_ip }}</td>
+                <td>{{ alert.service_type }}</td>
+                <td>{{ alert.target_port }}</td>
+                <td>{{ alert.country_name }}</td>
                 <td class="actions-cell">
                   <button class="btn btn-sm btn-secondary" @click="viewDetails(alert.id)">
                     Détails
@@ -311,6 +362,51 @@ const generateTimelineData = async (timeline: string = '24h') => {
               </tr>
             </tbody>
           </table>
+        </div>
+
+        <!-- Pagination -->
+        <div class="pagination-wrapper" v-if="totalPages > 1">
+          <div class="pagination-info">
+            Affichage {{ (currentPage - 1) * itemsPerPage + 1 }}-{{ Math.min(currentPage * itemsPerPage, alerts.length) }} sur {{ alerts.length }} alertes
+          </div>
+          <div class="pagination-container">
+            <div class="pagination">
+              <!-- Bouton Précédent -->
+              <button
+                class="page-btn page-prev"
+                @click="prevPage"
+                :disabled="currentPage === 1"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="15 18 9 12 15 6"></polyline>
+                </svg>
+              </button>
+
+              <!-- Numéros de pages -->
+              <template v-for="(page, index) in pageNumbers" :key="index">
+                <button
+                  v-if="typeof page === 'number'"
+                  class="page-number"
+                  :class="{ active: page === currentPage }"
+                  @click="goToPage(page)"
+                >
+                  {{ page }}
+                </button>
+                <span v-else class="page-ellipsis">...</span>
+              </template>
+
+              <!-- Bouton Suivant -->
+              <button
+                class="page-btn page-next"
+                @click="nextPage"
+                :disabled="currentPage === totalPages"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="9 18 15 12 9 6"></polyline>
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -396,11 +492,100 @@ const generateTimelineData = async (timeline: string = '24h') => {
   color: var(--text-color-muted);
 }
 
-@media (max-width: 768px) {
+/* Pagination */
+.pagination-wrapper {
+  padding: 20px 32px;
+  border-top: 1px solid var(--container-border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
 
+.pagination-info {
+  font-size: 14px;
+  color: var(--text-color-muted);
+}
+
+.pagination-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.pagination {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.page-btn,
+.page-number {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--container-border-color);
+  border-radius: 6px;
+  color: var(--text-color);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.page-btn:hover:not(:disabled),
+.page-number:hover {
+  background: rgba(255, 255, 255, 0.05);
+  border-color: var(--accent-color);
+}
+
+.page-number.active {
+  background: var(--accent-color);
+  border-color: var(--accent-color);
+  color: var(--white);
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-ellipsis {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-color-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+@media (max-width: 768px) {
   .chart-wrapper {
     height: 300px;
     padding: 16px;
+  }
+
+  .pagination-wrapper {
+    padding: 16px;
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .pagination {
+    gap: 6px;
+  }
+
+  .page-btn,
+  .page-number {
+    width: 32px;
+    height: 32px;
+    font-size: 13px;
   }
 }
 </style>

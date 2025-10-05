@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 from datetime import datetime, timedelta
 from collections import Counter
-from module.database.detail_log_analyse import last_log_analyse
+from module.database.detail_log_analyse import last_log_analyse, get_alerts_list
 
 log_analyse_bp = Blueprint("log_analyse_bp", __name__, url_prefix="/log-analyse")
 
@@ -81,3 +81,11 @@ def get_data():
             })
 
     return jsonify(data)
+
+@log_analyse_bp.route("/alerts", methods=["GET"])
+def get_alerts():
+    """
+    Récupère la liste des alertes
+    """
+    alerts = get_alerts_list(limit=50)
+    return jsonify(alerts), 200

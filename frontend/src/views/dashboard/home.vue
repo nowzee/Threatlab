@@ -433,7 +433,7 @@ export default defineComponent({
 
     .chart-container {
         position: relative;
-        height: 10%;
+        height: 30vh;
         width: 100%;
     }
 </style>

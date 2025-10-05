@@ -2,21 +2,131 @@
 """
 Test script for the /api/agent/report endpoint
 Tests SSH attacks, SMTP attacks, and error cases
+Each test assigns a random country (code + name) from a big list.
 """
 
 import requests
 import json
 import sys
+import random
 from datetime import datetime
 
 # Configuration
 BASE_URL = "http://localhost:5000"
 REPORT_ENDPOINT = f"{BASE_URL}/api/agent/report"
 
+# Large list of countries (ISO alpha-2 code, common name)
+COUNTRIES = [
+    {"code": "AF", "name": "Afghanistan"},
+    {"code": "AL", "name": "Albania"},
+    {"code": "DZ", "name": "Algeria"},
+    {"code": "AR", "name": "Argentina"},
+    {"code": "AM", "name": "Armenia"},
+    {"code": "AU", "name": "Australia"},
+    {"code": "AT", "name": "Austria"},
+    {"code": "AZ", "name": "Azerbaijan"},
+    {"code": "BD", "name": "Bangladesh"},
+    {"code": "BY", "name": "Belarus"},
+    {"code": "BE", "name": "Belgium"},
+    {"code": "BZ", "name": "Belize"},
+    {"code": "BO", "name": "Bolivia"},
+    {"code": "BA", "name": "Bosnia and Herzegovina"},
+    {"code": "BR", "name": "Brazil"},
+    {"code": "BG", "name": "Bulgaria"},
+    {"code": "CA", "name": "Canada"},
+    {"code": "CL", "name": "Chile"},
+    {"code": "CN", "name": "China"},
+    {"code": "CO", "name": "Colombia"},
+    {"code": "CR", "name": "Costa Rica"},
+    {"code": "HR", "name": "Croatia"},
+    {"code": "CY", "name": "Cyprus"},
+    {"code": "CZ", "name": "Czech Republic"},
+    {"code": "DK", "name": "Denmark"},
+    {"code": "DO", "name": "Dominican Republic"},
+    {"code": "EC", "name": "Ecuador"},
+    {"code": "EG", "name": "Egypt"},
+    {"code": "SV", "name": "El Salvador"},
+    {"code": "EE", "name": "Estonia"},
+    {"code": "FI", "name": "Finland"},
+    {"code": "FR", "name": "France"},
+    {"code": "GE", "name": "Georgia"},
+    {"code": "DE", "name": "Germany"},
+    {"code": "GH", "name": "Ghana"},
+    {"code": "GR", "name": "Greece"},
+    {"code": "GT", "name": "Guatemala"},
+    {"code": "HN", "name": "Honduras"},
+    {"code": "HK", "name": "Hong Kong"},
+    {"code": "HU", "name": "Hungary"},
+    {"code": "IS", "name": "Iceland"},
+    {"code": "IN", "name": "India"},
+    {"code": "ID", "name": "Indonesia"},
+    {"code": "IR", "name": "Iran"},
+    {"code": "IQ", "name": "Iraq"},
+    {"code": "IE", "name": "Ireland"},
+    {"code": "IL", "name": "Israel"},
+    {"code": "IT", "name": "Italy"},
+    {"code": "JP", "name": "Japan"},
+    {"code": "JO", "name": "Jordan"},
+    {"code": "KZ", "name": "Kazakhstan"},
+    {"code": "KE", "name": "Kenya"},
+    {"code": "KR", "name": "South Korea"},
+    {"code": "KW", "name": "Kuwait"},
+    {"code": "LB", "name": "Lebanon"},
+    {"code": "LY", "name": "Libya"},
+    {"code": "LT", "name": "Lithuania"},
+    {"code": "LU", "name": "Luxembourg"},
+    {"code": "MY", "name": "Malaysia"},
+    {"code": "MX", "name": "Mexico"},
+    {"code": "MD", "name": "Moldova"},
+    {"code": "MA", "name": "Morocco"},
+    {"code": "NL", "name": "Netherlands"},
+    {"code": "NZ", "name": "New Zealand"},
+    {"code": "NG", "name": "Nigeria"},
+    {"code": "NO", "name": "Norway"},
+    {"code": "PK", "name": "Pakistan"},
+    {"code": "PA", "name": "Panama"},
+    {"code": "PE", "name": "Peru"},
+    {"code": "PH", "name": "Philippines"},
+    {"code": "PL", "name": "Poland"},
+    {"code": "PT", "name": "Portugal"},
+    {"code": "RO", "name": "Romania"},
+    {"code": "RU", "name": "Russia"},
+    {"code": "SA", "name": "Saudi Arabia"},
+    {"code": "RS", "name": "Serbia"},
+    {"code": "SG", "name": "Singapore"},
+    {"code": "SK", "name": "Slovakia"},
+    {"code": "SI", "name": "Slovenia"},
+    {"code": "ZA", "name": "South Africa"},
+    {"code": "ES", "name": "Spain"},
+    {"code": "LK", "name": "Sri Lanka"},
+    {"code": "SE", "name": "Sweden"},
+    {"code": "CH", "name": "Switzerland"},
+    {"code": "TW", "name": "Taiwan"},
+    {"code": "TH", "name": "Thailand"},
+    {"code": "TN", "name": "Tunisia"},
+    {"code": "TR", "name": "Turkey"},
+    {"code": "UA", "name": "Ukraine"},
+    {"code": "AE", "name": "United Arab Emirates"},
+    {"code": "GB", "name": "United Kingdom"},
+    {"code": "US", "name": "United States"},
+    {"code": "UY", "name": "Uruguay"},
+    {"code": "UZ", "name": "Uzbekistan"},
+    {"code": "VE", "name": "Venezuela"},
+    {"code": "VN", "name": "Vietnam"},
+    {"code": "ZW", "name": "Zimbabwe"},
+]
+
+
+def pick_country():
+    """Return a random country dict with keys 'code' and 'name'."""
+    return random.choice(COUNTRIES)
+
+
 def test_ssh_attack():
     """Test SSH attack scenario"""
     print("\n=== Testing SSH Attack Scenario ===")
-    
+    country = pick_country()
+
     ssh_attack_data = {
         "agent_id": 2,
         "source_ip": "192.168.1.120",
@@ -25,16 +135,19 @@ def test_ssh_attack():
         "target_port": 22,
         "username_attempt": "root",
         "password_attempt": "admin123",
-        "country_code": "US",
-        "country_name": "United States",
+        "country_code": country["code"],
+        "country_name": country["name"],
         "classification": "brute_force"
     }
-    
+
     try:
         response = requests.post(REPORT_ENDPOINT, json=ssh_attack_data)
         print(f"Status Code: {response.status_code}")
-        print(f"Response: {response.json()}")
-        
+        try:
+            print(f"Response: {response.json()}")
+        except Exception:
+            print(f"Response text: {response.text}")
+
         if response.status_code == 200:
             print("✅ SSH attack test PASSED")
             return True
@@ -45,10 +158,12 @@ def test_ssh_attack():
         print(f"❌ SSH attack test ERROR: {e}")
         return False
 
+
 def test_smtp_attack():
     """Test SMTP attack scenario"""
     print("\n=== Testing SMTP Attack Scenario ===")
-    
+    country = pick_country()
+
     smtp_attack_data = {
         "agent_id": 2,
         "source_ip": "10.0.0.50",
@@ -60,16 +175,19 @@ def test_smtp_attack():
         "subject": "Urgent: Update your account",
         "message_content": "Please click this link to update your account...",
         "attachments": ["malware.exe", "trojan.pdf"],
-        "country_code": "RU",
-        "country_name": "Russia",
+        "country_code": country["code"],
+        "country_name": country["name"],
         "classification": "phishing"
     }
-    
+
     try:
         response = requests.post(REPORT_ENDPOINT, json=smtp_attack_data)
         print(f"Status Code: {response.status_code}")
-        print(f"Response: {response.json()}")
-        
+        try:
+            print(f"Response: {response.json()}")
+        except Exception:
+            print(f"Response text: {response.text}")
+
         if response.status_code == 200:
             print("✅ SMTP attack test PASSED")
             return True
@@ -80,41 +198,48 @@ def test_smtp_attack():
         print(f"❌ SMTP attack test ERROR: {e}")
         return False
 
+
 def test_missing_required_fields():
     """Test validation with missing required fields"""
     print("\n=== Testing Missing Required Fields ===")
-    
+
     # Test missing source_ip
     invalid_data1 = {
         "agent_id": 1,
         "service_type": "ssh"
         # Missing source_ip
     }
-    
+
     try:
         response = requests.post(REPORT_ENDPOINT, json=invalid_data1)
         print(f"Missing source_ip - Status Code: {response.status_code}")
-        print(f"Response: {response.json()}")
-        
+        try:
+            print(f"Response: {response.json()}")
+        except Exception:
+            print(f"Response text: {response.text}")
+
         if response.status_code == 400:
             print("✅ Missing source_ip validation PASSED")
         else:
             print("❌ Missing source_ip validation FAILED")
     except Exception as e:
         print(f"❌ Missing source_ip test ERROR: {e}")
-    
+
     # Test missing service_type
     invalid_data2 = {
         "agent_id": 1,
         "source_ip": "192.168.1.100"
         # Missing service_type
     }
-    
+
     try:
         response = requests.post(REPORT_ENDPOINT, json=invalid_data2)
         print(f"Missing service_type - Status Code: {response.status_code}")
-        print(f"Response: {response.json()}")
-        
+        try:
+            print(f"Response: {response.json()}")
+        except Exception:
+            print(f"Response text: {response.text}")
+
         if response.status_code == 400:
             print("✅ Missing service_type validation PASSED")
         else:
@@ -122,17 +247,18 @@ def test_missing_required_fields():
     except Exception as e:
         print(f"❌ Missing service_type test ERROR: {e}")
 
+
 def test_malformed_json():
     """Test with malformed JSON"""
     print("\n=== Testing Malformed JSON ===")
-    
+
     try:
-        response = requests.post(REPORT_ENDPOINT, 
-                               data="invalid json", 
-                               headers={'Content-Type': 'application/json'})
+        response = requests.post(REPORT_ENDPOINT,
+                                 data="invalid json",
+                                 headers={'Content-Type': 'application/json'})
         print(f"Malformed JSON - Status Code: {response.status_code}")
         print(f"Response: {response.text}")
-        
+
         if response.status_code in [400, 500]:
             print("✅ Malformed JSON handling PASSED")
         else:
@@ -140,10 +266,12 @@ def test_malformed_json():
     except Exception as e:
         print(f"❌ Malformed JSON test ERROR: {e}")
 
+
 def test_comprehensive_ssh_attack():
     """Test comprehensive SSH attack with all optional fields"""
     print("\n=== Testing Comprehensive SSH Attack ===")
-    
+    country = pick_country()
+
     comprehensive_ssh_data = {
         "agent_id": 3,
         "source_ip": "203.0.113.45",
@@ -155,15 +283,18 @@ def test_comprehensive_ssh_attack():
         "payload": "ssh -l admin 192.168.1.1",
         "malware_hash": "a1b2c3d4e5f6789012345678901234567890abcd",
         "classification": "credential_stuffing",
-        "country_code": "CN",
-        "country_name": "China"
+        "country_code": country["code"],
+        "country_name": country["name"]
     }
-    
+
     try:
         response = requests.post(REPORT_ENDPOINT, json=comprehensive_ssh_data)
         print(f"Status Code: {response.status_code}")
-        print(f"Response: {response.json()}")
-        
+        try:
+            print(f"Response: {response.json()}")
+        except Exception:
+            print(f"Response text: {response.text}")
+
         if response.status_code == 200:
             print("✅ Comprehensive SSH attack test PASSED")
             return True
@@ -174,12 +305,15 @@ def test_comprehensive_ssh_attack():
         print(f"❌ Comprehensive SSH attack test ERROR: {e}")
         return False
 
+
 def test_multiple_attacks_same_ip():
     """Test multiple attacks from the same IP to verify deduplication logic"""
     print("\n=== Testing Multiple Attacks from Same IP ===")
-    
+
     same_ip = "198.51.100.11"
-    
+    # pick one random country for both attacks to simulate same origin
+    country = pick_country()
+
     # First attack
     attack1 = {
         "agent_id": 1,
@@ -189,36 +323,42 @@ def test_multiple_attacks_same_ip():
         "password_attempt": "123456",
         "source_port": 45123,
         "target_port": 21,
-        "country_code": "SR",
-        "country_name": "France",
+        "country_code": country["code"],
+        "country_name": country["name"],
         "classification": "brute_force"
     }
-    
-    # Second attack from same IP
+
+    # Second attack from same IP (same country to simulate same origin)
     attack2 = {
         "agent_id": 3,
         "source_ip": same_ip,
         "service_type": "ssh",
         "username_attempt": "admin",
         "password_attempt": "admin",
-        "country_code": "FR",
+        "country_code": country["code"],
         "source_port": 45123,
         "target_port": 22,
-        "country_name": "France",
+        "country_name": country["name"],
         "classification": "brute_force"
     }
-    
+
     try:
         # Send first attack
         response1 = requests.post(REPORT_ENDPOINT, json=attack1)
         print(f"First attack - Status Code: {response1.status_code}")
-        print(f"Response: {response1.json()}")
-        
+        try:
+            print(f"Response: {response1.json()}")
+        except Exception:
+            print(f"Response text: {response1.text}")
+
         # Send second attack
         response2 = requests.post(REPORT_ENDPOINT, json=attack2)
         print(f"Second attack - Status Code: {response2.status_code}")
-        print(f"Response: {response2.json()}")
-        
+        try:
+            print(f"Response: {response2.json()}")
+        except Exception:
+            print(f"Response text: {response2.text}")
+
         if response1.status_code == 200 and response2.status_code == 200:
             print("✅ Multiple attacks from same IP test PASSED")
             return True
@@ -229,15 +369,19 @@ def test_multiple_attacks_same_ip():
         print(f"❌ Multiple attacks test ERROR: {e}")
         return False
 
+
 def main():
     """Run all tests"""
     print("🚀 Starting Agent Report Endpoint Tests")
     print(f"Target URL: {REPORT_ENDPOINT}")
     print(f"Timestamp: {datetime.now()}")
-    
+
     tests_passed = 0
     total_tests = 0
-    
+
+    # Optionally you can set a deterministic seed for reproducible country choices:
+    # random.seed(42)
+
     # Run tests
     test_functions = [
         test_ssh_attack,
@@ -245,29 +389,30 @@ def main():
         test_comprehensive_ssh_attack,
         test_multiple_attacks_same_ip
     ]
-    
+
     for test_func in test_functions:
         total_tests += 1
         if test_func():
             tests_passed += 1
-    
+
     # Run validation tests (don't count towards pass/fail)
     test_missing_required_fields()
     test_malformed_json()
-    
+
     # Summary
-    print(f"\n" + "="*50)
+    print(f"\n" + "=" * 50)
     print(f"TEST SUMMARY")
-    print(f"="*50)
+    print(f"=" * 50)
     print(f"Tests Passed: {tests_passed}/{total_tests}")
-    print(f"Success Rate: {(tests_passed/total_tests)*100:.1f}%")
-    
+    print(f"Success Rate: {(tests_passed / total_tests) * 100:.1f}%")
+
     if tests_passed == total_tests:
         print("ALL TESTS PASSED!")
         sys.exit(0)
     else:
         print("❌ SOME TESTS FAILED!")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()
