@@ -37,7 +37,6 @@ class ManageApiKey:
 
             db.execute("SELECT id, key, name, integration FROM api_keys")
             result = db.fetchall()
-            print(result)
             return result
 
     def update(self, api_key, name, integration):

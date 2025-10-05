@@ -343,7 +343,6 @@ def get_country_ranking():
 
         return data
 
-
 class ManagerAgent:
     @staticmethod
     def remove(agent_id: int) -> bool:

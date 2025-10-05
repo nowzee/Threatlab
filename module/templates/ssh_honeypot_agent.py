@@ -243,13 +243,5 @@ if __name__ == "__main__":
     logger.info("Threatlabs SSH Honeypot Agent")
     logger.info("="*60)
 
-    # Check dependencies
-    try:
-        import paramiko
-        import requests
-    except ImportError as e:
-        logger.error(f"Missing required dependency: {e}")
-        logger.error("Install dependencies: pip install paramiko requests")
-        sys.exit(1)
 
     start_ssh_honeypot()
