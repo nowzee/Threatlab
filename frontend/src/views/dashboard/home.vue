@@ -370,67 +370,6 @@ export default defineComponent({
         text-decoration: underline;
     }
 
-    .honeypot-details {
-        display: flex;
-        flex-direction: column;
-        gap: 8px;
-    }
-
-    .detail-item {
-        display: flex;
-        justify-content: space-between;
-    }
-
-    .detail-label {
-        color: var(--text-color-muted);
-        font-size: 14px;
-    }
-
-    .detail-value {
-        color: var(--text-color);
-        font-size: 14px;
-        font-weight: 500;
-    }
-
-    .threat-item {
-        display: flex;
-        align-items: center;
-        margin-bottom: 12px;
-    }
-
-    .threat-label {
-        width: 100px;
-        font-size: 14px;
-        color: var(--text-color);
-    }
-
-    .threat-bar-container {
-        flex: 1;
-        height: 8px;
-        background-color: var(--container-background-lighter);
-        border-radius: 4px;
-        overflow: hidden;
-        margin: 0 10px;
-    }
-
-    .threat-bar {
-        height: 100%;
-        background-color: var(--accent-color);
-        border-radius: 4px;
-    }
-
-    .threat-value {
-        width: 40px;
-        font-size: 14px;
-        color: var(--text-color-muted);
-        text-align: right;
-    }
-
-    .card-actions {
-        display: flex;
-        gap: 8px;
-    }
-
     .chart-container {
         position: relative;
         height: 30vh;
