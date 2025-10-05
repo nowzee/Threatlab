@@ -278,6 +278,30 @@ def get_agent_details():
 
     return data
 
+def get_country_ranking():
+    """
+    Get the top countries by attack count for dashboard visualization
+    """
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT country_name, COUNT(*) as attack_count
+            FROM attack_logs
+            WHERE country_name IS NOT NULL AND country_name != ''
+            GROUP BY country_name
+            ORDER BY attack_count DESC
+            LIMIT 10
+        ''')
+        countries = db.fetchall()
+
+        data = []
+        for country in countries:
+            data.append({
+                "country_name": country[0],
+                "attack_count": country[1]
+            })
+
+        return data
+
 
 class ManagerAgent:
     @staticmethod

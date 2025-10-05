@@ -283,19 +283,11 @@ const generateTimelineData = async (timeline: string = '24h') => {
               </svg>
               Filtres
             </button>
-            <button class="btn btn-secondary">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              Exporter
-            </button>
           </div>
         </div>
 
-        <div class="modern-table">
-          <table class="alerts-table">
+        <div class="table-container">
+          <table class="table">
             <thead>
               <tr>
                 <th>Date/Heure</th>
@@ -307,24 +299,12 @@ const generateTimelineData = async (timeline: string = '24h') => {
             </thead>
             <tbody>
               <tr v-for="alert in alerts" :key="alert.id" class="alert-row">
-                <td class="timestamp-cell">
-                  <time class="timestamp">{{ alert.timestamp }}</time>
-                </td>
-                <td class="source-cell">
-                  <div class="source-info">
-                    <div class="source-name">{{ alert.source }}</div>
-                  </div>
-                </td>
-                <td class="type-cell">{{ alert.type }}</td>
-                <td class="ip-cell">
-                  <code class="ip-address">{{ alert.ip }}</code>
-                </td>
+                <td class="timestamp">{{ alert.timestamp }}</td>
+                <td>{{ alert.source }}</td>
+                <td>{{ alert.type }}</td>
+                <td>{{ alert.ip }}</td>
                 <td class="actions-cell">
-                  <button class="action-btn primary" @click="viewDetails(alert.id)">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                      <circle cx="12" cy="12" r="3"></circle>
-                    </svg>
+                  <button class="btn btn-sm btn-secondary" @click="viewDetails(alert.id)">
                     Détails
                   </button>
                 </td>
@@ -344,7 +324,7 @@ const generateTimelineData = async (timeline: string = '24h') => {
   margin-bottom: 32px;
 }
 
-/* Conteneur de graphique modernisé */
+/* Conteneur de graphique */
 .chart-container {
   background: var(--container-background-lighter);
   border: 1px solid var(--container-border-color);
@@ -410,105 +390,10 @@ const generateTimelineData = async (timeline: string = '24h') => {
   gap: 12px;
 }
 
-.modern-table {
-  overflow-x: auto;
-}
-
-.alerts-table {
-  width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
-}
-
-.alerts-table thead th {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--text-color-muted);
-  font-weight: 600;
-  font-size: 14px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  padding: 16px 24px;
-  text-align: left;
-  border-bottom: 1px solid var(--container-border-color);
-}
-
-.alerts-table thead th:first-child {
-  border-top-left-radius: 0;
-}
-
-.alerts-table thead th:last-child {
-  border-top-right-radius: 0;
-}
-
-.alert-row {
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  transition: all 0.2s ease;
-}
-
-.alert-row:hover {
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.alerts-table td {
-  padding: 20px 24px;
-  vertical-align: middle;
-}
-
 .timestamp {
   font-family: 'Courier New', monospace;
   font-size: 13px;
   color: var(--text-color-muted);
-  display: block;
-}
-
-.source-info {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.source-name {
-  font-weight: 600;
-  color: var(--white);
-  font-size: 14px;
-}
-
-.type-cell {
-  color: var(--white);
-  font-weight: 500;
-}
-
-.ip-address {
-  background: rgba(255, 255, 255, 0.1);
-  padding: 6px 10px;
-  border-radius: 6px;
-  font-family: 'Courier New', monospace;
-  font-size: 13px;
-  color: var(--accent-color);
-  font-weight: 600;
-}
-
-.action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border: none;
-  border-radius: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.action-btn.primary {
-  background: var(--accent-color);
-  color: var(--white);
-}
-
-.action-btn.primary:hover {
-  background: #3f7cff;
-  transform: translateY(-1px);
 }
 
 @media (max-width: 768px) {
