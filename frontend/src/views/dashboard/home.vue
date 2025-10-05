@@ -1,6 +1,7 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, nextTick } from 'vue'
 import { Chart, registerables } from 'chart.js'
+import {useRouter} from "vue-router";
 
 Chart.register(...registerables)
 
@@ -19,6 +20,7 @@ interface LogData {
   target_port: number
   service_type: string
   created_at: string
+  id: number
 }
 
 interface CountryData {
@@ -29,6 +31,9 @@ interface CountryData {
 export default defineComponent({
   name: "home",
   setup() {
+
+    const router = useRouter()
+
     const metrics = ref<MetricData>({
       ip_count: 0,
       Sample_downloaded: 0,
@@ -189,6 +194,10 @@ export default defineComponent({
       window.location.href = `/api/agent/user/generated_rapport`
     }
 
+    const viewDetails = (logid: number) => {
+      router.push({ name: 'alert-details', params: { id: logid.toString() } })
+    }
+
     onMounted(() => {
       fetchMetrics()
       fetchLog()
@@ -196,6 +205,7 @@ export default defineComponent({
     })
 
     return {
+      viewDetails,
       downloadReport,
       metrics,
       logs,
@@ -324,7 +334,6 @@ export default defineComponent({
                 </svg>
                 Alertes récentes
             </h3>
-            <a href="#" class="view-all-link">Voir tout</a>
         </div>
 
       <div class="table-container">
@@ -350,7 +359,7 @@ export default defineComponent({
             <td>{{ log.target_port }}</td>
             <td>{{ log.service_type }}</td>
             <td>{{ log.country_name }}</td>
-            <td><button class="btn btn-sm btn-secondary">Détails</button></td>
+            <td><button class="btn btn-sm btn-secondary" @click="viewDetails(log.id)">Détails</button></td>
           </tr>
           </tbody>
         </table>

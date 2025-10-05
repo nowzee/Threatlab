@@ -296,7 +296,7 @@ def get_agent_details():
     with DatabaseManagerHoneypot() as db:
         # Récupérer les 5 derniers logs
         db.execute('''
-            SELECT country_name, source_ip, target_port, service_type, agent_id, created_at 
+            SELECT country_name, source_ip, target_port, service_type, agent_id, created_at, id 
             FROM attack_logs 
             ORDER BY id DESC 
             LIMIT 5
@@ -321,7 +321,8 @@ def get_agent_details():
                 "source_ip": log[1],
                 "target_port": log[2],
                 "service_type": log[3],
-                "created_at": log[5]
+                "created_at": log[5],
+                "id": log[6]
             })
 
     return data
