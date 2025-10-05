@@ -294,6 +294,7 @@ def get_default_metric_data():
 
 def get_agent_details():
     with DatabaseManagerHoneypot() as db:
+        # Récupérer les 5 derniers logs
         db.execute('''
             SELECT country_name, source_ip, target_port, service_type, agent_id, created_at 
             FROM attack_logs 
@@ -305,13 +306,16 @@ def get_agent_details():
         if not logs:
             return []
 
-        db.execute("SELECT agent_name FROM honey_agents WHERE id = ?", (logs[0][4],))
-        agent_name = db.fetchone()[0]
-
         data = []
         for log in logs:
+            agent_id = log[4]
+            # Récupérer le nom de l'agent pour chaque log
+            db.execute("SELECT agent_name FROM honey_agents WHERE id = ?", (agent_id,))
+            result = db.fetchone()
+            agent_name = result[0] if result else None
+
             data.append({
-                "agent_id": log[4],
+                "agent_id": agent_id,
                 "agent_name": agent_name,
                 "country_name": log[0],
                 "source_ip": log[1],
@@ -321,6 +325,7 @@ def get_agent_details():
             })
 
     return data
+
 
 def get_country_ranking():
     """
@@ -404,4 +409,275 @@ class ManagerAgent:
 
             db.execute("INSERT INTO groups_agent (group_name) VALUES (?)", (str(group_name),))
             return True
+
+
+# ============= FUNCTIONS FOR REPORT GENERATION =============
+
+def get_top_passwords(limit=20):
+    """Get the most attempted passwords with their count"""
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT password, count
+            FROM password_attempted
+            ORDER BY count DESC
+            LIMIT ?
+        ''', (limit,))
+        results = db.fetchall()
+
+        data = []
+        for row in results:
+            if row[0]:  # Skip null passwords
+                data.append({
+                    'password': row[0],
+                    'count': row[1]
+                })
+        return data
+
+
+def get_top_usernames(limit=20):
+    """Get the most attempted usernames with their count"""
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT username, count
+            FROM username_viewed
+            ORDER BY count DESC
+            LIMIT ?
+        ''', (limit,))
+        results = db.fetchall()
+
+        data = []
+        for row in results:
+            if row[0]:  # Skip null usernames
+                data.append({
+                    'username': row[0],
+                    'count': row[1]
+                })
+        return data
+
+
+def get_service_distribution():
+    """Get attack distribution by service type"""
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT service_type, COUNT(*) as count
+            FROM attack_logs
+            WHERE service_type IS NOT NULL
+            GROUP BY service_type
+            ORDER BY count DESC
+        ''')
+        results = db.fetchall()
+
+        data = []
+        for row in results:
+            data.append({
+                'service': row[0],
+                'count': row[1]
+            })
+        return data
+
+
+def get_top_malicious_ips(limit=20):
+    """Get the most aggressive IPs with their details"""
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT
+                m.ip_address,
+                m.country_name,
+                m.total_attack_count,
+                m.classification,
+                m.first_seen,
+                m.last_seen
+            FROM malicious_ips m
+            ORDER BY m.total_attack_count DESC
+            LIMIT ?
+        ''', (limit,))
+        results = db.fetchall()
+
+        data = []
+        for row in results:
+            data.append({
+                'ip': row[0],
+                'country': row[1] or 'Unknown',
+                'attacks': row[2],
+                'classification': row[3] or 'Unclassified',
+                'first_seen': row[4],
+                'last_seen': row[5]
+            })
+        return data
+
+
+def get_attacks_by_day(days=7):
+    """Get attack count for the last N days"""
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT
+                DATE(created_at) as date,
+                COUNT(*) as count
+            FROM attack_logs
+            WHERE created_at >= datetime('now', '-' || ? || ' days')
+            GROUP BY DATE(created_at)
+            ORDER BY date ASC
+        ''', (days,))
+        results = db.fetchall()
+
+        data = []
+        for row in results:
+            data.append({
+                'date': row[0],
+                'count': row[1]
+            })
+        return data
+
+
+def get_attacks_by_hour():
+    """Get attack count for the last 24 hours by hour"""
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT
+                strftime('%H', created_at) as hour,
+                COUNT(*) as count
+            FROM attack_logs
+            WHERE created_at >= datetime('now', '-1 day')
+            GROUP BY hour
+            ORDER BY hour ASC
+        ''')
+        results = db.fetchall()
+
+        data = []
+        for row in results:
+            data.append({
+                'hour': row[0] + ':00',
+                'count': row[1]
+            })
+        return data
+
+
+def get_agent_statistics():
+    """Get statistics for all agents"""
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT
+                ha.id,
+                ha.agent_name,
+                ha.country_name,
+                ha.service_type,
+                ha.is_active,
+                ha.alert_generated,
+                ha.created_at,
+                COUNT(al.id) as total_logs
+            FROM honey_agents ha
+            LEFT JOIN attack_logs al ON ha.id = al.agent_id
+            GROUP BY ha.id
+            ORDER BY total_logs DESC
+        ''')
+        results = db.fetchall()
+
+        data = []
+        for row in results:
+            data.append({
+                'id': row[0],
+                'name': row[1],
+                'country': row[2] or 'Unknown',
+                'service': row[3],
+                'is_active': row[4],
+                'alerts': row[5],
+                'created_at': row[6],
+                'total_logs': row[7]
+            })
+        return data
+
+
+def get_payload_statistics():
+    """Get statistics on captured payloads/malware"""
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT
+                payload_type,
+                malware_family,
+                COUNT(*) as count
+            FROM payloads
+            WHERE payload_type IS NOT NULL OR malware_family IS NOT NULL
+            GROUP BY payload_type, malware_family
+            ORDER BY count DESC
+            LIMIT 20
+        ''')
+        results = db.fetchall()
+
+        data = []
+        for row in results:
+            data.append({
+                'type': row[0] or 'Unknown',
+                'family': row[1] or 'Unknown',
+                'count': row[2]
+            })
+        return data
+
+
+def get_port_distribution():
+    """Get distribution of targeted ports"""
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT
+                target_port,
+                COUNT(*) as count
+            FROM attack_logs
+            WHERE target_port IS NOT NULL
+            GROUP BY target_port
+            ORDER BY count DESC
+            LIMIT 10
+        ''')
+        results = db.fetchall()
+
+        data = []
+        for row in results:
+            data.append({
+                'port': row[0],
+                'count': row[1]
+            })
+        return data
+
+
+def get_credential_combinations():
+    """Récupère les 15 combinaisons username/password les plus observées"""
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT
+                username,
+                password,
+                SUM(attempt_count) as total_attempts
+            FROM compromised_credentials
+            GROUP BY username, password
+            ORDER BY total_attempts DESC
+            LIMIT 15
+        ''')
+        results = db.fetchall()
+
+        data = [
+            {
+                'username': row[0],
+                'password': row[1],
+                'count': row[2]
+            }
+            for row in results
+        ]
+        return data
+
+
+
+def get_complete_report_data():
+    """Get all data needed for the comprehensive report"""
+    return {
+        'metrics': get_default_metric_data(),
+        'country_ranking': get_country_ranking(),
+        'top_passwords': get_top_passwords(20),
+        'top_usernames': get_top_usernames(20),
+        'service_distribution': get_service_distribution(),
+        'top_ips': get_top_malicious_ips(20),
+        'attacks_by_day': get_attacks_by_day(7),
+        'attacks_by_hour': get_attacks_by_hour(),
+        'agents': get_agent_statistics(),
+        'payloads': get_payload_statistics(),
+        'port_distribution': get_port_distribution(),
+        'credential_combinations': get_credential_combinations()
+    }
 

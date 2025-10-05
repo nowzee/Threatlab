@@ -185,6 +185,10 @@ export default defineComponent({
       })
     }
 
+    const downloadReport = () => {
+      window.location.href = `/api/agent/user/generated_rapport`
+    }
+
     onMounted(() => {
       fetchMetrics()
       fetchLog()
@@ -192,6 +196,7 @@ export default defineComponent({
     })
 
     return {
+      downloadReport,
       metrics,
       logs,
       countryRanking,
@@ -212,6 +217,7 @@ export default defineComponent({
             <rect x="3" y="14" width="7" height="7"></rect>
         </svg>
         Tableau de bord
+      <button class="btn btn-secondary" style="margin-left: auto;" @click="downloadReport"> Générer un rapport</button>
     </h1>
 
     <!-- Résumé statistique -->

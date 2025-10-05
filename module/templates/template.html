@@ -1,0 +1,650 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rapport ThreatLabs - {{ generation_date }}</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        {{ css_content }}
+    </style>
+</head>
+<body>
+    <div class="report-container">
+        <!-- Header -->
+        <div class="report-header">
+            <div class="logo-section">
+                <h1 class="logo">ThreatLabs</h1>
+                <p class="tagline">Honeypot Intelligence Report</p>
+            </div>
+            <div class="report-info">
+                <p class="generation-date">Générer{{ generation_date }}</p>
+                <p class="period">Période: {{ period }}</p>
+            </div>
+        </div>
+
+        <!-- Executive Summary -->
+        <section class="section">
+            <h2 class="section-title">Résumé Exécutif</h2>
+            <div class="metrics-grid">
+                <div class="metric-card">
+                    <div class="metric-icon" style="background-color: rgba(156, 77, 255, 0.1);">
+                        <svg width="24" height="24" fill="#9c4dff" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-value">{{ total_attacks }}</div>
+                        <div class="metric-label">Tentatives d'Attaque</div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-icon" style="background-color: rgba(255, 107, 107, 0.1);">
+                        <svg width="24" height="24" fill="#ff6b6b" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-value">{{ total_ips }}</div>
+                        <div class="metric-label">IPs Malveillantes Uniques</div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-icon" style="background-color: rgba(0, 230, 118, 0.1);">
+                        <svg width="24" height="24" fill="#00e676" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-value">{{ active_agents }}</div>
+                        <div class="metric-label">Agents Honeypot Actifs</div>
+                    </div>
+                </div>
+
+                <div class="metric-card">
+                    <div class="metric-icon" style="background-color: rgba(255, 183, 77, 0.1);">
+                        <svg width="24" height="24" fill="#ffb74d" viewBox="0 0 24 24">
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                        </svg>
+                    </div>
+                    <div class="metric-content">
+                        <div class="metric-value">{{ payloads_collected }}</div>
+                        <div class="metric-label">Malwares</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Geographical Distribution -->
+        <section class="section">
+            <h2 class="section-title">Distribution Géographique des Attaques</h2>
+            <div class="chart-container">
+                <canvas id="countryChart"></canvas>
+            </div>
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rang</th>
+                            <th>Pays</th>
+                            <th>Nombre d'Attaques</th>
+                            <th>Pourcentage</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for country in top_countries %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ country.country_name }}</td>
+                            <td>{{ country.attack_count }}</td>
+                            <td>{{ country.percentage }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Service Distribution -->
+        <section class="section">
+            <h2 class="section-title">Distribution par Service</h2>
+            <div class="chart-container">
+                <canvas id="serviceChart"></canvas>
+            </div>
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Service</th>
+                            <th>Nombre d'Attaques</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for service in service_distribution %}
+                        <tr>
+                            <td>{{ service.service }}</td>
+                            <td>{{ service.count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Port Distribution -->
+        <section class="section">
+            <h2 class="section-title">Ports les Plus Ciblés</h2>
+            <div class="chart-container">
+                <canvas id="portChart"></canvas>
+            </div>
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Port</th>
+                            <th>Nombre d'Attaques</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for port in port_distribution %}
+                        <tr>
+                            <td>{{ port.port }}</td>
+                            <td>{{ port.count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Credentials Analysis -->
+        <section class="section">
+            <h2 class="section-title">Analyse des Identifiants Compromis</h2>
+
+            <div class="credentials-grid">
+                <div class="credential-column">
+                    <h3 class="subsection-title">Top 15 Mots de Passe</h3>
+                    <div class="chart-container-small">
+                        <canvas id="passwordChart"></canvas>
+                    </div>
+                    <div class="data-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Mot de Passe</th>
+                                    <th>Tentatives</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for pwd in top_passwords %}
+                                <tr>
+                                    <td class="password-cell">{{ pwd.password }}</td>
+                                    <td>{{ pwd.count }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <div class="credential-column">
+                    <h3 class="subsection-title">Top 15 Noms d'Utilisateur</h3>
+                    <div class="chart-container-small">
+                        <canvas id="usernameChart"></canvas>
+                    </div>
+                    <div class="data-table">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Nom d'Utilisateur</th>
+                                    <th>Tentatives</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in top_usernames %}
+                                <tr>
+                                    <td>{{ user.username }}</td>
+                                    <td>{{ user.count }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="subsection-title" style="margin-top: 30px;">Combinaisons d'Identifiants les Plus Utilisées</h3>
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rang</th>
+                            <th>Nom d'Utilisateur</th>
+                            <th>Mot de Passe</th>
+                            <th>Tentatives</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cred in credential_combinations %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td>{{ cred.username }}</td>
+                            <td class="password-cell">{{ cred.password }}</td>
+                            <td>{{ cred.count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Top Malicious IPs -->
+        <section class="section">
+            <h2 class="section-title">IPs Malveillantes les Plus Actives</h2>
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Rang</th>
+                            <th>Adresse IP</th>
+                            <th>Pays</th>
+                            <th>Nombre d'Attaques</th>
+                            <th>Classification</th>
+                            <th>Premiére Vue</th>
+                            <th>Derniére Vue</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ip in top_ips %}
+                        <tr>
+                            <td>{{ loop.index }}</td>
+                            <td class="ip-cell">{{ ip.ip }}</td>
+                            <td>{{ ip.country }}</td>
+                            <td>{{ ip.attacks }}</td>
+                            <td><span class="classification-badge">{{ ip.classification }}</span></td>
+                            <td>{{ ip.first_seen }}</td>
+                            <td>{{ ip.last_seen }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Agents Status -->
+        <section class="section">
+            <h2 class="section-title">état des Agents Honeypot</h2>
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nom de l'Agent</th>
+                            <th>Pays</th>
+                            <th>Service</th>
+                            <th>état</th>
+                            <th>Logs Collectés</th>
+                            <th>Alertes Générées</th>
+                            <th>Date de Création</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for agent in agents %}
+                        <tr>
+                            <td>{{ agent.name }}</td>
+                            <td>{{ agent.country }}</td>
+                            <td>{{ agent.service }}</td>
+                            <td>
+                                {% if agent.is_active == 1 %}
+                                <span class="status-badge status-active">Actif</span>
+                                {% else %}
+                                <span class="status-badge status-inactive">Inactif</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ agent.total_logs }}</td>
+                            <td>{{ agent.alerts }}</td>
+                            <td>{{ agent.created_at }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- Payloads Analysis -->
+        {% if payloads %}
+        <section class="section">
+            <h2 class="section-title">Analyse des Malwares Capturés</h2>
+            <div class="data-table">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Type de Payload</th>
+                            <th>Famille de Malware</th>
+                            <th>Occurrences</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payload in payloads %}
+                        <tr>
+                            <td>{{ payload.type }}</td>
+                            <td>{{ payload.family }}</td>
+                            <td>{{ payload.count }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        {% endif %}
+
+        <!-- Footer -->
+        <div class="report-footer">
+            <p>Rapport généré automatiquement par ThreatLab</p>
+            <p>2025 ThreatLabs - Honeypot Intelligence Platform</p>
+        </div>
+    </div>
+
+    <script>
+        // Configuration globale des graphiques
+        Chart.defaults.color = '#e3e3e3';
+        Chart.defaults.borderColor = '#2c2c2c';
+        Chart.defaults.font.family = "'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif";
+
+        const chartColors = {
+            primary: '#9c4dff',
+            danger: '#ff6b6b',
+            success: '#00e676',
+            warning: '#ffb74d',
+            info: '#29b6f6',
+            purple: '#9c4dff',
+            pink: '#ff4d94',
+            cyan: '#4dcaff',
+            orange: '#ff944d',
+        };
+
+        // Graphique des pays
+        {% if top_countries %}
+        const countryCtx = document.getElementById('countryChart').getContext('2d');
+        new Chart(countryCtx, {
+            type: 'bar',
+            data: {
+                labels: [{% for country in top_countries %}'{{ country.country_name }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+                datasets: [{
+                    label: 'Nombre d\'attaques',
+                    data: [{% for country in top_countries %}{{ country.attack_count }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                    backgroundColor: chartColors.primary,
+                    borderColor: chartColors.primary,
+                    borderWidth: 0,
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#1a1a1a',
+                        titleColor: '#e3e3e3',
+                        bodyColor: '#e3e3e3',
+                        borderColor: '#2c2c2c',
+                        borderWidth: 1,
+                        padding: 12,
+                        displayColors: false,
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#2c2c2c',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: '#a1a7b3'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#a1a7b3'
+                        }
+                    }
+                }
+            }
+        });
+        {% endif %}
+
+        // Graphique des services
+        {% if service_distribution %}
+        const serviceCtx = document.getElementById('serviceChart').getContext('2d');
+        new Chart(serviceCtx, {
+            type: 'doughnut',
+            data: {
+                labels: [{% for service in service_distribution %}'{{ service.service }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+                datasets: [{
+                    data: [{% for service in service_distribution %}{{ service.count }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                    backgroundColor: [
+                        chartColors.primary,
+                        chartColors.danger,
+                        chartColors.success,
+                        chartColors.warning,
+                        chartColors.info,
+                        chartColors.pink,
+                        chartColors.cyan,
+                        chartColors.orange
+                    ],
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'right',
+                        labels: {
+                            color: '#e3e3e3',
+                            padding: 15,
+                            font: {
+                                size: 12
+                            }
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: '#1a1a1a',
+                        titleColor: '#e3e3e3',
+                        bodyColor: '#e3e3e3',
+                        borderColor: '#2c2c2c',
+                        borderWidth: 1,
+                        padding: 12,
+                    }
+                }
+            }
+        });
+        {% endif %}
+
+        // Graphique des ports
+        {% if port_distribution %}
+        const portCtx = document.getElementById('portChart').getContext('2d');
+        new Chart(portCtx, {
+            type: 'bar',
+            data: {
+                labels: [{% for port in port_distribution %}'Port {{ port.port }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+                datasets: [{
+                    label: 'Nombre d\'attaques',
+                    data: [{% for port in port_distribution %}{{ port.count }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                    backgroundColor: chartColors.info,
+                    borderColor: chartColors.info,
+                    borderWidth: 0,
+                    borderRadius: 6,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#1a1a1a',
+                        titleColor: '#e3e3e3',
+                        bodyColor: '#e3e3e3',
+                        borderColor: '#2c2c2c',
+                        borderWidth: 1,
+                        padding: 12,
+                        displayColors: false,
+                    }
+                },
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#2c2c2c',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: '#a1a7b3'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#a1a7b3'
+                        }
+                    }
+                }
+            }
+        });
+        {% endif %}
+
+        // Graphique des mots de passe
+        {% if top_passwords %}
+        const passwordCtx = document.getElementById('passwordChart').getContext('2d');
+        new Chart(passwordCtx, {
+            type: 'bar',
+            data: {
+                labels: [{% for pwd in top_passwords[:10] %}'{{ pwd.password[:15] }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+                datasets: [{
+                    label: 'Tentatives',
+                    data: [{% for pwd in top_passwords[:10] %}{{ pwd.count }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                    backgroundColor: chartColors.danger,
+                    borderColor: chartColors.danger,
+                    borderWidth: 0,
+                    borderRadius: 4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#1a1a1a',
+                        titleColor: '#e3e3e3',
+                        bodyColor: '#e3e3e3',
+                        borderColor: '#2c2c2c',
+                        borderWidth: 1,
+                        padding: 12,
+                        displayColors: false,
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#2c2c2c',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: '#a1a7b3'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#a1a7b3',
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+        {% endif %}
+
+        // Graphique des usernames
+        {% if top_usernames %}
+        const usernameCtx = document.getElementById('usernameChart').getContext('2d');
+        new Chart(usernameCtx, {
+            type: 'bar',
+            data: {
+                labels: [{% for user in top_usernames[:10] %}'{{ user.username }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+                datasets: [{
+                    label: 'Tentatives',
+                    data: [{% for user in top_usernames[:10] %}{{ user.count }}{% if not loop.last %}, {% endif %}{% endfor %}],
+                    backgroundColor: chartColors.success,
+                    borderColor: chartColors.success,
+                    borderWidth: 0,
+                    borderRadius: 4,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: false
+                    },
+                    tooltip: {
+                        backgroundColor: '#1a1a1a',
+                        titleColor: '#e3e3e3',
+                        bodyColor: '#e3e3e3',
+                        borderColor: '#2c2c2c',
+                        borderWidth: 1,
+                        padding: 12,
+                        displayColors: false,
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#2c2c2c',
+                            drawBorder: false
+                        },
+                        ticks: {
+                            color: '#a1a7b3'
+                        }
+                    },
+                    x: {
+                        grid: {
+                            display: false
+                        },
+                        ticks: {
+                            color: '#a1a7b3',
+                            maxRotation: 45,
+                            minRotation: 45
+                        }
+                    }
+                }
+            }
+        });
+        {% endif %}
+    </script>
+</body>
+</html>
