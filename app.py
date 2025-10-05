@@ -11,7 +11,6 @@ from route.log_analyse.alerte_details import alert_details_bp
 from route.CTI.threat_intelligence import threat_intel_bp
 from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser
 import secrets
-
 app = Flask(__name__, static_folder='./frontend/dist', static_url_path='')
 app.config['SECRET_KEY'] = secrets.token_hex(4096)
 app.config['DATABASE'] = os.path.join(app.root_path, 'honeypot.db')
@@ -60,5 +59,6 @@ if __name__ == '__main__':
 
         with DatabaseManagerHoneypot() as db:
             db.create_db()
+
 
     app.run(host='0.0.0.0', port=5000, debug=False)

@@ -43,15 +43,8 @@ export default defineComponent({
         if (!response.ok) {
           throw new Error('Erreur lors du chargement des clés API')
         } else {
-          // Le backend retourne directement un array, pas un objet avec data
           const data = await response.json()
-          // Transformer les données pour correspondre à l'interface
-          apiKeys.value = Array.isArray(data) ? data.map(item => ({
-            id: item[0], // id
-            key: item[1], // key
-            name: item[2], // name
-            integration: item[3] // integration
-          })) : []
+          apiKeys.value = Array.isArray(data) ? data : []
         }
       } catch (err) {
         error.value = 'Erreur lors du chargement des clés API'

@@ -47,7 +47,7 @@ def delete_api_key():
 def list_api_key():
     manager = ManageApiKey()
     api_keys = manager.list()
-    return api_keys, 200
+    return jsonify(api_keys), 200
 
 @config_api_key_bp.route("/update", methods=['POST'])
 def update_api_key():

@@ -302,6 +302,9 @@ def get_agent_details():
         ''')
         logs = db.fetchall()
 
+        if not logs:
+            return []
+
         db.execute("SELECT agent_name FROM honey_agents WHERE id = ?", (logs[0][4],))
         agent_name = db.fetchone()[0]
 

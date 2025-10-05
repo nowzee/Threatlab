@@ -1,9 +1,8 @@
 import hashlib
 from module.database.db_manager import DatabaseManagerUser
-
+from module.crypto_utils.key_manager import *
 
 def auth_user(username, password):
-
     password = hashlib.sha256(password.encode()).hexdigest()
 
     with DatabaseManagerUser() as db:
@@ -31,7 +30,11 @@ def get_otp_secret(username):
         db.execute("SELECT otp_code FROM users WHERE username = ?", (username,))
         result = db.fetchone()
         if result:
-            return result[0]
+
+            key_manager = Key_manager_db()
+            data = key_manager.decrypt(result[0])
+
+            return data
         return None
 
 def update_otp_status(username, active_code, secret=None):
@@ -39,8 +42,12 @@ def update_otp_status(username, active_code, secret=None):
 
     with DatabaseManagerUser() as db:
         if secret:
+
+            key_manager = Key_manager_db()
+            cypher_secret = key_manager.encrypt(secret)
+
             db.execute("UPDATE users SET otp_active = ?, otp_code = ? WHERE username = ?",
-                         (active_code, secret, username))
+                         (active_code, cypher_secret, username))
         else:
             db.execute("UPDATE users SET otp_active = ? WHERE username = ?",
                          (active_code, username))
