@@ -28,6 +28,11 @@ interface CountryData {
   attack_count: number
 }
 
+interface PasswordData {
+  password: string,
+  count: number
+}
+
 export default defineComponent({
   name: "home",
   setup() {
@@ -43,9 +48,11 @@ export default defineComponent({
 
     const logs = ref<LogData[]>([])
     const countryRanking = ref<CountryData[]>([])
+    const passwordRanking = ref<PasswordData[]>([])
     const isLoading = ref(true)
     const error = ref<string | null>(null)
     let chartInstance: Chart | null = null
+    let passwordChartInstance: Chart | null = null
 
     const fetchMetrics = async () => {
       try {
@@ -113,6 +120,28 @@ export default defineComponent({
         createChart()
       } catch (e: any) {
         console.error('Error fetching country ranking:', e)
+      }
+    }
+
+    const fetchPasswordRanking = async () => {
+      try {
+        const response = await fetch('/api/agent/user/password_ranking', {
+          method: 'GET',
+          headers: {
+            'Accept': 'application/json',
+          },
+          credentials: 'include',
+        })
+
+        if (!response.ok) {
+          throw new Error('Erreur lors du chargement du classement des mots de passe')
+        }
+
+        passwordRanking.value = await response.json()
+        await nextTick()
+        createPasswordChart()
+      } catch (e: any) {
+        console.error('Error fetching password ranking:', e)
       }
     }
 
@@ -190,6 +219,64 @@ export default defineComponent({
       })
     }
 
+    const createPasswordChart = () => {
+  const canvas = document.getElementById('passwordChart') as HTMLCanvasElement
+  if (!canvas) return
+
+  // Destroy existing chart if it exists
+  if (passwordChartInstance) {
+    passwordChartInstance.destroy()
+  }
+
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return
+
+  const labels = passwordRanking.value.map(c => c.password)
+  const data = passwordRanking.value.map(c => c.count)
+      const CHART_COLORS = [
+  'rgb(255, 99, 132)',
+  'rgb(255, 159, 64)',
+  'rgb(255, 205, 86)',
+  'rgb(75, 192, 192)',
+  'rgb(54, 162, 235)'
+]
+  const backgroundColors = CHART_COLORS.slice(0, labels.length)
+  passwordChartInstance = new Chart(ctx, {
+    type: 'pie',
+    data: {
+      labels: labels,
+      datasets: [{
+        data: data,
+        backgroundColor: backgroundColors,
+        borderWidth: 1
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: {
+            color: '#ffffff',
+            font: {
+              size: 12
+            }
+          }
+        },
+        tooltip: {
+          backgroundColor: 'rgba(26, 29, 41, 0.95)',
+          titleColor: '#ffffff',
+          bodyColor: '#8b92a7',
+          borderColor: 'rgba(62, 69, 88, 1)',
+          borderWidth: 1,
+          padding: 12
+        }
+      }
+    }
+  })
+}
+
     const downloadReport = () => {
       window.location.href = `/api/agent/user/generated_rapport`
     }
@@ -202,6 +289,7 @@ export default defineComponent({
       fetchMetrics()
       fetchLog()
       fetchCountryRanking()
+      fetchPasswordRanking()
     })
 
     return {
@@ -305,8 +393,9 @@ export default defineComponent({
         </div>
     </div>
 
-    <!-- Classement des pays -->
-    <div class="section-card">
+      <div style="display: flex; flex-direction: row; gap: 20px; margin-top: 20px;" >
+          <!-- Classement des pays -->
+    <div class="section-card" style="width: 70%">
         <div class="card-header" style="padding: 0 0 16px 0; margin-bottom: 16px;">
             <h3 class="card-title">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -321,6 +410,20 @@ export default defineComponent({
         <div class="chart-container">
             <canvas id="countryChart"></canvas>
         </div>
+    </div>
+
+    <!-- Classement des mots de passe les plus utilisés -->
+  <div class="section-card" style="width: 30%">
+    <div class="card-header" style="padding: 0 0 16px 0; margin-bottom: 16px;">
+      <h3 class="card-title">
+        Mots de passe les plus utilisés
+      </h3>
+    </div>
+    <div class="chart-container">
+            <canvas id="passwordChart"></canvas>
+        </div>
+
+  </div>
     </div>
 
     <!-- Alertes récentes -->

@@ -352,6 +352,22 @@ def get_country_ranking():
 
         return data
 
+def get_password_ranking():
+
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''SELECT password, count FROM password_attempted GROUP BY password ORDER BY count DESC LIMIT 5''')
+        results = db.fetchall()
+
+        data = []
+        for password in results:
+            data.append({
+                'password': password[0],
+                'count': password[1]
+            })
+
+        return data
+
+
 class ManagerAgent:
     @staticmethod
     def remove(agent_id: int) -> bool:

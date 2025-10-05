@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, Response
-from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data
+from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking
 from datetime import datetime
 import os, traceback
 from jinja2 import Template
@@ -27,6 +27,13 @@ def get_new_logs_agent():
 def get_country_ranking_data():
 
     data = get_country_ranking()
+
+    return jsonify(data)
+
+@agent_user_api_bp.route("/password_ranking", methods=['GET'])
+def get_password_ranking_data():
+
+    data = get_password_ranking()
 
     return jsonify(data)
 
