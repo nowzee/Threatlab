@@ -30,8 +30,9 @@ def generate_jwt(agent_id: int) -> str:
     secret_key = current_app.config['SECRET_KEY']
     payload_to_encode = {
         'agent_id': agent_id,
-        'nonce': os.urandom(16).hex()
+        'nonce': os.urandom(16).hex()  # Random nonce prevents token reuse
     }
+    # Sign with HS256 for agent authentication
     token = jwt.encode(payload_to_encode, secret_key, algorithm='HS256')
     return token
 
@@ -104,7 +105,7 @@ def agent_report() -> Tuple[Response, int]:
         data = request.json
         agent_id = data.get('agent_id')
 
-        # Validate required fields
+        # Validate that essential fields are present
         required_fields = ['source_ip', 'service_type']
         for field in required_fields:
             if not data.get(field):
@@ -114,9 +115,9 @@ def agent_report() -> Tuple[Response, int]:
         service_type = data.get('service_type')
         country_name = data.get('country_name')
 
-        # Prepare attack data structure
+        # Build attack data dictionary with all available fields
         attack_data = {
-            'agent_id': data.get('agent_id'),  # Use agent_id instead of id
+            'agent_id': data.get('agent_id'),  # Use agent_id from JWT payload
             'source_ip': data.get('source_ip'),
             'service_type': data.get('service_type'),
             'source_port': data.get('source_port'),
@@ -130,20 +131,21 @@ def agent_report() -> Tuple[Response, int]:
             'country_name': data.get('country_name')
         }
 
-        # Add malicious IP to database
+        # Register or update IP in malicious_ips table with relationships
         if not add_malicious_ip_address(agent_id, source_ip, service_type, country_name,
                                         data.get('country_code'), data.get('classification')):
             return jsonify({'success': False, 'error': 'Failed to add malicious IP'}), 500
 
-        # Insert attack log for all
+        # Insert detailed attack log for forensics and analysis
         if not add_attack_log(attack_data):
             return jsonify({'success': False, 'error': 'Failed to add attack log'}), 500
 
-        # Service-specific processing
+        # Process service-specific data (SSH credentials, SMTP emails, etc.)
         if service_type == 'ssh':
             username_attempt = data.get('username_attempt')
             password_attempt = data.get('password_attempt')
 
+            # Track compromised credentials for brute-force analysis
             if username_attempt and password_attempt:
                 if not add_compromised_credential(source_ip, username_attempt, password_attempt, service_type):
                     return jsonify({'success': False, 'error': 'Failed to add compromised credential'}), 500
@@ -155,7 +157,7 @@ def agent_report() -> Tuple[Response, int]:
             message_content = data.get('message_content')
             attachments = data.get('attachments')
 
-            # Store SMTP-specific interaction data
+            # Store SMTP-specific data for phishing/spam analysis
             if not add_smtp_interaction(source_ip, sender_email, recipient_email,
                                         subject, message_content, attachments):
                 return jsonify({'success': False, 'error': 'Failed to add SMTP interaction'}), 500
@@ -204,22 +206,23 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
         with open(template_path, 'r') as f:
             template_content = f.read()
 
-        # Retrieve the actual JWT token for this agent
-        # Since we can't reverse the SHA256, we'll generate a new JWT token
+        # Generate a fresh JWT token for this agent download
+        # We can't retrieve the original token (stored as SHA-256 hash), so generate new one
         secret_token = generate_jwt(agent_id)
 
-        # Get server URL from request
+        # Extract server URL from current request for agent to report back to
         server_url = request.host_url.rstrip('/')
 
-        # Default values
-        ssh_port = 22
+        # Set default configuration values
+        ssh_port = 22  # Default SSH port for honeypot
         if not banner:
-            banner = "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5"
+            banner = "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5"  # Default SSH banner
 
-        # Replace placeholders in template
+        # Load template and substitute placeholders with actual values
         with open(template_path, 'r') as f:
             template_content = f.read()
 
+        # Use Template for safe variable substitution
         t = Template(template_content)
         agent_content = t.substitute(
             agent_id=agent_id,

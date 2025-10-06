@@ -29,34 +29,44 @@ def generate_custom_snowflake(username: str) -> int:
     Returns:
         int: Identifiant Snowflake unique.
     """
-    # Paramètres fixes pour éviter des IDs trop grands
+    # === Snowflake ID bit allocation ===
+    # Sequence: 12 bits (0-4095) - incremental counter for same millisecond
+    # Worker ID: 5 bits (0-31) - identifies which worker/process generated the ID
+    # Datacenter ID: 5 bits (0-31) - identifies which datacenter
+    # Timestamp: 42 bits (remaining) - milliseconds since custom epoch
     SEQUENCE_BITS = 12
     WORKER_ID_BITS = 5
     DATACENTER_ID_BITS = 5
 
-    MAX_SEQUENCE = (1 << SEQUENCE_BITS) - 1
-    MAX_WORKER_ID = (1 << WORKER_ID_BITS) - 1
-    MAX_DATACENTER_ID = (1 << DATACENTER_ID_BITS) - 1
+    # Calculate maximum values for each component using bit shifting
+    MAX_SEQUENCE = (1 << SEQUENCE_BITS) - 1  # 4095
+    MAX_WORKER_ID = (1 << WORKER_ID_BITS) - 1  # 31
+    MAX_DATACENTER_ID = (1 << DATACENTER_ID_BITS) - 1  # 31
 
-    WORKER_ID_SHIFT = SEQUENCE_BITS
-    DATACENTER_ID_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS
-    TIMESTAMP_LEFT_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS + DATACENTER_ID_BITS
+    # Calculate bit shift positions for each component
+    WORKER_ID_SHIFT = SEQUENCE_BITS  # 12
+    DATACENTER_ID_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS  # 17
+    TIMESTAMP_LEFT_SHIFT = SEQUENCE_BITS + WORKER_ID_BITS + DATACENTER_ID_BITS  # 22
 
-    EPOCH = 1577836800000  # 1er janvier 2020 en ms
+    # Custom epoch: January 1st, 2020 in milliseconds
+    EPOCH = 1577836800000
 
-    # Horodatage actuel en millisecondes
+    # Get current timestamp in milliseconds since epoch
     timestamp = int(time.time() * 1000)
 
-    # Datacenter et Worker aléatoires
+    # Generate random datacenter and worker IDs
     datacenter_id = secrets.randbelow(MAX_DATACENTER_ID + 1)
     worker_id = secrets.randbelow(MAX_WORKER_ID + 1)
 
-    # Générer une "sequence" pseudo-aléatoire basée sur username + timestamp
+    # Generate pseudo-random sequence based on username and timestamp
+    # Use SHA256 hash to ensure uniqueness
     hash_input = f"{username}-{timestamp}".encode()
     hash_digest = hashlib.sha256(hash_input).hexdigest()
+    # Take first 3 hex characters (12 bits) and apply bitmask
     sequence = int(hash_digest[:3], 16) & MAX_SEQUENCE
 
-    # Construction de l'ID avec limitation de la taille
+    # Construct the Snowflake ID by combining all components with bit shifts
+    # Format: [timestamp][datacenter_id][worker_id][sequence]
     snowflake = (
             ((timestamp - EPOCH) << TIMESTAMP_LEFT_SHIFT) |
             (datacenter_id << DATACENTER_ID_SHIFT) |

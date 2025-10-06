@@ -22,6 +22,7 @@ def last_log_analyse(timeline: str) -> Union[List[tuple], bool]:
     """
     global interval
 
+    # Map timeline strings to SQLite datetime intervals
     if timeline == '24h':
         interval = "-1 day"
     elif timeline == '7d':
@@ -30,6 +31,8 @@ def last_log_analyse(timeline: str) -> Union[List[tuple], bool]:
         interval = "-30 day"
 
     with DatabaseManagerHoneypot() as db:
+        # Query logs from specified time period using SQLite's datetime functions
+        # datetime('now', interval) calculates timestamp for N days/hours ago
         db.execute("SELECT created_at, country_code, country_name, agent_id  "
                    "FROM attack_logs WHERE created_at >= datetime('now', ?) ORDER BY created_at DESC", (interval,))
         result = db.fetchall()

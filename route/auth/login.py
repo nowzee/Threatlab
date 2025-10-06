@@ -57,21 +57,28 @@ def login() -> Tuple[Response, int]:
         data = request.get_json(silent=True) or {}
         username = (data.get('username') or "").strip()
         password = data.get('password') or ""
+        # Validate input length to prevent DoS and ensure reasonable limits (140 chars max)
         if not username or not password or len(username) > 140 or len(password) > 140:
             return jsonify({"error": "Invalid username or password"}), 401
+        # Attempt authentication with provided credentials
         if not auth_user(username, password):
+            # Log failed attempt for security monitoring
             log_attempt_account(username, request.remote_addr, 'Failed login')
             return jsonify({"error": "Invalid username or password"}), 401
 
 
+        # Credentials valid - establish session
         session['logged_in'] = True
         session['username'] = username
 
+        # Check if user has 2FA enabled
         if a2f_active(username):
+            # Mark session as requiring 2FA verification before full access
             session['a2f_validate'] = False
             log_attempt_account(username, request.remote_addr, 'A2F required')
             return jsonify({"authenticated": True, "requires_a2f": True}), 200
 
+        # No 2FA required - grant full access
         log_attempt_account(username, request.remote_addr, 'Successful login')
         return jsonify({"authenticated": True}), 200
 
@@ -107,18 +114,20 @@ def a2f() -> Tuple[Response, int]:
             if not code:
                 return jsonify({"error": "Veuillez entrer un code de vérification"}), 400
 
-            # Retrieve the user's secret key from the database
+            # Retrieve the encrypted OTP secret from database and decrypt it
             secret = get_otp_secret(session['username'])
 
-            # Create a TOTP object for verification
+            # Create TOTP verifier using the secret (6-digit codes, 30-second window)
             totp = pyotp.TOTP(secret)
 
-            # Verify the code
+            # Verify the 6-digit code - allows for time drift tolerance
             if totp.verify(code):
+                # Code valid - complete authentication process
                 session['a2f_validate'] = True
                 log_attempt_account(session['username'], request.remote_addr, 'A2F validated')
                 return jsonify({"authenticated": True, "requires_a2f": False}), 200
             else:
+                # Code invalid - log failed attempt for security monitoring
                 log_attempt_account(session['username'], request.remote_addr, 'A2F failed')
                 return jsonify({"error": "Code de vérification invalide"}), 400
 

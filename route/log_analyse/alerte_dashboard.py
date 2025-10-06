@@ -35,20 +35,20 @@ def get_data() -> Response:
     req_data = request.get_json()
     timeline = req_data.get("time", "24h")
 
-    # Get logs from database for the requested timeline
+    # Fetch attack logs from database for specified time period
     logs = last_log_analyse(timeline)
 
-    # Process logs to create timeline
+    # Initialize structures for timeline aggregation
     data: List[Dict[str, Any]] = []
     now = datetime.now()
 
-    # Count logs per period (hourly for 24h, daily for 7d/30d)
+    # Use Counter to aggregate attacks per time bucket
     period_counts: Counter = Counter()
 
     if logs:
         for log in logs:
             try:
-                # Timestamp is the first element of the tuple
+                # Parse timestamp (handle both microsecond and non-microsecond formats)
                 created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S.%f")
             except ValueError:
                 try:
@@ -56,22 +56,25 @@ def get_data() -> Response:
                 except ValueError:
                     continue
 
-            # Group by hour for 24h, by day for 7d and 30d
+            # Determine time bucket granularity based on timeline
             if timeline == "24h":
+                # Hourly buckets for 24-hour view
                 period_key = created_at.replace(minute=0, second=0, microsecond=0)
             else:  # 7d or 30d
+                # Daily buckets for weekly/monthly views
                 period_key = created_at.replace(hour=0, minute=0, second=0, microsecond=0)
 
             period_counts[period_key] += 1
 
-    # Generate complete timeline with zeros for periods without logs
+    # Generate complete timeline with zero-filled gaps for chart continuity
     if timeline == "24h":
         periods = 24
+        # Iterate backwards from now to 24 hours ago
         for i in range(periods - 1, -1, -1):
             period = now - timedelta(hours=i)
             key = period.replace(minute=0, second=0, microsecond=0)
             label = f"{period.hour:02d}:00"
-            count = period_counts.get(key, 0)
+            count = period_counts.get(key, 0)  # Default to 0 if no attacks
 
             data.append({
                 "time": period.isoformat(),

@@ -19,11 +19,16 @@ from route.CTI.threat_intelligence import threat_intel_bp
 from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser
 import secrets
 
+# Initialize Flask app with Vue.js frontend static files
 app = Flask(__name__, static_folder='./frontend/dist', static_url_path='')
+
+# Generate a secure random secret key for session management
 app.config['SECRET_KEY'] = secrets.token_hex(4096)
+
+# Configure database path
 app.config['DATABASE'] = os.path.join(app.root_path, 'honeypot.db')
 
-# Register blueprints
+# Register all application blueprints (routes modules)
 app.register_blueprint(log_analyse_bp)
 app.register_blueprint(alert_details_bp)
 app.register_blueprint(threat_intel_bp)
@@ -46,15 +51,20 @@ def before_request() -> Optional[Tuple[dict, int]]:
         Optional[Tuple[dict, int]]: JSON response with status code if authentication
                                     is required, None otherwise.
     """
-    # Liste des endpoints accessibles sans authentification
+    # Define endpoints that don't require authentication
+    # Includes: static files, login, session check, Vue app, and agent reporting
     public_endpoints = ["static", "auth.login", "serve_static_or_index", "auth.session_state", "serve_vue_app", "agent_create.agent_report"]
+
+    # Define endpoints accessible during 2FA validation process
     a2f_endpoints = ['auth.a2f', 'static', 'serve_static_or_index', 'serve_vue_app']
 
-    # Redirection vers login si non connecté et endpoint non public
+    # Redirect to login if user is not authenticated and trying to access protected endpoint
     if not session.get('logged_in') and request.endpoint not in public_endpoints:
         return jsonify({'auth_required': False}), 200
 
+    # Check if 2FA validation is required
     if session.get('a2f_validate') is not None:
+        # If 2FA is pending (a2f_validate=False) and endpoint requires 2FA, redirect to 2FA page
         if session['a2f_validate'] == False and request.endpoint not in a2f_endpoints:
             return jsonify({"requires_a2f": True}), 200
 
@@ -73,15 +83,20 @@ def serve_static_or_index(path) -> str:
     return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
-    # Initialisation de la base de données
+    # Database initialization on first run
+    # Check if database directory exists, if not create it and initialize databases
     if not os.path.exists('db'):
         os.makedirs('db')
 
+        # Initialize user database (accounts, API keys, login attempts)
         with DatabaseManagerUser() as db:
             db.create_db()
 
+        # Initialize honeypot database (agents, attack logs, malicious IPs, payloads)
         with DatabaseManagerHoneypot() as db:
             db.create_db()
 
-
+    # Start Flask development server
+    # Listen on all interfaces (0.0.0.0) on port 5000
+    # Debug mode disabled for production-like behavior
     app.run(host='0.0.0.0', port=5000, debug=False)

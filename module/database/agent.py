@@ -25,8 +25,9 @@ def generate_jwt(agent_id: int) -> str:
     secret_key = current_app.config['SECRET_KEY']
     payload_to_encode = {
         'agent_id': agent_id,
-        'nonce': os.urandom(16).hex()
+        'nonce': os.urandom(16).hex()  # Add random nonce for uniqueness and replay protection
     }
+    # Sign token with HS256 algorithm for agent authentication
     token = jwt.encode(payload_to_encode, secret_key, algorithm='HS256')
     return token
 
@@ -53,21 +54,22 @@ def create_agent_token(agent_name: str,
     """
     try:
         with DatabaseManagerHoneypot() as db:
-            # 1. Insérer un nouvel agent sans token
+            # Step 1: Insert new agent with configuration but without token
             db.execute("""
                 INSERT INTO honey_agents (agent_name, ip_address, country_name, service_type, groupe, banner)
                 VALUES (?, ?, ?, ?, ?, ?)
             """, (agent_name, ip_address, country_name, service_type, groupe, banner))
 
-            # 2. Récupérer l'ID de l'agent inséré
+            # Step 2: Get the auto-generated ID of the newly inserted agent
             db.execute("SELECT last_insert_rowid()")
             agent_id = db.fetchone()[0]
 
-            # 3. Générer un token unique et son hash
+            # Step 3: Generate JWT token using agent_id and hash it with SHA-256
+            # We store the hash only for security, return plaintext token to agent
             secret_token = generate_jwt(agent_id)
             secret_token_sha256 = hashlib.sha256(secret_token.encode()).hexdigest()
 
-            # 4. Mettre à jour l'agent avec le hash du token
+            # Step 4: Update agent record with token hash for future authentication
             db.execute("""
                 UPDATE honey_agents
                 SET secret_token_sha256 = ?
@@ -104,15 +106,16 @@ def add_malicious_ip_address(agent_id: int,
     """
     try:
         with DatabaseManagerHoneypot() as db:
-            # Step 1: Get or create the malicious IP record
+            # Step 1: Check if IP already exists in malicious_ips table
             db.execute("SELECT id, total_attack_count FROM malicious_ips WHERE ip_address = ?", (ip_address,))
             existing_ip = db.fetchone()
 
             if existing_ip:
-                # Update existing IP record
+                # IP exists - increment attack counter and update timestamp
                 ip_id, total_attack_count = existing_ip
                 new_total_count = total_attack_count + 1
 
+                # Use COALESCE to update fields only if new data provided (preserve existing if NULL)
                 db.execute("""UPDATE malicious_ips
                              SET last_seen = CURRENT_TIMESTAMP,
                                  total_attack_count = ?,
@@ -122,20 +125,20 @@ def add_malicious_ip_address(agent_id: int,
                              WHERE id = ?""",
                           (new_total_count, country_name, country_code, classification, ip_id))
             else:
-                # Insert new malicious IP
+                # New malicious IP - insert with initial data
                 db.execute("""INSERT INTO malicious_ips
                              (ip_address, country_name, country_code, classification)
                              VALUES (?, ?, ?, ?)""",
                           (ip_address, country_name, country_code, classification))
 
-                # Get the newly inserted IP ID
+                # Retrieve the auto-generated ID for the new IP
                 db.execute("SELECT id FROM malicious_ips WHERE ip_address = ?", (ip_address,))
                 ip_id = db.fetchone()[0]
 
-            # Step 2: Manage IP-Agent relationship
+            # Step 2: Update many-to-many relationship between IP and Agent
             _update_ip_agent_relation(db, ip_id, agent_id)
 
-            # Step 3: Manage IP-Service attack count
+            # Step 3: Update attack counter for this IP-Service combination
             _update_ip_service_attacks(db, ip_id, service_type)
 
             return True
@@ -156,13 +159,13 @@ def _update_ip_agent_relation(db: DatabaseManagerHoneypot, ip_id: int, agent_id:
         Exception: Si une erreur survient lors de la mise à jour.
     """
     try:
-        # Check if relationship already exists
+        # Check if this IP has already been seen by this specific agent
         db.execute("SELECT id, report_count FROM ip_agent_relations WHERE ip_id = ? AND agent_id = ?",
                   (ip_id, agent_id))
         existing_relation = db.fetchone()
 
         if existing_relation:
-            # Update existing relationship
+            # Relationship exists - increment counter to track frequency
             relation_id, report_count = existing_relation
             new_report_count = report_count + 1
             db.execute("""UPDATE ip_agent_relations
@@ -170,7 +173,7 @@ def _update_ip_agent_relation(db: DatabaseManagerHoneypot, ip_id: int, agent_id:
                          WHERE id = ?""",
                       (new_report_count, relation_id))
         else:
-            # Insert new IP-Agent relationship
+            # First time this IP has attacked this agent - create new relation
             db.execute("""INSERT INTO ip_agent_relations (ip_id, agent_id)
                          VALUES (?, ?)""", (ip_id, agent_id))
     except Exception as e:
@@ -190,13 +193,13 @@ def _update_ip_service_attacks(db: DatabaseManagerHoneypot, ip_id: int, service_
         Exception: Si une erreur survient lors de la mise à jour.
     """
     try:
-        # Check if IP-Service combination already exists
+        # Check if this IP has targeted this service type before
         db.execute("SELECT id, attack_count FROM ip_service_attacks WHERE ip_id = ? AND service_type = ?",
                   (ip_id, service_type))
         existing_service = db.fetchone()
 
         if existing_service:
-            # Update existing service attack count
+            # IP has attacked this service before - increment counter
             service_id, attack_count = existing_service
             new_attack_count = attack_count + 1
             db.execute("""UPDATE ip_service_attacks
@@ -204,7 +207,7 @@ def _update_ip_service_attacks(db: DatabaseManagerHoneypot, ip_id: int, service_
                          WHERE id = ?""",
                       (new_attack_count, service_id))
         else:
-            # Insert new IP-Service attack record
+            # First time this IP targets this service type - create new record
             db.execute("""INSERT INTO ip_service_attacks (ip_id, service_type)
                          VALUES (?, ?)""", (ip_id, service_type))
     except Exception as e:
@@ -231,7 +234,7 @@ def add_compromised_credential(malicious_ip: str,
     """
     try:
         with DatabaseManagerHoneypot() as db:
-            # Get malicious IP ID
+            # Lookup the IP ID from the malicious_ips table
             db.execute("SELECT id FROM malicious_ips WHERE ip_address = ?", (malicious_ip,))
             ip_record = db.fetchone()
 
@@ -241,14 +244,14 @@ def add_compromised_credential(malicious_ip: str,
 
             malicious_ip_id = ip_record[0]
 
-            # Check if credential combination already exists
+            # Check if this exact credential pair has been tried by this IP before
             db.execute("""SELECT id, attempt_count FROM compromised_credentials
                          WHERE malicious_ip_id = ? AND service_type = ? AND username = ? AND password = ?""",
                       (malicious_ip_id, service_type, username, password))
             existing_credential = db.fetchone()
 
             if existing_credential:
-                # Update existing credential
+                # Credential combination exists - increment attempt counter
                 credential_id, attempt_count = existing_credential
                 new_attempt_count = attempt_count + 1
                 db.execute("""UPDATE compromised_credentials
@@ -256,13 +259,13 @@ def add_compromised_credential(malicious_ip: str,
                              WHERE id = ?""",
                           (new_attempt_count, credential_id))
             else:
-                # Insert new credential
+                # New credential combination - insert with initial count of 1
                 db.execute("""INSERT INTO compromised_credentials
                              (malicious_ip_id, service_type, username, password)
                              VALUES (?, ?, ?, ?)""",
                           (malicious_ip_id, service_type, username, password))
 
-            # Update username statistics
+            # Update global username statistics for analytics
             db.execute("SELECT id, count FROM username_viewed WHERE username = ?", (username,))
             username_record = db.fetchone()
 
@@ -271,9 +274,10 @@ def add_compromised_credential(malicious_ip: str,
                 db.execute("UPDATE username_viewed SET count = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?",
                           (count + 1, username_id))
             else:
+                # First time seeing this username globally
                 db.execute("INSERT INTO username_viewed (username) VALUES (?)", (username,))
 
-            # Update password statistics
+            # Update global password statistics for analytics
             db.execute("SELECT id, count FROM password_attempted WHERE password = ?", (password,))
             password_record = db.fetchone()
 
@@ -282,6 +286,7 @@ def add_compromised_credential(malicious_ip: str,
                 db.execute("UPDATE password_attempted SET count = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?",
                           (count + 1, password_id))
             else:
+                # First time seeing this password globally
                 db.execute("INSERT INTO password_attempted (password) VALUES (?)", (password,))
 
             return True
@@ -468,6 +473,8 @@ def get_country_ranking() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: Liste des 10 pays avec le plus d'attaques, triés par ordre décroissant.
     """
     with DatabaseManagerHoneypot() as db:
+        # Aggregate attack counts by country, filtering out NULL and empty values
+        # GROUP BY groups all attacks by country, COUNT(*) tallies total per country
         db.execute('''
             SELECT country_name, COUNT(*) as attack_count
             FROM attack_logs
@@ -795,6 +802,9 @@ def get_agent_statistics() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: Liste des agents avec leurs statistiques détaillées.
     """
     with DatabaseManagerHoneypot() as db:
+        # Join agents with attack logs to calculate total logs per agent
+        # LEFT JOIN ensures all agents are included even with zero logs
+        # GROUP BY aggregates logs per agent, COUNT tallies total per agent
         db.execute('''
             SELECT
                 ha.id,
@@ -895,6 +905,8 @@ def get_credential_combinations() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: Liste des combinaisons de credentials avec leur compteur.
     """
     with DatabaseManagerHoneypot() as db:
+        # Aggregate credentials by username/password pairs
+        # SUM(attempt_count) totals all attempts for each unique pair across all IPs
         db.execute('''
             SELECT
                 username,

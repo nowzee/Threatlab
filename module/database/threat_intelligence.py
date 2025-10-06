@@ -6,9 +6,11 @@ import re
 
 def is_valid_ip(ip_string: str) -> bool:
     """Vérifie si la chaîne est une adresse IP valide"""
+    # Regex validates IPv4 format: 4 groups of 1-3 digits separated by dots
     pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
     if not re.match(pattern, ip_string):
         return False
+    # Check that each octet is in valid range 0-255
     parts = ip_string.split('.')
     return all(0 <= int(part) <= 255 for part in parts)
 
@@ -110,10 +112,10 @@ def search_ip(ip_address: str) -> dict:
                 "count": row[1]
             })
 
-        # Timeline d'activité
+        # Calculate activity metrics across different time periods for trending
         now = datetime.now()
 
-        # Dernières 24h
+        # Count attacks in last 24 hours
         db.execute("""
             SELECT COUNT(*)
             FROM attack_logs
@@ -122,7 +124,7 @@ def search_ip(ip_address: str) -> dict:
         """, (ip_address,))
         last_24h = db.fetchone()[0]
 
-        # Derniers 7 jours
+        # Count attacks in last 7 days
         db.execute("""
             SELECT COUNT(*)
             FROM attack_logs
@@ -131,7 +133,7 @@ def search_ip(ip_address: str) -> dict:
         """, (ip_address,))
         last_7d = db.fetchone()[0]
 
-        # Derniers 30 jours
+        # Count attacks in last 30 days
         db.execute("""
             SELECT COUNT(*)
             FROM attack_logs
@@ -475,17 +477,17 @@ def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
     Récupère les données temporelles pour une IP spécifique
     """
     with DatabaseManagerHoneypot() as db:
-        # Déterminer la période de temps
+        # Map timeline parameter to SQLite datetime expression
         if timeline == "24h":
             time_filter = "datetime('now', '-1 day')"
         elif timeline == "7d":
             time_filter = "datetime('now', '-7 day')"
         elif timeline == "30d":
             time_filter = "datetime('now', '-30 day')"
-        else:  # "all" ou autre
-            time_filter = "datetime('1970-01-01')"  # Depuis le début
+        else:  # "all" or other - get all historical data
+            time_filter = "datetime('1970-01-01')"  # Unix epoch start
 
-        # Récupérer tous les logs pour cette IP
+        # Fetch all attack timestamps for this IP in the time range
         db.execute(f"""
             SELECT created_at
             FROM attack_logs
@@ -496,7 +498,7 @@ def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
 
         logs = db.fetchall()
 
-        # Traitement des logs pour créer la timeline
+        # Process logs to create timeline with proper bucketing
         data = []
         now = datetime.now()
         period_counts = Counter()
@@ -504,29 +506,35 @@ def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
         if logs:
             for log in logs:
                 try:
+                    # Try parsing with microseconds first
                     created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S.%f")
                 except ValueError:
                     try:
+                        # Fallback to parsing without microseconds
                         created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S")
                     except ValueError:
                         continue
 
-                # Grouper par heure pour 24h, par jour pour le reste
+                # Group attacks into time buckets: hourly for 24h, daily for longer periods
                 if timeline == "24h":
+                    # Round down to the hour for hourly buckets
                     period_key = created_at.replace(minute=0, second=0, microsecond=0)
                 else:
+                    # Round down to the day for daily buckets
                     period_key = created_at.replace(hour=0, minute=0, second=0, microsecond=0)
 
                 period_counts[period_key] += 1
 
-        # Générer la timeline complète avec des zéros pour les périodes sans logs
+        # Generate complete timeline with zeros for periods without attacks
+        # This ensures charts display correctly with continuous time axis
         if timeline == "24h":
             periods = 24
+            # Iterate backwards from now to 24 hours ago
             for i in range(periods - 1, -1, -1):
                 period = now - timedelta(hours=i)
                 key = period.replace(minute=0, second=0, microsecond=0)
                 label = f"{period.hour:02d}:00"
-                count = period_counts.get(key, 0)
+                count = period_counts.get(key, 0)  # 0 if no attacks in this hour
 
                 data.append({
                     "time": period.isoformat(),

@@ -31,9 +31,12 @@ class Key_manager_db:
         si le fichier n'existe pas.
         """
         if not os.path.exists('.key'):
+            # Generate a new 256-bit (32 bytes) AES key for first-time setup
             with open('.key', 'wb') as f:
+                # Store key as base64 for easier file handling
                 f.write(base64.b64encode(get_random_bytes(32)))
 
+        # Load and decode the AES key from file
         with open('.key', 'rb') as f:
             self.AES_KEY = base64.b64decode(f.read())
 
@@ -50,11 +53,17 @@ class Key_manager_db:
         Returns:
             str: Données chiffrées encodées en base64 (nonce + tag + ciphertext).
         """
+        # Generate random 12-byte nonce (number used once) for GCM mode
         nonce = get_random_bytes(12)
+        # Initialize AES cipher in GCM mode (provides both encryption and authentication)
         cipher = AES.new(self.AES_KEY, AES.MODE_GCM, nonce=nonce)
+        # Encrypt and generate 16-byte authentication tag in one operation
         ciphertext, tag = cipher.encrypt_and_digest(data.encode('utf-8'))
+        # Concatenate: nonce (12 bytes) + tag (16 bytes) + ciphertext (variable)
+        # This format allows decryption since nonce and tag are needed
         blob = nonce + tag + ciphertext
 
+        # Encode as base64 for safe storage in database/text fields
         return base64.b64encode(blob).decode('utf-8')
 
     def decrypt(self, data: str) -> str:
@@ -73,11 +82,15 @@ class Key_manager_db:
         Raises:
             ValueError: Si le tag d'authentification ne correspond pas (données altérées).
         """
+        # Decode from base64 to get raw bytes
         blob = base64.b64decode(data)
-        nonce = blob[:12]
-        tag = blob[12:28]
-        ciphertext = blob[28:]
+        # Extract components from concatenated blob
+        nonce = blob[:12]        # First 12 bytes: nonce
+        tag = blob[12:28]        # Next 16 bytes: authentication tag
+        ciphertext = blob[28:]   # Remaining bytes: actual encrypted data
 
+        # Initialize cipher with same nonce used during encryption
         cipher = AES.new(self.AES_KEY, AES.MODE_GCM, nonce=nonce)
+        # Decrypt and verify tag in one operation (will raise ValueError if tampered)
         plaintext = cipher.decrypt_and_verify(ciphertext, tag)
         return plaintext.decode('utf-8')

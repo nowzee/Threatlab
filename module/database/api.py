@@ -21,6 +21,7 @@ def verify_api_key(api_key: str) -> bool:
         bool: True si la clé existe, False sinon.
     """
     with DatabaseManagerUser() as db:
+        # Query database for existing encrypted API key
         db.execute("SELECT id FROM api_keys WHERE key = ?", (api_key,))
         result = db.fetchone()
         return result is not None
@@ -48,15 +49,18 @@ class ManageApiKey:
         Returns:
             bool: True si l'ajout a réussi, False si la clé existe déjà.
         """
+        # Encrypt the API key using AES-GCM to protect sensitive data
         key_manager = Key_manager_db()
         cypher_api_key = key_manager.encrypt(api_key)
 
+        # Check if this encrypted key already exists to prevent duplicates
         if verify_api_key(cypher_api_key):
             return False
 
         now = datetime.now()
 
         with DatabaseManagerUser() as db:
+            # Store encrypted key with metadata
             db.execute(
                 "INSERT INTO api_keys (key, name, integration, created_at) VALUES (?, ?, ?, ?)",
                 (cypher_api_key, name, integration, now)
@@ -78,15 +82,16 @@ class ManageApiKey:
         """
         key_manager = Key_manager_db()
         with DatabaseManagerUser() as db:
+            # Retrieve all encrypted API keys from database
             db.execute("SELECT id, key, name, integration FROM api_keys")
             result = db.fetchall()
 
-        # Déchiffre les clés avant de les retourner
+        # Decrypt each key before returning to user
         decrypted_results = []
         for row in result:
             decrypted_results.append({
                 "id": row[0],
-                "key": key_manager.decrypt(row[1]),
+                "key": key_manager.decrypt(row[1]),  # Decrypt the encrypted key
                 "name": row[2],
                 "integration": row[3]
             })
@@ -105,13 +110,16 @@ class ManageApiKey:
         Returns:
             bool: True si la mise à jour a réussi, False si la clé n'existe pas.
         """
+        # Encrypt the API key to match stored format
         key_manager = Key_manager_db()
         cypher_api_key = key_manager.encrypt(api_key)
 
+        # Verify key exists before attempting update
         if not verify_api_key(cypher_api_key):
             return False
 
         with DatabaseManagerUser() as db:
+            # Update metadata only, key itself remains unchanged
             db.execute(
                 "UPDATE api_keys SET name = ?, integration = ? WHERE key = ?",
                 (name, integration, cypher_api_key)

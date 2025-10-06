@@ -20,9 +20,11 @@ def auth_user(username: str, password: str) -> bool:
     Returns:
         bool: True if authentication successful, False otherwise.
     """
+    # Hash the password using SHA-256 to compare with stored hash
     password = hashlib.sha256(password.encode()).hexdigest()
 
     with DatabaseManagerUser() as db:
+        # Query for matching username and password hash
         db.execute("SELECT username FROM users WHERE username = ? AND password = ?", (username, password))
         result = db.fetchone()
         if result:
@@ -44,6 +46,8 @@ def a2f_active(username: str) -> bool:
     with DatabaseManagerUser() as db:
         db.execute("SELECT otp_active FROM users WHERE username = ?", (username,))
         result = db.fetchone()[0]
+        # Status 2 means 2FA is fully activated and verified
+        # Status 1 means 2FA setup is pending, Status 0 means disabled
         if result == 2:
             return True
         else:
@@ -63,9 +67,11 @@ def get_otp_secret(username: str) -> Optional[str]:
         Optional[str]: Decrypted OTP secret, or None if not found.
     """
     with DatabaseManagerUser() as db:
+        # Retrieve the encrypted OTP secret from database
         db.execute("SELECT otp_code FROM users WHERE username = ?", (username,))
         result = db.fetchone()
         if result:
+            # Decrypt the secret using AES-GCM before returning
             key_manager = Key_manager_db()
             data = key_manager.decrypt(result[0])
             return data
@@ -86,12 +92,15 @@ def update_otp_status(username: str, active_code: int, secret: Optional[str] = N
     """
     with DatabaseManagerUser() as db:
         if secret:
+            # Encrypt the OTP secret using AES-GCM before storing
             key_manager = Key_manager_db()
             cypher_secret = key_manager.encrypt(secret)
 
+            # Update both status and encrypted secret
             db.execute("UPDATE users SET otp_active = ?, otp_code = ? WHERE username = ?",
                          (active_code, cypher_secret, username))
         else:
+            # Only update status (e.g., when disabling 2FA)
             db.execute("UPDATE users SET otp_active = ? WHERE username = ?",
                          (active_code, username))
         return True

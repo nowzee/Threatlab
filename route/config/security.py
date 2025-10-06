@@ -37,20 +37,23 @@ def change_password() -> Response:
     if not old_password or not new_password or not confirm_password:
         return jsonify({'success': False, 'error': 'Tous les champs sont obligatoires'})
 
-    # Minimum length verification
+    # Enforce minimum length of 12 characters for security
     if len(new_password) < 12:
         return jsonify({'success': False, 'error': 'Le mot de passe doit contenir au moins 12 caractères'})
 
-    # Maximum length verification
+    # Enforce maximum length to prevent DoS attacks
     if len(new_password) > 140:
         return jsonify({'success': False, 'error': 'Le mot de passe ne doit pas dépasser 140 caractères'})
 
-    # Verify passwords match
+    # Verify both password fields match to prevent typos
     if new_password != confirm_password:
         return jsonify({'success': False, 'error': 'Les mots de passe ne correspondent pas'})
 
-    # Strength verification with regex
-    # At least one lowercase letter, one uppercase, one digit and one special character
+    # Enforce complexity requirements using regex with positive lookaheads
+    # (?=.*[a-z]) - requires at least one lowercase letter
+    # (?=.*[A-Z]) - requires at least one uppercase letter
+    # (?=.*[0-9]) - requires at least one digit
+    # (?=.*[!@#$%^&*(),.?":{}|<>]) - requires at least one special character
     password_pattern = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).*$')
 
     if not password_pattern.match(new_password):
@@ -89,33 +92,33 @@ def active_a2f() -> Response:
         return jsonify({'success': False, 'error': 'Mot de passe incorrect'})
 
     if activated == 'true':
-        # Create OTP key with QR code generation
-        # Use a reasonable secret size for TOTP app compatibility
+        # Generate a random base32-encoded secret for TOTP (standard 32-char length)
         secret = pyotp.random_base32()
         totp = pyotp.TOTP(secret)
 
-        # Create the URL for the QR code
+        # Create provisioning URI for authenticator apps (Google Authenticator, Authy, etc.)
+        # Format: otpauth://totp/Threatlab:username?secret=XXX&issuer=Threatlab
         provisioning_url = totp.provisioning_uri(name=session['username'], issuer_name='Threatlab')
 
-        # Generate QR code server-side
+        # Generate QR code image that encodes the provisioning URI
         qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_L,
-            box_size=10,
-            border=4,
+            version=1,  # Size of QR code (1 is smallest)
+            error_correction=qrcode.constants.ERROR_CORRECT_L,  # ~7% error correction
+            box_size=10,  # Pixels per "box" in QR code
+            border=4,  # Border width in boxes (minimum is 4)
         )
         qr.add_data(provisioning_url)
         qr.make(fit=True)
 
-        # Create an image from the QR code
+        # Render QR code as black and white image
         img = qr.make_image(fill_color="black", back_color="white")
 
-        # Convert the image to base64 to send to client
+        # Convert PIL image to base64-encoded PNG for sending to browser
         buffered = io.BytesIO()
         img.save(buffered, format="PNG")
         qr_code_base64 = base64.b64encode(buffered.getvalue()).decode()
 
-        # Store the secret in the database
+        # Store encrypted secret in database with status 1 (pending verification)
         if update_otp_status(session['username'], 1, secret):
             return jsonify({
                 'success': True,
@@ -126,20 +129,20 @@ def active_a2f() -> Response:
             return jsonify({'success': False, 'error': 'Erreur lors de l\'activation de l\'A2F'})
 
     elif activated == 'false':
-        # Disable A2F with temporary code verification
+        # User wants to disable 2FA - require TOTP code verification first
         code = request.form.get('code')
         if not code:
             return jsonify({'success': False, 'error': 'Code de vérification manquant'})
 
-        # Retrieve existing secret to verify the code
+        # Retrieve and decrypt the user's OTP secret
         secret = get_otp_secret(session['username'])
         if not secret:
             return jsonify({'success': False, 'error': 'Configuration A2F non trouvée'})
 
-        # Verify TOTP code
+        # Verify user still has access to their authenticator app before disabling
         totp = pyotp.TOTP(secret)
         if totp.verify(code):
-            # Disable A2F for this user
+            # Code valid - disable 2FA by setting status to 0
             if update_otp_status(session['username'], 0):
                 return jsonify({'success': True})
             else:

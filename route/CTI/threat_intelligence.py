@@ -38,8 +38,9 @@ def search() -> Tuple[Response, int]:
 
         result: Optional[dict] = None
 
-        # If type specified, search directly by type
+        # Search strategy depends on specified type or auto-detection
         if search_type == "ip":
+            # Explicit IP search - validate format first
             if not is_valid_ip(query):
                 return jsonify({
                     "error": "Invalid IP format",
@@ -47,32 +48,36 @@ def search() -> Tuple[Response, int]:
                 }), 400
             result = search_ip(query)
         elif search_type == "password":
+            # Explicit password search
             result = search_password(query)
         elif search_type == "username":
+            # Explicit username search
             result = search_username(query)
         else:
-            # Auto mode: automatic type detection
-            # 1. Check if it's a valid IP
+            # Auto mode: try to detect query type and search accordingly
+            # Priority order: IP > Password > Username
+
+            # 1. Try IP search if format matches
             if is_valid_ip(query):
                 result = search_ip(query)
                 if result:
                     return jsonify(result), 200
 
-            # 2. Search in passwords
+            # 2. Try password search
             result = search_password(query)
             if result:
                 return jsonify(result), 200
 
-            # 3. Search in usernames
+            # 3. Try username search as fallback
             result = search_username(query)
             if result:
                 return jsonify(result), 200
 
-        # If a result was found, return it
+        # Return result if found in any of the searches
         if result:
             return jsonify(result), 200
 
-        # No results found
+        # No matches in threat intelligence database
         return jsonify({
             "error": "No results found",
             "message": f"Aucune donnée trouvée pour '{query}'"
@@ -107,18 +112,20 @@ def timeline() -> Tuple[Response, int]:
         if not ip_address:
             return jsonify({"error": "IP address parameter is required"}), 400
 
+        # Validate IP format using regex
         if not is_valid_ip(ip_address):
             return jsonify({
                 "error": "Invalid IP format",
                 "message": f"'{ip_address}' n'est pas une adresse IP valide"
             }), 400
 
-        # Validate timeline parameter
+        # Validate timeline parameter against allowed values
         valid_timelines = ["24h", "7d", "30d"]
         if timeline_param not in valid_timelines:
+            # Default to 24h if invalid value provided
             timeline_param = "24h"
 
-        # Get timeline data
+        # Fetch and aggregate attack timeline data for this IP
         timeline_data = get_ip_timeline(ip_address, timeline_param)
 
         return jsonify(timeline_data), 200
