@@ -85,7 +85,7 @@ def timeline():
             }), 400
 
         # Valider le paramètre timeline
-        valid_timelines = ["24h", "7d", "30d", "all"]
+        valid_timelines = ["24h", "7d", "30d"]
         if timeline not in valid_timelines:
             timeline = "24h"
 

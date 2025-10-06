@@ -214,8 +214,8 @@ export default defineComponent({
           {
             label: 'Attaques',
             data: attackWaves.value.map(wave => wave.count),
-            borderColor: '#ffb74d',
-            backgroundColor: 'rgba(255, 183, 77, 0.1)',
+            borderColor: '#9c4dff',
+            backgroundColor: 'rgba(156,77,255,0.45)',
             fill: true,
             tension: 0.4,
             pointRadius: 4,
@@ -477,13 +477,6 @@ export default defineComponent({
                 @click="setTimeline('30d')"
               >
                 30j
-              </button>
-              <button
-                class="btn btn-secondary btn-sm"
-                :class="{ active: selectedTimeline === 'all' }"
-                @click="setTimeline('all')"
-              >
-                Tout
               </button>
             </div>
           </div>
