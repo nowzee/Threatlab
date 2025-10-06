@@ -1,5 +1,5 @@
 from flask import Blueprint, jsonify, request
-from module.database.threat_intelligence import search_ip, search_password, search_username, is_valid_ip
+from module.database.threat_intelligence import search_ip, search_password, search_username, is_valid_ip, get_ip_timeline
 
 threat_intel_bp = Blueprint("threat_intel_bp", __name__, url_prefix="/api/threat-intel")
 
@@ -62,4 +62,38 @@ def search():
 
     except Exception as e:
         print(f"Error in threat intel search: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+
+@threat_intel_bp.route("/timeline", methods=["POST"])
+def timeline():
+    """
+    Endpoint pour récupérer la timeline d'une IP spécifique
+    """
+    try:
+        data = request.get_json()
+        ip_address = data.get("ip_address", "").strip()
+        timeline = data.get("timeline", "24h").strip()
+
+        if not ip_address:
+            return jsonify({"error": "IP address parameter is required"}), 400
+
+        if not is_valid_ip(ip_address):
+            return jsonify({
+                "error": "Invalid IP format",
+                "message": f"'{ip_address}' n'est pas une adresse IP valide"
+            }), 400
+
+        # Valider le paramètre timeline
+        valid_timelines = ["24h", "7d", "30d", "all"]
+        if timeline not in valid_timelines:
+            timeline = "24h"
+
+        # Récupérer les données de la timeline
+        timeline_data = get_ip_timeline(ip_address, timeline)
+
+        return jsonify(timeline_data), 200
+
+    except Exception as e:
+        print(f"Error in threat intel timeline: {e}")
         return jsonify({"error": "Internal server error"}), 500

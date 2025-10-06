@@ -1,5 +1,6 @@
 from module.database.db_manager import DatabaseManagerHoneypot
 from datetime import datetime, timedelta
+from collections import Counter
 import re
 
 
@@ -467,3 +468,124 @@ def search_username(username: str) -> dict:
                 "last30d": last_30d
             }
         }
+
+
+def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
+    """
+    Récupère les données temporelles pour une IP spécifique
+    """
+    with DatabaseManagerHoneypot() as db:
+        # Déterminer la période de temps
+        if timeline == "24h":
+            time_filter = "datetime('now', '-1 day')"
+        elif timeline == "7d":
+            time_filter = "datetime('now', '-7 day')"
+        elif timeline == "30d":
+            time_filter = "datetime('now', '-30 day')"
+        else:  # "all" ou autre
+            time_filter = "datetime('1970-01-01')"  # Depuis le début
+
+        # Récupérer tous les logs pour cette IP
+        db.execute(f"""
+            SELECT created_at
+            FROM attack_logs
+            WHERE source_ip = ?
+            AND created_at >= {time_filter}
+            ORDER BY created_at ASC
+        """, (ip_address,))
+
+        logs = db.fetchall()
+
+        # Traitement des logs pour créer la timeline
+        data = []
+        now = datetime.now()
+        period_counts = Counter()
+
+        if logs:
+            for log in logs:
+                try:
+                    created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S.%f")
+                except ValueError:
+                    try:
+                        created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        continue
+
+                # Grouper par heure pour 24h, par jour pour le reste
+                if timeline == "24h":
+                    period_key = created_at.replace(minute=0, second=0, microsecond=0)
+                else:
+                    period_key = created_at.replace(hour=0, minute=0, second=0, microsecond=0)
+
+                period_counts[period_key] += 1
+
+        # Générer la timeline complète avec des zéros pour les périodes sans logs
+        if timeline == "24h":
+            periods = 24
+            for i in range(periods - 1, -1, -1):
+                period = now - timedelta(hours=i)
+                key = period.replace(minute=0, second=0, microsecond=0)
+                label = f"{period.hour:02d}:00"
+                count = period_counts.get(key, 0)
+
+                data.append({
+                    "time": period.isoformat(),
+                    "label": label,
+                    "count": count
+                })
+        elif timeline == "7d":
+            periods = 7
+            for i in range(periods - 1, -1, -1):
+                period = now - timedelta(days=i)
+                key = period.replace(hour=0, minute=0, second=0, microsecond=0)
+                label = f"{period.day:02d}/{period.month:02d}"
+                count = period_counts.get(key, 0)
+
+                data.append({
+                    "time": period.isoformat(),
+                    "label": label,
+                    "count": count
+                })
+        elif timeline == "30d":
+            periods = 30
+            for i in range(periods - 1, -1, -1):
+                period = now - timedelta(days=i)
+                key = period.replace(hour=0, minute=0, second=0, microsecond=0)
+                label = f"{period.day:02d}/{period.month:02d}"
+                count = period_counts.get(key, 0)
+
+                data.append({
+                    "time": period.isoformat(),
+                    "label": label,
+                    "count": count
+                })
+        else:  # "all" - grouper par jour depuis le début
+            if logs and len(logs) > 0:
+                # Trouver la première date
+                try:
+                    first_date = datetime.strptime(logs[0][0], "%Y-%m-%d %H:%M:%S.%f")
+                except ValueError:
+                    first_date = datetime.strptime(logs[0][0], "%Y-%m-%d %H:%M:%S")
+
+                first_date = first_date.replace(hour=0, minute=0, second=0, microsecond=0)
+                current_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                days_diff = (current_date - first_date).days
+
+                # Limiter à 365 jours max pour éviter trop de données
+                if days_diff > 365:
+                    days_diff = 365
+                    first_date = current_date - timedelta(days=365)
+
+                for i in range(days_diff, -1, -1):
+                    period = now - timedelta(days=i)
+                    key = period.replace(hour=0, minute=0, second=0, microsecond=0)
+                    label = f"{period.day:02d}/{period.month:02d}"
+                    count = period_counts.get(key, 0)
+
+                    data.append({
+                        "time": period.isoformat(),
+                        "label": label,
+                        "count": count
+                    })
+
+        return data

@@ -1,5 +1,34 @@
 <script lang="ts">
 import { defineComponent, ref, computed } from 'vue'
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js'
+import { Line } from 'vue-chartjs'
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+)
+
+interface AttackWave {
+  time: string
+  label: string
+  count: number
+}
 
 interface RelatedItem {
   count: number
@@ -57,12 +86,15 @@ interface SearchResult {
 
 export default defineComponent({
   name: "ThreatIntelligence",
+  components: {Line},
   setup() {
     const searchQuery = ref('')
     const searchType = ref<'auto' | 'ip' | 'password' | 'username'>('auto')
     const isLoading = ref(false)
     const searchResult = ref<SearchResult | null>(null)
     const error = ref<string | null>(null)
+    const attackWaves = ref<AttackWave[]>([])
+    const selectedTimeline = ref('24h')
 
     const searchPlaceholder = computed(() => {
       switch (searchType.value) {
@@ -73,12 +105,49 @@ export default defineComponent({
       }
     })
 
+    const fetchTimelineData = async (ipAddress: string, timeline: string = '24h') => {
+      try {
+        const response = await fetch('/api/threat-intel/timeline', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            ip_address: ipAddress,
+            timeline: timeline
+          })
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          attackWaves.value = data
+          console.log('Timeline data loaded:', data)
+        } else {
+          console.error('Error fetching timeline data:', response.statusText)
+          attackWaves.value = []
+        }
+      } catch (error) {
+        console.error('Error fetching timeline data:', error)
+        attackWaves.value = []
+      }
+    }
+
+    const setTimeline = (timeline: string) => {
+      selectedTimeline.value = timeline
+      if (searchResult.value && searchResult.value.type === 'ip') {
+        fetchTimelineData(searchResult.value.value, timeline)
+      }
+    }
+
     const performSearch = async () => {
       if (!searchQuery.value.trim()) return
 
       isLoading.value = true
       error.value = null
       searchResult.value = null
+      attackWaves.value = []
 
       try {
         const response = await fetch('/api/threat-intel/search', {
@@ -97,6 +166,11 @@ export default defineComponent({
         if (response.ok) {
           const data = await response.json()
           searchResult.value = data
+
+          // Si c'est une IP, charger les données de la timeline
+          if (data.type === 'ip') {
+            await fetchTimelineData(data.value, selectedTimeline.value)
+          }
         } else if (response.status === 404) {
           error.value = `Aucun résultat trouvé pour "${searchQuery.value}"`
         } else {
@@ -114,6 +188,7 @@ export default defineComponent({
       searchQuery.value = ''
       searchResult.value = null
       error.value = null
+      attackWaves.value = []
     }
 
     const getTypeLabel = (type: string) => {
@@ -129,6 +204,76 @@ export default defineComponent({
       return num.toLocaleString('fr-FR')
     }
 
+    // Configuration du graphique
+    const chartData = computed(() => {
+      const labels = attackWaves.value.map(wave => wave.label)
+
+      return {
+        labels,
+        datasets: [
+          {
+            label: 'Attaques',
+            data: attackWaves.value.map(wave => wave.count),
+            borderColor: '#ffb74d',
+            backgroundColor: 'rgba(255, 183, 77, 0.1)',
+            fill: true,
+            tension: 0.4,
+            pointRadius: 4,
+            pointHoverRadius: 6
+          }
+        ]
+      }
+    })
+
+    const chartOptions = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false
+        },
+        title: {
+          display: false
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          titleColor: '#ffffff',
+          bodyColor: '#ffffff',
+          borderColor: 'rgba(255, 255, 255, 0.2)',
+          borderWidth: 1
+        }
+      },
+      scales: {
+        x: {
+          grid: {
+            color: 'rgba(255, 255, 255, 0.1)'
+          },
+          ticks: {
+            color: '#cccccc',
+            font: {
+              size: 12
+            }
+          }
+        },
+        y: {
+          beginAtZero: true,
+          grid: {
+            color: 'rgba(255, 255, 255, 0.1)'
+          },
+          ticks: {
+            color: '#cccccc',
+            font: {
+              size: 12
+            }
+          }
+        }
+      },
+      interaction: {
+        intersect: false,
+        mode: 'index' as const
+      }
+    }
+
     return {
       searchQuery,
       searchType,
@@ -139,7 +284,12 @@ export default defineComponent({
       performSearch,
       clearSearch,
       getTypeLabel,
-      formatNumber
+      formatNumber,
+      attackWaves,
+      chartData,
+      chartOptions,
+      selectedTimeline,
+      setTimeline
     }
   }
 })
@@ -294,6 +444,51 @@ export default defineComponent({
           <div class="card-body">
             <p><strong>Pays :</strong> {{ searchResult.country }}</p>
             <p v-if="searchResult.classification"><strong>Classification :</strong> {{ searchResult.classification }}</p>
+          </div>
+        </div>
+
+        <!-- Graphique temporel -->
+        <div class="section-card">
+          <div class="chart-header">
+            <h3 class="card-title">
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+              </svg>
+              Timeline des Attaques pour {{ searchResult.value }}
+            </h3>
+            <div class="chart-controls">
+              <button
+                class="btn btn-secondary btn-sm"
+                :class="{ active: selectedTimeline === '24h' }"
+                @click="setTimeline('24h')"
+              >
+                24h
+              </button>
+              <button
+                class="btn btn-secondary btn-sm"
+                :class="{ active: selectedTimeline === '7d' }"
+                @click="setTimeline('7d')"
+              >
+                7j
+              </button>
+              <button
+                class="btn btn-secondary btn-sm"
+                :class="{ active: selectedTimeline === '30d' }"
+                @click="setTimeline('30d')"
+              >
+                30j
+              </button>
+              <button
+                class="btn btn-secondary btn-sm"
+                :class="{ active: selectedTimeline === 'all' }"
+                @click="setTimeline('all')"
+              >
+                Tout
+              </button>
+            </div>
+          </div>
+          <div class="chart-wrapper">
+            <Line :data="chartData" :options="chartOptions" />
           </div>
         </div>
 
@@ -937,6 +1132,33 @@ export default defineComponent({
   100% { transform: rotate(360deg); }
 }
 
+/* Chart styles */
+.chart-header {
+  padding: 20px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  border-bottom: 1px solid var(--container-border-color);
+}
+
+.chart-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.chart-controls .btn.active {
+  background: var(--accent-color);
+  color: var(--white);
+  border-color: var(--accent-color);
+}
+
+.chart-wrapper {
+  height: 400px;
+  padding: 32px 0;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .type-options {
@@ -964,11 +1186,27 @@ export default defineComponent({
   .result-stats {
     gap: 20px;
   }
+
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .chart-wrapper {
+    height: 300px;
+    padding: 16px 0;
+  }
 }
 
 @media (max-width: 480px) {
   .type-options {
     grid-template-columns: 1fr;
+  }
+
+  .chart-controls {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 </style>
