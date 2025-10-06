@@ -4,7 +4,6 @@ Module de gestion du chiffrement AES pour les données sensibles.
 Ce module fournit une classe pour chiffrer et déchiffrer des données
 en utilisant AES-GCM avec une clé stockée de manière sécurisée.
 """
-from typing import str as String
 import base64
 import os
 from Crypto.Random import get_random_bytes

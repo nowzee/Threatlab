@@ -134,7 +134,7 @@ class DatabaseManagerHoneypot:
         - password_attempted: Mots de passe tentés
         - username_viewed: Noms d'utilisateur observés
         """
-            self.cursor.execute('''
+        self.cursor.execute('''
                                 CREATE TABLE IF NOT EXISTS honey_agents
                                 (
                                     id                  INTEGER PRIMARY KEY,
@@ -152,24 +152,23 @@ class DatabaseManagerHoneypot:
                                 )
                                 ''')
 
-            # Add banner column to existing tables if it doesn't exist
-            try:
-                self.cursor.execute("ALTER TABLE honey_agents ADD COLUMN banner TEXT")
-            except sqlite3.OperationalError:
-                # Column already exists
-                pass
+        # Add banner column to existing tables if it doesn't exist
+        try:
+            self.cursor.execute("ALTER TABLE honey_agents ADD COLUMN banner TEXT")
+        except sqlite3.OperationalError:
+            pass
 
             # Table des groupes pour les agents
-            self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS groups_agent
-            (
-                id INTEGER PRIMARY KEY,
-                group_name TEXT NOT NULL
-            )
-                                ''')
+        self.cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS groups_agent
+                            (
+                                id         INTEGER PRIMARY KEY,
+                                group_name TEXT NOT NULL
+                            )
+                            ''')
 
             # Table pour stocker les logs d'attaques
-            self.cursor.execute('''
+        self.cursor.execute('''
                                 CREATE TABLE IF NOT EXISTS attack_logs
                                 (
                                     id               INTEGER PRIMARY KEY,
@@ -191,132 +190,132 @@ class DatabaseManagerHoneypot:
                                 )
                                 ''')
 
-            # Table pour les IP malveillantes classifie (normalized)
-            self.cursor.execute('''
-                                CREATE TABLE IF NOT EXISTS malicious_ips
-                                (
-                                    id                INTEGER PRIMARY KEY,
-                                    ip_address        TEXT UNIQUE NOT NULL,
-                                    first_seen        DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    last_seen         DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    total_attack_count INTEGER  DEFAULT 1,
-                                    country_code      TEXT,
-                                    country_name      TEXT,
-                                    reputation_score  INTEGER  DEFAULT 0,
-                                    classification    TEXT,
-                                    notes             TEXT
-                                )
-                                ''')
+        # Table pour les IP malveillantes classifie (normalized)
+        self.cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS malicious_ips
+                            (
+                                id                 INTEGER PRIMARY KEY,
+                                ip_address         TEXT UNIQUE NOT NULL,
+                                first_seen         DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                last_seen          DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                total_attack_count INTEGER  DEFAULT 1,
+                                country_code       TEXT,
+                                country_name       TEXT,
+                                reputation_score   INTEGER  DEFAULT 0,
+                                classification     TEXT,
+                                notes              TEXT
+                            )
+                            ''')
 
-            # Table pour les relations IP-Agent (qui a vu quelle IP)
-            self.cursor.execute('''
-                                CREATE TABLE IF NOT EXISTS ip_agent_relations
-                                (
-                                    id           INTEGER PRIMARY KEY,
-                                    ip_id        INTEGER NOT NULL,
-                                    agent_id     INTEGER NOT NULL,
-                                    first_seen   DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    last_seen    DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    report_count INTEGER  DEFAULT 1,
-                                    FOREIGN KEY (ip_id) REFERENCES malicious_ips (id),
-                                    FOREIGN KEY (agent_id) REFERENCES honey_agents (id),
-                                    UNIQUE(ip_id, agent_id)
-                                )
-                                ''')
+        # Table pour les relations IP-Agent (qui a vu quelle IP)
+        self.cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS ip_agent_relations
+                            (
+                                id           INTEGER PRIMARY KEY,
+                                ip_id        INTEGER NOT NULL,
+                                agent_id     INTEGER NOT NULL,
+                                first_seen   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                last_seen    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                report_count INTEGER  DEFAULT 1,
+                                FOREIGN KEY (ip_id) REFERENCES malicious_ips (id),
+                                FOREIGN KEY (agent_id) REFERENCES honey_agents (id),
+                                UNIQUE (ip_id, agent_id)
+                            )
+                            ''')
 
-            # Table pour les attaques par service (IP-Service avec compteurs)
-            self.cursor.execute('''
-                                CREATE TABLE IF NOT EXISTS ip_service_attacks
-                                (
-                                    id           INTEGER PRIMARY KEY,
-                                    ip_id        INTEGER NOT NULL,
-                                    service_type TEXT    NOT NULL,
-                                    attack_count INTEGER  DEFAULT 1,
-                                    first_seen   DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    last_seen    DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    FOREIGN KEY (ip_id) REFERENCES malicious_ips (id),
-                                    UNIQUE(ip_id, service_type)
-                                )
-                                ''')
+        # Table pour les attaques par service (IP-Service avec compteurs)
+        self.cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS ip_service_attacks
+                            (
+                                id           INTEGER PRIMARY KEY,
+                                ip_id        INTEGER NOT NULL,
+                                service_type TEXT    NOT NULL,
+                                attack_count INTEGER  DEFAULT 1,
+                                first_seen   DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                last_seen    DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                FOREIGN KEY (ip_id) REFERENCES malicious_ips (id),
+                                UNIQUE (ip_id, service_type)
+                            )
+                            ''')
 
-            # Table pour les payloads et malwares
-            self.cursor.execute('''
-                                CREATE TABLE IF NOT EXISTS payloads
-                                (
-                                    id              INTEGER PRIMARY KEY,
-                                    malicious_ip_id INTEGER,
-                                    service_type    TEXT        NOT NULL,
-                                    payload_name    TEXT        NOT NULL,
-                                    payload_hash    TEXT UNIQUE NOT NULL,
-                                    file_extension  TEXT,
-                                    file_size       INTEGER,
-                                    payload_content TEXT,
-                                    payload_type    TEXT,
-                                    malware_family  TEXT,
-                                    first_seen      DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    last_seen       DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    detection_count INTEGER  DEFAULT 1,
-                                    FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
-                                )
-                                ''')
+        # Table pour les payloads et malwares
+        self.cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS payloads
+                            (
+                                id              INTEGER PRIMARY KEY,
+                                malicious_ip_id INTEGER,
+                                service_type    TEXT        NOT NULL,
+                                payload_name    TEXT        NOT NULL,
+                                payload_hash    TEXT UNIQUE NOT NULL,
+                                file_extension  TEXT,
+                                file_size       INTEGER,
+                                payload_content TEXT,
+                                payload_type    TEXT,
+                                malware_family  TEXT,
+                                first_seen      DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                last_seen       DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                detection_count INTEGER  DEFAULT 1,
+                                FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
+                            )
+                            ''')
 
-            # Table pour les interactions SMTP mail spécifiques
-            self.cursor.execute('''
-                                CREATE TABLE IF NOT EXISTS smtp_interactions
-                                (
-                                    id                     INTEGER PRIMARY KEY,
-                                    malicious_server_ip_id INTEGER,
-                                    sender_email           TEXT,
-                                    recipient_email        TEXT,
-                                    subject                TEXT,
-                                    message_content        TEXT,
-                                    attachments            TEXT, -- JSON array des pièces jointes
-                                    timestamp              DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    FOREIGN KEY (malicious_server_ip_id) REFERENCES malicious_ips (id)
-                                )
-                                ''')
+        # Table pour les interactions SMTP mail spécifiques
+        self.cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS smtp_interactions
+                            (
+                                id                     INTEGER PRIMARY KEY,
+                                malicious_server_ip_id INTEGER,
+                                sender_email           TEXT,
+                                recipient_email        TEXT,
+                                subject                TEXT,
+                                message_content        TEXT,
+                                attachments            TEXT, -- JSON array des pièces jointes
+                                timestamp              DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                FOREIGN KEY (malicious_server_ip_id) REFERENCES malicious_ips (id)
+                            )
+                            ''')
 
-            # Table pour les credentials compromis collectés par service
-            self.cursor.execute('''
-                                CREATE TABLE IF NOT EXISTS compromised_credentials
-                                (
-                                    id              INTEGER PRIMARY KEY,
-                                    malicious_ip_id INTEGER,
-                                    service_type    TEXT NOT NULL, -- 'smtp', 'ftp', 'iot', 'ssh', etc.
-                                    username        TEXT NOT NULL,
-                                    password        TEXT NOT NULL,
-                                    first_seen      DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    last_seen       DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    attempt_count   INTEGER  DEFAULT 1,
-                                    FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
-                                )
-                                ''')
+        # Table pour les credentials compromis collectés par service
+        self.cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS compromised_credentials
+                            (
+                                id              INTEGER PRIMARY KEY,
+                                malicious_ip_id INTEGER,
+                                service_type    TEXT NOT NULL, -- 'smtp', 'ftp', 'iot', 'ssh', etc.
+                                username        TEXT NOT NULL,
+                                password        TEXT NOT NULL,
+                                first_seen      DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                last_seen       DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                attempt_count   INTEGER  DEFAULT 1,
+                                FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
+                            )
+                            ''')
 
-            # Table de tout les mots de passe collecte et les plus teste
-            self.cursor.execute('''
-                                CREATE TABLE IF NOT EXISTS password_attempted
-                                (
-                                    id         INTEGER PRIMARY KEY,
-                                    password   TEXT NOT NULL,
-                                    count      INTEGER  DEFAULT 1,
-                                    first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    last_seen  DATETIME DEFAULT CURRENT_TIMESTAMP
-                                )
-                                ''')
+        # Table de tout les mots de passe collecte et les plus teste
+        self.cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS password_attempted
+                            (
+                                id         INTEGER PRIMARY KEY,
+                                password   TEXT NOT NULL,
+                                count      INTEGER  DEFAULT 1,
+                                first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                last_seen  DATETIME DEFAULT CURRENT_TIMESTAMP
+                            )
+                            ''')
 
-            # Table pour les username les plus vues
-            self.cursor.execute('''
-                                CREATE TABLE IF NOT EXISTS username_viewed
-                                (
-                                    id         INTEGER PRIMARY KEY,
-                                    username   TEXT NOT NULL,
-                                    count      INTEGER  DEFAULT 1,
-                                    first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-                                    last_seen  DATETIME DEFAULT CURRENT_TIMESTAMP
-                                )
-                                ''')
+        # Table pour les username les plus vues
+        self.cursor.execute('''
+                            CREATE TABLE IF NOT EXISTS username_viewed
+                            (
+                                id         INTEGER PRIMARY KEY,
+                                username   TEXT NOT NULL,
+                                count      INTEGER  DEFAULT 1,
+                                first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+                                last_seen  DATETIME DEFAULT CURRENT_TIMESTAMP
+                            )
+                            ''')
 
-            self.conn.commit()
+        self.conn.commit()
 
     def execute(self, query: str, params: Optional[Tuple[Any, ...]] = None) -> None:
         """
@@ -361,17 +360,6 @@ class DatabaseManagerHoneypot:
             exc_val (Optional[BaseException]): Instance de l'exception.
             exc_tb (Optional[Any]): Traceback de l'exception.
         """
-        try:
-            if exc_type is None:
-                # Pas d'erreur : on commit les changements
-                self.conn.commit()
-            else:
-                # Il y a eu une erreur : on rollback
-                print(f"erreur cote db honeypote : {exc_type.__name__}: {exc_val}")
-                self.conn.rollback()
-        finally:
-            # Dans tous les cas : on ferme la connexion
-            self.conn.close()
 
 class DatabaseManagerUser:
     """
