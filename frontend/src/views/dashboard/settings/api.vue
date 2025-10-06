@@ -313,7 +313,7 @@ export default defineComponent({
         <div class="card">
           <div class="card-header">
             <h3 class="card-title">Ajouter une clé API</h3>
-            <button @click="closeModals" class="btn-close">&times;</button>
+            <button @click="closeModals" class="modal-close-btn">&times;</button>
           </div>
           <div class="card-body">
             <div class="form-group">
@@ -363,7 +363,7 @@ export default defineComponent({
         <div class="card">
           <div class="card-header">
             <h3 class="card-title">Modifier la clé API</h3>
-            <button @click="closeModals" class="btn-close">&times;</button>
+            <span @click="closeModals" class="modal-close-btn">&times;</span>
           </div>
           <div class="card-body">
             <div class="form-group">
@@ -469,11 +469,6 @@ export default defineComponent({
   gap: 16px;
 }
 
-.no-data-icon {
-  font-size: 48px;
-  opacity: 0.5;
-}
-
 .no-data-text h4 {
   margin: 0;
   color: var(--text-color);
@@ -484,47 +479,6 @@ export default defineComponent({
   margin: 4px 0 0 0;
   color: var(--text-color-muted);
   font-size: 14px;
-}
-
-/* Modal */
-.modal-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  z-index: 1000;
-  backdrop-filter: blur(4px);
-}
-
-.modal-container {
-  min-width: 500px;
-  max-width: 600px;
-  max-height: 80vh;
-  overflow-y: auto;
-}
-
-.btn-close {
-  background: none;
-  border: none;
-  font-size: 24px;
-  cursor: pointer;
-  color: var(--text-color-muted);
-  transition: color 0.2s;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.btn-close:hover {
-  color: var(--danger-color);
 }
 
 /* Personnalisation des alerts */
