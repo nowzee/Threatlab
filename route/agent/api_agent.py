@@ -124,7 +124,7 @@ def download_agent(agent_id):
     try:
         # Get agent details from database
         with DatabaseManagerHoneypot() as db:
-            db.execute("""SELECT agent_name, ip_address, secret_token_sha256, banner, service_type
+            db.execute("""SELECT agent_name, banner
                          FROM honey_agents
                          WHERE id = ?""", (agent_id,))
             result = db.fetchone()
@@ -132,7 +132,7 @@ def download_agent(agent_id):
             if not result:
                 return jsonify({'error': 'Agent not found'}), 404
 
-            agent_name, ip_address, secret_token_sha256, banner, service_type = result
+            agent_name, banner = result
 
         # Read the template file
         template_path = os.path.join(

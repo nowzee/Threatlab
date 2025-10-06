@@ -477,17 +477,6 @@ export default defineComponent({
 <style src="@/assets/css/dashboard/notifications.css"></style>
 <style scoped>
 
-    .view-all-link {
-        color: var(--accent-color);
-        font-size: 14px;
-        text-decoration: none;
-        font-weight: 500;
-    }
-
-    .view-all-link:hover {
-        text-decoration: underline;
-    }
-
     .chart-container {
         position: relative;
         height: 30vh;
