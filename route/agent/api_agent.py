@@ -5,7 +5,7 @@ This module provides Flask routes for honeypot agent operations,
 including agent creation, attack reporting, and agent file downloads.
 """
 
-from typing import Tuple, Dict, Any
+from typing import Tuple
 from flask import Blueprint, jsonify, request, current_app, send_file, Response
 import jwt
 import os
