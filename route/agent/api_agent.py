@@ -1,4 +1,12 @@
-from flask import Blueprint, jsonify, request, current_app, send_file
+"""
+Agent API Route Module.
+
+This module provides Flask routes for honeypot agent operations,
+including agent creation, attack reporting, and agent file downloads.
+"""
+
+from typing import Tuple, Dict, Any
+from flask import Blueprint, jsonify, request, current_app, send_file, Response
 import jwt
 import os
 from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction
@@ -8,9 +16,16 @@ from module.auth.decorator import agent_jwt_required
 
 agent_create_bp = Blueprint('agent_create', __name__, url_prefix='/api/agent')
 
+
 def generate_jwt(agent_id: int) -> str:
     """
-    Génère un JWT unique pour un agent spécifique.
+    Generate a unique JWT token for a specific agent.
+
+    Args:
+        agent_id: The ID of the agent to generate a token for.
+
+    Returns:
+        A JWT token string containing the agent_id and a random nonce.
     """
     secret_key = current_app.config['SECRET_KEY']
     payload_to_encode = {
@@ -20,8 +35,24 @@ def generate_jwt(agent_id: int) -> str:
     token = jwt.encode(payload_to_encode, secret_key, algorithm='HS256')
     return token
 
+
 @agent_create_bp.route("/create", methods=['POST'])
-def agent_create():
+def agent_create() -> Tuple[Response, int]:
+    """
+    Create a new honeypot agent and generate its authentication token.
+
+    Expects JSON body with:
+    - agent_name: Name of the agent
+    - agent_type: Service type (default: 'ssh')
+    - ip_address: Agent's IP address (default: '0.0.0.0')
+    - country_name: Country where the agent is deployed
+    - groupe: Group name for organizing agents
+    - banner: Service banner to display (default: SSH banner)
+
+    Returns:
+        JSON response with agent_id and secret_token on success.
+        HTTP status codes: 200 (success), 500 (creation failed).
+    """
     agent_name = request.json.get('agent_name')
     agent_type = request.json.get('agent_type', 'ssh')
     ip_address = request.json.get('ip_address', '0.0.0.0')
@@ -50,7 +81,25 @@ def agent_create():
 
 @agent_create_bp.route("/report", methods=['POST'])
 @agent_jwt_required
-def agent_report():
+def agent_report() -> Tuple[Response, int]:
+    """
+    Receive and process attack reports from honeypot agents.
+
+    This endpoint is protected by JWT authentication and processes attack data
+    based on the service type (SSH, SMTP, etc.).
+
+    Required fields in JSON body:
+    - source_ip: The attacker's IP address
+    - service_type: The service being attacked (ssh, smtp, etc.)
+
+    Optional fields vary by service type:
+    - For SSH: username_attempt, password_attempt
+    - For SMTP: sender_email, recipient_email, subject, message_content, attachments
+
+    Returns:
+        JSON response with success status and message.
+        HTTP status codes: 200 (success), 400 (missing fields), 500 (database error).
+    """
     try:
         data = request.json
         agent_id = data.get('agent_id')
@@ -119,8 +168,20 @@ def agent_report():
 
 
 @agent_create_bp.route("/download/<int:agent_id>", methods=['GET'])
-def download_agent(agent_id):
-    """Generate and download the Python honeypot agent for the specified agent_id"""
+def download_agent(agent_id: int) -> Tuple[Response, int]:
+    """
+    Generate and download the Python honeypot agent script for a specific agent.
+
+    This endpoint creates a customized honeypot agent script based on a template,
+    filling in the agent's specific configuration (ID, token, banner, etc.).
+
+    Args:
+        agent_id: The ID of the agent to generate a script for.
+
+    Returns:
+        A Python script file as download, or JSON error response.
+        HTTP status codes: 200 (success), 404 (agent not found), 500 (generation error).
+    """
     try:
         # Get agent details from database
         with DatabaseManagerHoneypot() as db:

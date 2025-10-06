@@ -1,8 +1,25 @@
-import hashlib
-from module.database.db_manager import DatabaseManagerUser
-from module.crypto_utils.key_manager import *
+"""
+Authentication and Two-Factor Authentication (2FA) module.
 
-def auth_user(username, password):
+Handles user authentication, 2FA status management and OTP secret handling.
+"""
+import hashlib
+from typing import Optional
+from module.database.db_manager import DatabaseManagerUser
+from module.crypto_utils.key_manager import Key_manager_db
+
+
+def auth_user(username: str, password: str) -> bool:
+    """
+    Authenticate a user with username and password.
+
+    Args:
+        username (str): Username to authenticate.
+        password (str): Password in plaintext.
+
+    Returns:
+        bool: True if authentication successful, False otherwise.
+    """
     password = hashlib.sha256(password.encode()).hexdigest()
 
     with DatabaseManagerUser() as db:
@@ -13,8 +30,17 @@ def auth_user(username, password):
         else:
             return False
 
-def a2f_active(username):
 
+def a2f_active(username: str) -> bool:
+    """
+    Check if Two-Factor Authentication is active for a user.
+
+    Args:
+        username (str): Username to check.
+
+    Returns:
+        bool: True if 2FA is active (status = 2), False otherwise.
+    """
     with DatabaseManagerUser() as db:
         db.execute("SELECT otp_active FROM users WHERE username = ?", (username,))
         result = db.fetchone()[0]
@@ -23,26 +49,43 @@ def a2f_active(username):
         else:
             return False
 
-def get_otp_secret(username):
-    """Récupère le secret OTP d'un utilisateur pour la vérification A2F"""
 
+def get_otp_secret(username: str) -> Optional[str]:
+    """
+    Retrieve the OTP secret for a user for 2FA verification.
+
+    The secret is stored encrypted in the database and is decrypted before returning.
+
+    Args:
+        username (str): Username to retrieve OTP secret for.
+
+    Returns:
+        Optional[str]: Decrypted OTP secret, or None if not found.
+    """
     with DatabaseManagerUser() as db:
         db.execute("SELECT otp_code FROM users WHERE username = ?", (username,))
         result = db.fetchone()
         if result:
-
             key_manager = Key_manager_db()
             data = key_manager.decrypt(result[0])
-
             return data
         return None
 
-def update_otp_status(username, active_code, secret=None):
-    """Active ou désactive l'A2F pour un utilisateur et met à jour le secret si fourni"""
 
+def update_otp_status(username: str, active_code: int, secret: Optional[str] = None) -> bool:
+    """
+    Enable or disable 2FA for a user and update the secret if provided.
+
+    Args:
+        username (str): Username to update.
+        active_code (int): Status code (0=disabled, 1=pending, 2=active).
+        secret (Optional[str], optional): OTP secret to store (encrypted). Defaults to None.
+
+    Returns:
+        bool: True if update was successful.
+    """
     with DatabaseManagerUser() as db:
         if secret:
-
             key_manager = Key_manager_db()
             cypher_secret = key_manager.encrypt(secret)
 

@@ -1,16 +1,31 @@
+"""
+Module de gestion des agents honeypot et des données d'attaques.
+
+Ce module fournit les fonctions pour créer et gérer les agents honeypot,
+enregistrer les attaques, gérer les IPs malveillantes et générer des rapports.
+"""
+from typing import Optional, Tuple, Dict, List, Any
 from module.database.db_manager import DatabaseManagerHoneypot
 from datetime import datetime
-import jwt, os, hashlib
+import jwt
+import os
+import hashlib
 from flask import current_app
 
 def generate_jwt(agent_id: int) -> str:
     """
     Génère un JWT unique pour un agent spécifique.
+
+    Args:
+        agent_id (int): Identifiant de l'agent honeypot.
+
+    Returns:
+        str: Token JWT signé contenant l'ID de l'agent et un nonce.
     """
     secret_key = current_app.config['SECRET_KEY']
     payload_to_encode = {
         'agent_id': agent_id,
-        'nonce': os.urandom(16).hex()  # Ajoute de l'aléatoire pour garantir l'unicité
+        'nonce': os.urandom(16).hex()
     }
     token = jwt.encode(payload_to_encode, secret_key, algorithm='HS256')
     return token
@@ -18,13 +33,23 @@ def generate_jwt(agent_id: int) -> str:
 
 def create_agent_token(agent_name: str,
                        ip_address: str = "0.0.0.0",
-                       country_name: str = None,
+                       country_name: Optional[str] = None,
                        service_type: str = "ssh",
-                       groupe: str = None,
-                       banner: str = None):
+                       groupe: Optional[str] = None,
+                       banner: Optional[str] = None) -> Tuple[Optional[int], Optional[str]]:
     """
     Crée un enregistrement pour un nouvel agent honeypot et génère un token unique.
-    Retourne (agent_id, secret_token) si succès, sinon (None, None).
+
+    Args:
+        agent_name (str): Nom de l'agent honeypot.
+        ip_address (str, optional): Adresse IP de l'agent. Par défaut "0.0.0.0".
+        country_name (Optional[str], optional): Nom du pays où l'agent est déployé. Par défaut None.
+        service_type (str, optional): Type de service simulé (ssh, smtp, ftp, etc.). Par défaut "ssh".
+        groupe (Optional[str], optional): Groupe d'appartenance de l'agent. Par défaut None.
+        banner (Optional[str], optional): Banner du service simulé. Par défaut None.
+
+    Returns:
+        Tuple[Optional[int], Optional[str]]: (agent_id, secret_token) si succès, sinon (None, None).
     """
     try:
         with DatabaseManagerHoneypot() as db:
@@ -55,172 +80,245 @@ def create_agent_token(agent_name: str,
         print(f"Error creating agent token: {e}")
         return None, None
 
-def add_malicious_ip_address(agent_id, ip_address, service_type, country_name=None, country_code=None, classification=None):
+def add_malicious_ip_address(agent_id: int,
+                            ip_address: str,
+                            service_type: str,
+                            country_name: Optional[str] = None,
+                            country_code: Optional[str] = None,
+                            classification: Optional[str] = None) -> bool:
     """
-    Add or update malicious IP with normalized relationships.
-    Manages IP record, IP-Agent relationship, and IP-Service attack count.
+    Ajoute ou met à jour une IP malveillante avec ses relations normalisées.
+
+    Gère l'enregistrement de l'IP, la relation IP-Agent et le compteur d'attaques IP-Service.
+
+    Args:
+        agent_id (int): Identifiant de l'agent honeypot.
+        ip_address (str): Adresse IP malveillante.
+        service_type (str): Type de service ciblé (ssh, smtp, ftp, etc.).
+        country_name (Optional[str], optional): Nom du pays d'origine. Par défaut None.
+        country_code (Optional[str], optional): Code pays (ISO). Par défaut None.
+        classification (Optional[str], optional): Classification de la menace. Par défaut None.
+
+    Returns:
+        bool: True si l'opération a réussi, False sinon.
     """
     try:
         with DatabaseManagerHoneypot() as db:
             # Step 1: Get or create the malicious IP record
             db.execute("SELECT id, total_attack_count FROM malicious_ips WHERE ip_address = ?", (ip_address,))
             existing_ip = db.fetchone()
-            
+
             if existing_ip:
                 # Update existing IP record
                 ip_id, total_attack_count = existing_ip
                 new_total_count = total_attack_count + 1
-                
-                db.execute("""UPDATE malicious_ips 
-                             SET last_seen = CURRENT_TIMESTAMP, 
+
+                db.execute("""UPDATE malicious_ips
+                             SET last_seen = CURRENT_TIMESTAMP,
                                  total_attack_count = ?,
                                  country_name = COALESCE(?, country_name),
                                  country_code = COALESCE(?, country_code),
                                  classification = COALESCE(?, classification)
-                             WHERE id = ?""", 
+                             WHERE id = ?""",
                           (new_total_count, country_name, country_code, classification, ip_id))
             else:
                 # Insert new malicious IP
-                db.execute("""INSERT INTO malicious_ips 
-                             (ip_address, country_name, country_code, classification) 
+                db.execute("""INSERT INTO malicious_ips
+                             (ip_address, country_name, country_code, classification)
                              VALUES (?, ?, ?, ?)""",
                           (ip_address, country_name, country_code, classification))
-                
+
                 # Get the newly inserted IP ID
                 db.execute("SELECT id FROM malicious_ips WHERE ip_address = ?", (ip_address,))
                 ip_id = db.fetchone()[0]
-            
+
             # Step 2: Manage IP-Agent relationship
             _update_ip_agent_relation(db, ip_id, agent_id)
-            
+
             # Step 3: Manage IP-Service attack count
             _update_ip_service_attacks(db, ip_id, service_type)
-            
+
             return True
     except Exception as e:
         print(f"Error adding malicious IP address: {e}")
         return False
 
-def _update_ip_agent_relation(db, ip_id, agent_id):
-    """Helper function to update IP-Agent relationship"""
+def _update_ip_agent_relation(db: DatabaseManagerHoneypot, ip_id: int, agent_id: int) -> None:
+    """
+    Met à jour la relation entre une IP et un agent (fonction helper).
+
+    Args:
+        db (DatabaseManagerHoneypot): Instance du gestionnaire de base de données.
+        ip_id (int): Identifiant de l'IP malveillante.
+        agent_id (int): Identifiant de l'agent honeypot.
+
+    Raises:
+        Exception: Si une erreur survient lors de la mise à jour.
+    """
     try:
         # Check if relationship already exists
-        db.execute("SELECT id, report_count FROM ip_agent_relations WHERE ip_id = ? AND agent_id = ?", 
+        db.execute("SELECT id, report_count FROM ip_agent_relations WHERE ip_id = ? AND agent_id = ?",
                   (ip_id, agent_id))
         existing_relation = db.fetchone()
-        
+
         if existing_relation:
             # Update existing relationship
             relation_id, report_count = existing_relation
             new_report_count = report_count + 1
-            db.execute("""UPDATE ip_agent_relations 
-                         SET last_seen = CURRENT_TIMESTAMP, report_count = ? 
-                         WHERE id = ?""", 
+            db.execute("""UPDATE ip_agent_relations
+                         SET last_seen = CURRENT_TIMESTAMP, report_count = ?
+                         WHERE id = ?""",
                       (new_report_count, relation_id))
         else:
             # Insert new IP-Agent relationship
-            db.execute("""INSERT INTO ip_agent_relations (ip_id, agent_id) 
+            db.execute("""INSERT INTO ip_agent_relations (ip_id, agent_id)
                          VALUES (?, ?)""", (ip_id, agent_id))
     except Exception as e:
         print(f"Error updating IP-Agent relationship: {e}")
         raise
 
-def _update_ip_service_attacks(db, ip_id, service_type):
-    """Helper function to update IP-Service attack count"""
+def _update_ip_service_attacks(db: DatabaseManagerHoneypot, ip_id: int, service_type: str) -> None:
+    """
+    Met à jour le compteur d'attaques IP-Service (fonction helper).
+
+    Args:
+        db (DatabaseManagerHoneypot): Instance du gestionnaire de base de données.
+        ip_id (int): Identifiant de l'IP malveillante.
+        service_type (str): Type de service ciblé.
+
+    Raises:
+        Exception: Si une erreur survient lors de la mise à jour.
+    """
     try:
         # Check if IP-Service combination already exists
-        db.execute("SELECT id, attack_count FROM ip_service_attacks WHERE ip_id = ? AND service_type = ?", 
+        db.execute("SELECT id, attack_count FROM ip_service_attacks WHERE ip_id = ? AND service_type = ?",
                   (ip_id, service_type))
         existing_service = db.fetchone()
-        
+
         if existing_service:
             # Update existing service attack count
             service_id, attack_count = existing_service
             new_attack_count = attack_count + 1
-            db.execute("""UPDATE ip_service_attacks 
-                         SET last_seen = CURRENT_TIMESTAMP, attack_count = ? 
-                         WHERE id = ?""", 
+            db.execute("""UPDATE ip_service_attacks
+                         SET last_seen = CURRENT_TIMESTAMP, attack_count = ?
+                         WHERE id = ?""",
                       (new_attack_count, service_id))
         else:
             # Insert new IP-Service attack record
-            db.execute("""INSERT INTO ip_service_attacks (ip_id, service_type) 
+            db.execute("""INSERT INTO ip_service_attacks (ip_id, service_type)
                          VALUES (?, ?)""", (ip_id, service_type))
     except Exception as e:
         print(f"Error updating IP-Service attacks: {e}")
         raise
 
-def add_compromised_credential(malicious_ip, username, password, service_type):
+def add_compromised_credential(malicious_ip: str,
+                              username: str,
+                              password: str,
+                              service_type: str) -> bool:
+    """
+    Ajoute ou met à jour des credentials compromis.
+
+    Met également à jour les statistiques globales des usernames et passwords observés.
+
+    Args:
+        malicious_ip (str): Adresse IP malveillante.
+        username (str): Nom d'utilisateur tenté.
+        password (str): Mot de passe tenté.
+        service_type (str): Type de service ciblé.
+
+    Returns:
+        bool: True si l'opération a réussi, False sinon.
+    """
     try:
         with DatabaseManagerHoneypot() as db:
             # Get malicious IP ID
             db.execute("SELECT id FROM malicious_ips WHERE ip_address = ?", (malicious_ip,))
             ip_record = db.fetchone()
-            
+
             if not ip_record:
                 print(f"Malicious IP {malicious_ip} not found in database")
                 return False
-                
+
             malicious_ip_id = ip_record[0]
-            
+
             # Check if credential combination already exists
-            db.execute("""SELECT id, attempt_count FROM compromised_credentials 
+            db.execute("""SELECT id, attempt_count FROM compromised_credentials
                          WHERE malicious_ip_id = ? AND service_type = ? AND username = ? AND password = ?""",
                       (malicious_ip_id, service_type, username, password))
             existing_credential = db.fetchone()
-            
+
             if existing_credential:
                 # Update existing credential
                 credential_id, attempt_count = existing_credential
                 new_attempt_count = attempt_count + 1
-                db.execute("""UPDATE compromised_credentials 
-                             SET last_seen = CURRENT_TIMESTAMP, attempt_count = ? 
-                             WHERE id = ?""", 
+                db.execute("""UPDATE compromised_credentials
+                             SET last_seen = CURRENT_TIMESTAMP, attempt_count = ?
+                             WHERE id = ?""",
                           (new_attempt_count, credential_id))
             else:
                 # Insert new credential
-                db.execute("""INSERT INTO compromised_credentials 
-                             (malicious_ip_id, service_type, username, password) 
+                db.execute("""INSERT INTO compromised_credentials
+                             (malicious_ip_id, service_type, username, password)
                              VALUES (?, ?, ?, ?)""",
                           (malicious_ip_id, service_type, username, password))
-            
+
             # Update username statistics
             db.execute("SELECT id, count FROM username_viewed WHERE username = ?", (username,))
             username_record = db.fetchone()
-            
+
             if username_record:
                 username_id, count = username_record
-                db.execute("UPDATE username_viewed SET count = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?", 
+                db.execute("UPDATE username_viewed SET count = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?",
                           (count + 1, username_id))
             else:
                 db.execute("INSERT INTO username_viewed (username) VALUES (?)", (username,))
-            
+
             # Update password statistics
             db.execute("SELECT id, count FROM password_attempted WHERE password = ?", (password,))
             password_record = db.fetchone()
-            
+
             if password_record:
                 password_id, count = password_record
-                db.execute("UPDATE password_attempted SET count = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?", 
+                db.execute("UPDATE password_attempted SET count = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?",
                           (count + 1, password_id))
             else:
                 db.execute("INSERT INTO password_attempted (password) VALUES (?)", (password,))
-            
+
             return True
     except Exception as e:
         print(f"Error adding compromised credential: {e}")
         return False
 
-def add_attack_log(attack_data):
-    """Insert attack log data into the database with current timestamp"""
+def add_attack_log(attack_data: Dict[str, Any]) -> bool:
+    """
+    Insère un log d'attaque dans la base de données avec l'horodatage actuel.
+
+    Args:
+        attack_data (Dict[str, Any]): Dictionnaire contenant les données de l'attaque:
+            - agent_id: Identifiant de l'agent
+            - source_ip: IP source de l'attaque
+            - source_port: Port source
+            - target_port: Port ciblé
+            - service_type: Type de service
+            - username_attempt: Tentative de username (optionnel)
+            - password_attempt: Tentative de password (optionnel)
+            - payload: Payload capturé (optionnel)
+            - malware_hash: Hash du malware (optionnel)
+            - classification: Type d'attaque (optionnel)
+            - country_code: Code pays (optionnel)
+            - country_name: Nom du pays (optionnel)
+
+    Returns:
+        bool: True si l'insertion a réussi, False sinon.
+    """
     try:
         with DatabaseManagerHoneypot() as db:
-            now = datetime.now()  # heure locale du serveur
-            # ou datetime.utcnow() si tu veux UTC
+            now = datetime.now()
 
-            db.execute("""INSERT INTO attack_logs 
-                         (created_at, agent_id, source_ip, source_port, target_port, service_type, 
-                          username_attempt, password_attempt, payload, malware_hash, 
-                          attack_type, country_code, country_name) 
+            db.execute("""INSERT INTO attack_logs
+                         (created_at, agent_id, source_ip, source_port, target_port, service_type,
+                          username_attempt, password_attempt, payload, malware_hash,
+                          attack_type, country_code, country_name)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                       (now,
                        attack_data.get('agent_id'),
@@ -240,36 +338,64 @@ def add_attack_log(attack_data):
         print(f"Error adding attack log: {e}")
         return False
 
-def add_smtp_interaction(malicious_ip, sender_email, recipient_email, subject, message_content, attachments=None):
-    """Insert SMTP interaction data into the database"""
+def add_smtp_interaction(malicious_ip: str,
+                        sender_email: str,
+                        recipient_email: str,
+                        subject: str,
+                        message_content: str,
+                        attachments: Optional[List[str]] = None) -> bool:
+    """
+    Insère une interaction SMTP dans la base de données.
+
+    Args:
+        malicious_ip (str): Adresse IP du serveur malveillant.
+        sender_email (str): Email de l'expéditeur.
+        recipient_email (str): Email du destinataire.
+        subject (str): Sujet de l'email.
+        message_content (str): Contenu du message.
+        attachments (Optional[List[str]], optional): Liste des pièces jointes. Par défaut None.
+
+    Returns:
+        bool: True si l'insertion a réussi, False sinon.
+    """
     try:
         with DatabaseManagerHoneypot() as db:
             # Get malicious IP ID
             db.execute("SELECT id FROM malicious_ips WHERE ip_address = ?", (malicious_ip,))
             ip_record = db.fetchone()
-            
+
             if not ip_record:
                 print(f"Malicious IP {malicious_ip} not found in database")
                 return False
-                
+
             malicious_ip_id = ip_record[0]
-            
+
             # Insert SMTP interaction
             import json
             attachments_json = json.dumps(attachments) if attachments else None
-            
-            db.execute("""INSERT INTO smtp_interactions 
-                         (malicious_server_ip_id, sender_email, recipient_email, subject, 
-                          message_content, attachments) 
+
+            db.execute("""INSERT INTO smtp_interactions
+                         (malicious_server_ip_id, sender_email, recipient_email, subject,
+                          message_content, attachments)
                          VALUES (?, ?, ?, ?, ?, ?)""",
-                      (malicious_ip_id, sender_email, recipient_email, subject, 
+                      (malicious_ip_id, sender_email, recipient_email, subject,
                        message_content, attachments_json))
             return True
     except Exception as e:
         print(f"Error adding SMTP interaction: {e}")
         return False
 
-def get_default_metric_data():
+def get_default_metric_data() -> Dict[str, int]:
+    """
+    Récupère les métriques par défaut du dashboard.
+
+    Returns:
+        Dict[str, int]: Dictionnaire contenant:
+            - ip_count: Nombre d'IPs malveillantes uniques
+            - Sample_downloaded: Nombre de samples/payloads uniques
+            - tentative_access: Nombre total de tentatives d'accès
+            - active_honeypot: Nombre d'agents honeypot actifs
+    """
     with DatabaseManagerHoneypot() as db:
         db.execute("SELECT COUNT(*) FROM malicious_ips")
         ip_count = db.fetchone()
@@ -292,13 +418,19 @@ def get_default_metric_data():
 
         return data
 
-def get_agent_details():
+def get_agent_details() -> List[Dict[str, Any]]:
+    """
+    Récupère les détails des 5 derniers logs d'attaques avec informations des agents.
+
+    Returns:
+        List[Dict[str, Any]]: Liste de dictionnaires contenant les informations des logs.
+    """
     with DatabaseManagerHoneypot() as db:
         # Récupérer les 5 derniers logs
         db.execute('''
-            SELECT country_name, source_ip, target_port, service_type, agent_id, created_at, id 
-            FROM attack_logs 
-            ORDER BY id DESC 
+            SELECT country_name, source_ip, target_port, service_type, agent_id, created_at, id
+            FROM attack_logs
+            ORDER BY id DESC
             LIMIT 5
         ''')
         logs = db.fetchall()
@@ -328,9 +460,12 @@ def get_agent_details():
     return data
 
 
-def get_country_ranking():
+def get_country_ranking() -> List[Dict[str, Any]]:
     """
-    Get the top countries by attack count for dashboard visualization
+    Récupère le classement des pays par nombre d'attaques pour le dashboard.
+
+    Returns:
+        List[Dict[str, Any]]: Liste des 10 pays avec le plus d'attaques, triés par ordre décroissant.
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
@@ -352,8 +487,13 @@ def get_country_ranking():
 
         return data
 
-def get_password_ranking():
+def get_password_ranking() -> List[Dict[str, Any]]:
+    """
+    Récupère le classement des 5 mots de passe les plus tentés.
 
+    Returns:
+        List[Dict[str, Any]]: Liste des 5 mots de passe les plus populaires.
+    """
     with DatabaseManagerHoneypot() as db:
         db.execute('''SELECT password, count FROM password_attempted GROUP BY password ORDER BY count DESC LIMIT 5''')
         results = db.fetchall()
@@ -369,10 +509,23 @@ def get_password_ranking():
 
 
 class ManagerAgent:
+    """
+    Classe pour gérer les opérations CRUD sur les agents honeypot.
+    """
+
     @staticmethod
     def remove(agent_id: int) -> bool:
+        """
+        Supprime un agent honeypot de la base de données.
+
+        Args:
+            agent_id (int): Identifiant de l'agent à supprimer.
+
+        Returns:
+            bool: True si l'agent a été supprimé, False s'il n'existe pas.
+        """
         with DatabaseManagerHoneypot() as db:
-            
+
             db.execute('''SELECT id FROM honey_agents WHERE id = ?''', (int(agent_id),))
             agent = db.fetchone()
             if agent:
@@ -380,11 +533,25 @@ class ManagerAgent:
                 return True
             return False
 
-    def update(self, agent_id, agent_name, is_active):
+    def update(self, agent_id: int, agent_name: str, is_active: int) -> None:
+        """
+        Met à jour les informations d'un agent honeypot.
+
+        Args:
+            agent_id (int): Identifiant de l'agent.
+            agent_name (str): Nouveau nom de l'agent.
+            is_active (int): Statut d'activation (0 ou 1).
+        """
         pass
 
     @staticmethod
-    def list() -> list:
+    def list() -> List[Dict[str, Any]]:
+        """
+        Récupère la liste complète de tous les agents honeypot.
+
+        Returns:
+            List[Dict[str, Any]]: Liste de dictionnaires contenant les informations des agents.
+        """
         with DatabaseManagerHoneypot() as db:
             db.execute('''SELECT id,
                                  agent_name,
@@ -407,17 +574,26 @@ class ManagerAgent:
                     'ip_address': row[2],
                     'service_type': row[3],
                     'updated_at': row[4],
-                    'is_active': row[5] if len(row) > 5 else 1,  # Valeur par défaut
-                    'groupe': row[6] if len(row) > 6 else 'default',  # Valeur par défaut
-                    'alert_generated': row[7] if len(row) > 7 else 0,  # Valeur par défaut
-                    'created_at': row[8] if len(row) > 8 else row[4]  # Utiliser updated_at si created_at n'existe pas
+                    'is_active': row[5] if len(row) > 5 else 1,
+                    'groupe': row[6] if len(row) > 6 else 'default',
+                    'alert_generated': row[7] if len(row) > 7 else 0,
+                    'created_at': row[8] if len(row) > 8 else row[4]
                 }
                 agents.append(agent)
 
             return agents
 
     @staticmethod
-    def create_group(group_name) -> bool:
+    def create_group(group_name: str) -> bool:
+        """
+        Crée un nouveau groupe d'agents.
+
+        Args:
+            group_name (str): Nom du groupe à créer.
+
+        Returns:
+            bool: True si le groupe a été créé, False s'il existe déjà.
+        """
         with DatabaseManagerHoneypot() as db:
             db.execute("SELECT id FROM groups_agent WHERE group_name = ?", (str(group_name),))
             result = db.fetchone()
@@ -430,8 +606,16 @@ class ManagerAgent:
 
 # ============= FUNCTIONS FOR REPORT GENERATION =============
 
-def get_top_passwords(limit=20):
-    """Get the most attempted passwords with their count"""
+def get_top_passwords(limit: int = 20) -> List[Dict[str, Any]]:
+    """
+    Récupère les mots de passe les plus tentés.
+
+    Args:
+        limit (int, optional): Nombre maximum de résultats. Par défaut 20.
+
+    Returns:
+        List[Dict[str, Any]]: Liste des mots de passe avec leur nombre d'occurrences.
+    """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
             SELECT password, count
@@ -451,8 +635,16 @@ def get_top_passwords(limit=20):
         return data
 
 
-def get_top_usernames(limit=20):
-    """Get the most attempted usernames with their count"""
+def get_top_usernames(limit: int = 20) -> List[Dict[str, Any]]:
+    """
+    Récupère les noms d'utilisateur les plus tentés.
+
+    Args:
+        limit (int, optional): Nombre maximum de résultats. Par défaut 20.
+
+    Returns:
+        List[Dict[str, Any]]: Liste des usernames avec leur nombre d'occurrences.
+    """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
             SELECT username, count
@@ -472,8 +664,13 @@ def get_top_usernames(limit=20):
         return data
 
 
-def get_service_distribution():
-    """Get attack distribution by service type"""
+def get_service_distribution() -> List[Dict[str, Any]]:
+    """
+    Récupère la distribution des attaques par type de service.
+
+    Returns:
+        List[Dict[str, Any]]: Liste des services ciblés avec le nombre d'attaques.
+    """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
             SELECT service_type, COUNT(*) as count
@@ -493,8 +690,16 @@ def get_service_distribution():
         return data
 
 
-def get_top_malicious_ips(limit=20):
-    """Get the most aggressive IPs with their details"""
+def get_top_malicious_ips(limit: int = 20) -> List[Dict[str, Any]]:
+    """
+    Récupère les IPs malveillantes les plus agressives.
+
+    Args:
+        limit (int, optional): Nombre maximum de résultats. Par défaut 20.
+
+    Returns:
+        List[Dict[str, Any]]: Liste des IPs avec leurs détails et statistiques.
+    """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
             SELECT
@@ -523,8 +728,16 @@ def get_top_malicious_ips(limit=20):
         return data
 
 
-def get_attacks_by_day(days=7):
-    """Get attack count for the last N days"""
+def get_attacks_by_day(days: int = 7) -> List[Dict[str, Any]]:
+    """
+    Récupère le nombre d'attaques pour les N derniers jours.
+
+    Args:
+        days (int, optional): Nombre de jours à analyser. Par défaut 7.
+
+    Returns:
+        List[Dict[str, Any]]: Liste des dates avec le nombre d'attaques par jour.
+    """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
             SELECT
@@ -546,8 +759,13 @@ def get_attacks_by_day(days=7):
         return data
 
 
-def get_attacks_by_hour():
-    """Get attack count for the last 24 hours by hour"""
+def get_attacks_by_hour() -> List[Dict[str, Any]]:
+    """
+    Récupère le nombre d'attaques par heure pour les dernières 24 heures.
+
+    Returns:
+        List[Dict[str, Any]]: Liste des heures avec le nombre d'attaques.
+    """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
             SELECT
@@ -569,8 +787,13 @@ def get_attacks_by_hour():
         return data
 
 
-def get_agent_statistics():
-    """Get statistics for all agents"""
+def get_agent_statistics() -> List[Dict[str, Any]]:
+    """
+    Récupère les statistiques pour tous les agents honeypot.
+
+    Returns:
+        List[Dict[str, Any]]: Liste des agents avec leurs statistiques détaillées.
+    """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
             SELECT
@@ -604,8 +827,13 @@ def get_agent_statistics():
         return data
 
 
-def get_payload_statistics():
-    """Get statistics on captured payloads/malware"""
+def get_payload_statistics() -> List[Dict[str, Any]]:
+    """
+    Récupère les statistiques sur les payloads/malwares capturés.
+
+    Returns:
+        List[Dict[str, Any]]: Liste des types de payloads avec leur compteur.
+    """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
             SELECT
@@ -630,8 +858,13 @@ def get_payload_statistics():
         return data
 
 
-def get_port_distribution():
-    """Get distribution of targeted ports"""
+def get_port_distribution() -> List[Dict[str, Any]]:
+    """
+    Récupère la distribution des ports ciblés.
+
+    Returns:
+        List[Dict[str, Any]]: Liste des 10 ports les plus ciblés avec leur compteur.
+    """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
             SELECT
@@ -654,8 +887,13 @@ def get_port_distribution():
         return data
 
 
-def get_credential_combinations():
-    """Récupère les 15 combinaisons username/password les plus observées"""
+def get_credential_combinations() -> List[Dict[str, Any]]:
+    """
+    Récupère les 15 combinaisons username/password les plus observées.
+
+    Returns:
+        List[Dict[str, Any]]: Liste des combinaisons de credentials avec leur compteur.
+    """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
             SELECT
@@ -681,8 +919,25 @@ def get_credential_combinations():
 
 
 
-def get_complete_report_data():
-    """Get all data needed for the comprehensive report"""
+def get_complete_report_data() -> Dict[str, Any]:
+    """
+    Récupère toutes les données nécessaires pour un rapport complet.
+
+    Returns:
+        Dict[str, Any]: Dictionnaire contenant toutes les métriques et statistiques:
+            - metrics: Métriques générales
+            - country_ranking: Classement des pays
+            - top_passwords: Mots de passe les plus tentés
+            - top_usernames: Usernames les plus tentés
+            - service_distribution: Distribution des services
+            - top_ips: IPs les plus agressives
+            - attacks_by_day: Attaques par jour
+            - attacks_by_hour: Attaques par heure
+            - agents: Statistiques des agents
+            - payloads: Statistiques des payloads
+            - port_distribution: Distribution des ports
+            - credential_combinations: Combinaisons de credentials
+    """
     return {
         'metrics': get_default_metric_data(),
         'country_ranking': get_country_ranking(),
@@ -697,4 +952,3 @@ def get_complete_report_data():
         'port_distribution': get_port_distribution(),
         'credential_combinations': get_credential_combinations()
     }
-

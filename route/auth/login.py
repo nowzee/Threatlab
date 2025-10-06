@@ -1,12 +1,31 @@
-from flask import Blueprint, jsonify, session, request
+"""
+Authentication Route Module.
+
+This module provides Flask routes for user authentication, including
+login, two-factor authentication (A2F), session management, and logout.
+"""
+
+from typing import Tuple
+from flask import Blueprint, jsonify, session, request, Response
 from module.database.auth import auth_user, a2f_active, get_otp_secret
 from module.database.account import log_attempt_account
 import pyotp
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
 
+
 @auth_bp.route('/session', methods=['GET'])
-def session_state():
+def session_state() -> Tuple[Response, int]:
+    """
+    Check the current session authentication state.
+
+    Returns:
+        A JSON response containing:
+        - authenticated: Whether the user is fully authenticated
+        - requires_a2f: Whether two-factor authentication is pending
+        - username: The authenticated username (or None)
+        HTTP status code 200.
+    """
     authenticated = bool(session.get('logged_in'))
     requires_a2f = session.get('a2f_validate') is False
     username = session.get('username') if authenticated else None
@@ -16,8 +35,19 @@ def session_state():
         "username": username
     }), 200
 
+
 @auth_bp.route("/login", methods=['GET', 'POST'])
-def login():
+def login() -> Tuple[Response, int]:
+    """
+    Handle user login with optional two-factor authentication.
+
+    This endpoint accepts username and password credentials and initiates
+    the login process. If A2F is enabled for the user, a second step is required.
+
+    Returns:
+        JSON response with authentication status and A2F requirement if applicable.
+        HTTP status codes: 200 (success), 401 (authentication failed).
+    """
     if request.is_json:
         if session.get('logged_in'):
             if session.get('a2f_validate') is False:
@@ -47,33 +77,43 @@ def login():
 
 
 @auth_bp.route("/a2f", methods=['GET', 'POST'])
-def a2f():
-    # Vérifier si l'utilisateur est connecté
+def a2f() -> Tuple[Response, int]:
+    """
+    Handle two-factor authentication verification.
+
+    This endpoint validates the TOTP code provided by the user after
+    initial login when A2F is enabled.
+
+    Returns:
+        JSON response indicating A2F validation success or failure.
+        HTTP status codes: 200 (success), 400 (invalid code), 401 (not authenticated).
+    """
+    # Check if the user is logged in
     if not session.get('logged_in'):
         if request.is_json:
             return jsonify({"error": "Non authentifié"}), 401
 
-    # Si l'utilisateur a déjà passé l'A2F, rediriger vers le tableau de bord
+    # If the user has already passed A2F, redirect to dashboard
     if session.get('a2f_validate'):
         if request.is_json:
             return jsonify({"authenticated": True, "requires_a2f": False}), 200
 
     if request.method == 'POST':
         if request.is_json:
-            # Traitement pour les requêtes JSON (Vue.js)
+            # Processing for JSON requests (Vue.js)
             data = request.get_json(silent=True) or {}
             code = data.get('code', '').strip()
 
             if not code:
                 return jsonify({"error": "Veuillez entrer un code de vérification"}), 400
 
-            # Récupérer la clé secrète de l'utilisateur depuis la base de données
+            # Retrieve the user's secret key from the database
             secret = get_otp_secret(session['username'])
 
-            # Créer un objet TOTP pour vérification
+            # Create a TOTP object for verification
             totp = pyotp.TOTP(secret)
 
-            # Vérifier le code
+            # Verify the code
             if totp.verify(code):
                 session['a2f_validate'] = True
                 log_attempt_account(session['username'], request.remote_addr, 'A2F validated')
@@ -84,6 +124,12 @@ def a2f():
 
 
 @auth_bp.route("/logout")
-def logout():
+def logout() -> Response:
+    """
+    Clear the user session and log out.
+
+    Returns:
+        JSON response confirming session has been cleared.
+    """
     session.clear()
     return jsonify({"clear": True})

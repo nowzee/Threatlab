@@ -1,3 +1,11 @@
+"""
+Module de gestion des bases de données SQLite pour le système Threatlabs.
+
+Ce module fournit deux gestionnaires de contexte pour interagir avec les bases de données:
+- DatabaseManagerHoneypot: Gestion des agents honeypot et des logs d'attaques
+- DatabaseManagerUser: Gestion des utilisateurs et des clés API
+"""
+from typing import Optional, List, Tuple, Any
 import sqlite3
 import time
 import string
@@ -9,6 +17,18 @@ users_db = 'db/user.db'
 
 
 def generate_custom_snowflake(username: str) -> int:
+    """
+    Génère un identifiant unique de type Snowflake pour un utilisateur.
+
+    Cette fonction crée un ID unique basé sur un timestamp, un datacenter ID,
+    un worker ID et une séquence générée à partir du nom d'utilisateur.
+
+    Args:
+        username (str): Nom d'utilisateur pour lequel générer l'ID.
+
+    Returns:
+        int: Identifiant Snowflake unique.
+    """
     # Paramètres fixes pour éviter des IDs trop grands
     SEQUENCE_BITS = 12
     WORKER_ID_BITS = 5
@@ -47,19 +67,63 @@ def generate_custom_snowflake(username: str) -> int:
 
     return snowflake
 
-def generate_random_string(length=12):
+def generate_random_string(length: int = 12) -> str:
+    """
+    Génère une chaîne aléatoire alphanumérique.
+
+    Args:
+        length (int, optional): Longueur de la chaîne à générer. Par défaut 12.
+
+    Returns:
+        str: Chaîne aléatoire de la longueur spécifiée.
+    """
     chars = string.ascii_letters + string.digits
     return ''.join(secrets.choice(chars) for _ in range(length))
 
 class DatabaseManagerHoneypot:
-    def __init__(self):
+    """
+    Gestionnaire de contexte pour la base de données Honeypot.
+
+    Cette classe gère les connexions à la base de données SQLite contenant
+    les informations sur les agents honeypot, les logs d'attaques, les IPs
+    malveillantes et les payloads capturés.
+
+    Attributes:
+        conn (sqlite3.Connection): Connexion à la base de données.
+        cursor (sqlite3.Cursor): Curseur pour exécuter les requêtes SQL.
+    """
+
+    def __init__(self) -> None:
+        """Initialise la connexion à la base de données honeypot."""
         self.conn = sqlite3.connect(honeypot_db)
         self.cursor = self.conn.cursor()
 
-    def __enter__(self):
+    def __enter__(self) -> 'DatabaseManagerHoneypot':
+        """
+        Entre dans le contexte du gestionnaire.
+
+        Returns:
+            DatabaseManagerHoneypot: L'instance elle-même.
+        """
         return self
 
-    def create_db(self):
+    def create_db(self) -> None:
+        """
+        Crée toutes les tables nécessaires pour la base de données honeypot.
+
+        Crée les tables suivantes si elles n'existent pas:
+        - honey_agents: Informations sur les agents honeypot
+        - groups_agent: Groupes d'agents
+        - attack_logs: Logs des attaques détectées
+        - malicious_ips: IPs malveillantes détectées
+        - ip_agent_relations: Relations entre IPs et agents
+        - ip_service_attacks: Attaques par service
+        - payloads: Payloads et malwares capturés
+        - smtp_interactions: Interactions SMTP spécifiques
+        - compromised_credentials: Credentials compromis collectés
+        - password_attempted: Mots de passe tentés
+        - username_viewed: Noms d'utilisateur observés
+        """
             self.cursor.execute('''
                                 CREATE TABLE IF NOT EXISTS honey_agents
                                 (
@@ -244,19 +308,49 @@ class DatabaseManagerHoneypot:
 
             self.conn.commit()
 
-    def execute(self, query, params=None):
+    def execute(self, query: str, params: Optional[Tuple[Any, ...]] = None) -> None:
+        """
+        Exécute une requête SQL.
+
+        Args:
+            query (str): Requête SQL à exécuter.
+            params (Optional[Tuple[Any, ...]], optional): Paramètres de la requête. Par défaut None.
+        """
         if params is not None:
             self.cursor.execute(query, params)
         else:
             self.cursor.execute(query)
 
-    def fetchall(self):
+    def fetchall(self) -> List[Tuple[Any, ...]]:
+        """
+        Récupère tous les résultats de la dernière requête.
+
+        Returns:
+            List[Tuple[Any, ...]]: Liste de tuples contenant les résultats.
+        """
         return self.cursor.fetchall()
-    def fetchone(self):
+
+    def fetchone(self) -> Optional[Tuple[Any, ...]]:
+        """
+        Récupère le premier résultat de la dernière requête.
+
+        Returns:
+            Optional[Tuple[Any, ...]]: Tuple contenant le résultat, ou None si aucun résultat.
+        """
         return self.cursor.fetchone()
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Sortie du context manager - TOUJOURS appelée"""
+    def __exit__(self, exc_type: Optional[type], exc_val: Optional[BaseException], exc_tb: Optional[Any]) -> None:
+        """
+        Sortie du context manager.
+
+        Commit les changements si aucune erreur n'est survenue, sinon rollback.
+        Ferme toujours la connexion à la base de données.
+
+        Args:
+            exc_type (Optional[type]): Type d'exception si une erreur est survenue.
+            exc_val (Optional[BaseException]): Instance de l'exception.
+            exc_tb (Optional[Any]): Traceback de l'exception.
+        """
         try:
             if exc_type is None:
                 # Pas d'erreur : on commit les changements
@@ -270,15 +364,42 @@ class DatabaseManagerHoneypot:
             self.conn.close()
 
 class DatabaseManagerUser:
-    def __init__(self):
+    """
+    Gestionnaire de contexte pour la base de données utilisateurs.
+
+    Cette classe gère les connexions à la base de données SQLite contenant
+    les informations sur les utilisateurs, les clés API et les logs de connexion.
+
+    Attributes:
+        conn (sqlite3.Connection): Connexion à la base de données.
+        cursor (sqlite3.Cursor): Curseur pour exécuter les requêtes SQL.
+    """
+
+    def __init__(self) -> None:
+        """Initialise la connexion à la base de données utilisateurs."""
         self.conn = sqlite3.connect(users_db)
         self.cursor = self.conn.cursor()
 
-    def __enter__(self):
+    def __enter__(self) -> 'DatabaseManagerUser':
+        """
+        Entre dans le contexte du gestionnaire.
+
+        Returns:
+            DatabaseManagerUser: L'instance elle-même.
+        """
         return self
 
+    def create_db(self) -> None:
+        """
+        Crée toutes les tables nécessaires pour la base de données utilisateurs.
 
-    def create_db(self):
+        Crée les tables suivantes si elles n'existent pas:
+        - users: Informations des utilisateurs
+        - api_keys: Clés API pour les intégrations
+        - log_attempt_account: Logs des tentatives de connexion
+
+        Crée également un utilisateur Admin par défaut si aucun n'existe.
+        """
         self.cursor.execute('''
                         CREATE TABLE IF NOT EXISTS users
                            (
@@ -328,20 +449,49 @@ class DatabaseManagerUser:
             print(f"Admin user created with password: {raw_password}")
         
 
-    def execute(self, query, params=None):
+    def execute(self, query: str, params: Optional[Tuple[Any, ...]] = None) -> None:
+        """
+        Exécute une requête SQL.
+
+        Args:
+            query (str): Requête SQL à exécuter.
+            params (Optional[Tuple[Any, ...]], optional): Paramètres de la requête. Par défaut None.
+        """
         if params is not None:
             self.cursor.execute(query, params)
         else:
             self.cursor.execute(query)
 
+    def fetchall(self) -> List[Tuple[Any, ...]]:
+        """
+        Récupère tous les résultats de la dernière requête.
 
-    def fetchall(self):
+        Returns:
+            List[Tuple[Any, ...]]: Liste de tuples contenant les résultats.
+        """
         return self.cursor.fetchall()
 
-    def fetchone(self):
+    def fetchone(self) -> Optional[Tuple[Any, ...]]:
+        """
+        Récupère le premier résultat de la dernière requête.
+
+        Returns:
+            Optional[Tuple[Any, ...]]: Tuple contenant le résultat, ou None si aucun résultat.
+        """
         return self.cursor.fetchone()
 
-    def __exit__(self, exc_type, exc_val, exc_tb):
+    def __exit__(self, exc_type: Optional[type], exc_val: Optional[BaseException], exc_tb: Optional[Any]) -> None:
+        """
+        Sortie du context manager.
+
+        Commit les changements si aucune erreur n'est survenue, sinon rollback.
+        Ferme toujours la connexion à la base de données.
+
+        Args:
+            exc_type (Optional[type]): Type d'exception si une erreur est survenue.
+            exc_val (Optional[BaseException]): Instance de l'exception.
+            exc_tb (Optional[Any]): Traceback de l'exception.
+        """
         try:
             if exc_type is None:
                 # Pas d'erreur : on commit les changements

@@ -1,6 +1,25 @@
+"""
+Detailed Log Analysis Module.
+
+This module provides functions for retrieving and analyzing attack logs
+from the honeypot database, including timeline queries and alert details.
+"""
+
+from typing import List, Dict, Any, Optional, Union
 from module.database.db_manager import DatabaseManagerHoneypot
 
-def last_log_analyse(timeline):
+
+def last_log_analyse(timeline: str) -> Union[List[tuple], bool]:
+    """
+    Retrieve attack logs within a specified timeline.
+
+    Args:
+        timeline: The time period to query. Valid values are '24h', '7d', or '30d'.
+
+    Returns:
+        A list of tuples containing (created_at, country_code, country_name, agent_id)
+        for each log entry, or False if no results are found.
+    """
     global interval
 
     if timeline == '24h':
@@ -19,9 +38,23 @@ def last_log_analyse(timeline):
 
         return result
 
-def get_alerts_list(limit=50):
+
+def get_alerts_list(limit: int = 50) -> List[Dict[str, Any]]:
     """
-    Récupère la liste des dernières alertes depuis attack_logs
+    Retrieve the list of recent alerts from attack logs.
+
+    Args:
+        limit: Maximum number of alerts to retrieve. Defaults to 50.
+
+    Returns:
+        A list of dictionaries containing alert information with keys:
+        - id: The alert ID
+        - timestamp: When the attack occurred
+        - agent_id: The honeypot agent ID
+        - source_ip: The attacker's IP address
+        - target_port: The targeted port
+        - service_type: The service type (ssh, smtp, etc.)
+        - country_name: The attacker's country or "Inconnu" if unknown
     """
     with DatabaseManagerHoneypot() as db:
         db.execute("""
@@ -54,9 +87,21 @@ def get_alerts_list(limit=50):
 
         return alerts
 
-def get_alert_detail_by_id(alert_id):
+
+def get_alert_detail_by_id(alert_id: int) -> Optional[Dict[str, Any]]:
     """
-    Récupère les détails complets d'une alerte spécifique
+    Retrieve complete details for a specific alert.
+
+    Args:
+        alert_id: The ID of the alert to retrieve.
+
+    Returns:
+        A dictionary containing detailed alert information including:
+        - id, timestamp, agent_id, agent_name
+        - source_ip, source_port, target_port
+        - service_type, username_attempt, password_attempt
+        - payload, command, country_code, country_name, attack_type
+        Returns None if the alert is not found.
     """
     with DatabaseManagerHoneypot() as db:
         db.execute("""

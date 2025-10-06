@@ -1,14 +1,32 @@
-from flask import Blueprint, jsonify, request
+"""
+Threat Intelligence Route Module.
+
+This module provides Flask routes for cyber threat intelligence lookups,
+including IP address, password, and username searches, as well as timeline data.
+"""
+
+from typing import Tuple, Optional
+from flask import Blueprint, jsonify, request, Response
 from module.database.threat_intelligence import search_ip, search_password, search_username, is_valid_ip, get_ip_timeline
 
 threat_intel_bp = Blueprint("threat_intel_bp", __name__, url_prefix="/api/threat-intel")
 
 
 @threat_intel_bp.route("/search", methods=["POST"])
-def search():
+def search() -> Tuple[Response, int]:
     """
-    Endpoint de recherche unifié pour IP, password ou username
-    Peut détecter automatiquement le type ou utiliser le type spécifié
+    Unified search endpoint for IP addresses, passwords, or usernames.
+
+    This endpoint can automatically detect the query type or use a specified type.
+    It searches the threat intelligence database for matching indicators.
+
+    Expects JSON body with:
+    - query: The search term (IP, password, or username)
+    - type: Optional search type ('ip', 'password', 'username', or 'auto')
+
+    Returns:
+        JSON response with threat intelligence data if found, or error message.
+        HTTP status codes: 200 (found), 400 (invalid format), 404 (not found), 500 (error).
     """
     try:
         data = request.get_json()
@@ -18,9 +36,9 @@ def search():
         if not query:
             return jsonify({"error": "Query parameter is required"}), 400
 
-        result = None
+        result: Optional[dict] = None
 
-        # Si type spécifié, rechercher directement selon le type
+        # If type specified, search directly by type
         if search_type == "ip":
             if not is_valid_ip(query):
                 return jsonify({
@@ -33,28 +51,28 @@ def search():
         elif search_type == "username":
             result = search_username(query)
         else:
-            # Mode auto : détection automatique du type
-            # 1. Vérifier si c'est une IP valide
+            # Auto mode: automatic type detection
+            # 1. Check if it's a valid IP
             if is_valid_ip(query):
                 result = search_ip(query)
                 if result:
                     return jsonify(result), 200
 
-            # 2. Chercher dans les passwords
+            # 2. Search in passwords
             result = search_password(query)
             if result:
                 return jsonify(result), 200
 
-            # 3. Chercher dans les usernames
+            # 3. Search in usernames
             result = search_username(query)
             if result:
                 return jsonify(result), 200
 
-        # Si un résultat a été trouvé, le retourner
+        # If a result was found, return it
         if result:
             return jsonify(result), 200
 
-        # Aucun résultat trouvé
+        # No results found
         return jsonify({
             "error": "No results found",
             "message": f"Aucune donnée trouvée pour '{query}'"
@@ -66,14 +84,25 @@ def search():
 
 
 @threat_intel_bp.route("/timeline", methods=["POST"])
-def timeline():
+def timeline() -> Tuple[Response, int]:
     """
-    Endpoint pour récupérer la timeline d'une IP spécifique
+    Retrieve timeline data for a specific IP address.
+
+    This endpoint retrieves activity timeline data for a given IP address,
+    showing attack patterns over the specified time period.
+
+    Expects JSON body with:
+    - ip_address: The IP address to query
+    - timeline: Time period ('24h', '7d', or '30d'), defaults to '24h'
+
+    Returns:
+        JSON response with timeline data including attack counts by period.
+        HTTP status codes: 200 (success), 400 (invalid IP or missing parameter), 500 (error).
     """
     try:
         data = request.get_json()
         ip_address = data.get("ip_address", "").strip()
-        timeline = data.get("timeline", "24h").strip()
+        timeline_param = data.get("timeline", "24h").strip()
 
         if not ip_address:
             return jsonify({"error": "IP address parameter is required"}), 400
@@ -84,13 +113,13 @@ def timeline():
                 "message": f"'{ip_address}' n'est pas une adresse IP valide"
             }), 400
 
-        # Valider le paramètre timeline
+        # Validate timeline parameter
         valid_timelines = ["24h", "7d", "30d"]
-        if timeline not in valid_timelines:
-            timeline = "24h"
+        if timeline_param not in valid_timelines:
+            timeline_param = "24h"
 
-        # Récupérer les données de la timeline
-        timeline_data = get_ip_timeline(ip_address, timeline)
+        # Get timeline data
+        timeline_data = get_ip_timeline(ip_address, timeline_param)
 
         return jsonify(timeline_data), 200
 

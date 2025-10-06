@@ -1,29 +1,54 @@
-from flask import Blueprint, jsonify, request
+"""
+Alert Dashboard Route Module.
+
+This module provides Flask routes for log analysis and alert visualization,
+including timeline data for charts and alert lists.
+"""
+
+from typing import List, Dict, Any, Tuple
+from flask import Blueprint, jsonify, request, Response
 from datetime import datetime, timedelta
 from collections import Counter
 from module.database.detail_log_analyse import last_log_analyse, get_alerts_list
 
 log_analyse_bp = Blueprint("log_analyse_bp", __name__, url_prefix="/log-analyse")
 
+
 @log_analyse_bp.route("/get_data_chart", methods=["POST"])
-def get_data():
+def get_data() -> Response:
+    """
+    Retrieve timeline data for chart visualization.
+
+    This endpoint processes attack logs and groups them by time periods
+    (hourly for 24h, daily for 7d/30d) to create chart data.
+
+    Expects JSON body with:
+    - time: Timeline period ('24h', '7d', or '30d')
+
+    Returns:
+        JSON array of time periods with attack counts for visualization.
+        Each entry contains:
+        - time: ISO format timestamp
+        - label: Human-readable time label
+        - count: Number of attacks in that period
+    """
     req_data = request.get_json()
     timeline = req_data.get("time", "24h")
 
-    # Récupère les logs depuis la base pour la timeline demandée
+    # Get logs from database for the requested timeline
     logs = last_log_analyse(timeline)
 
-    # Traitement des logs pour créer la timeline
-    data = []
+    # Process logs to create timeline
+    data: List[Dict[str, Any]] = []
     now = datetime.now()
 
-    # Compter le nombre de logs par période (heure pour 24h, jour pour 7d/30d)
-    period_counts = Counter()
+    # Count logs per period (hourly for 24h, daily for 7d/30d)
+    period_counts: Counter = Counter()
 
     if logs:
         for log in logs:
             try:
-                # Le timestamp est le premier élément du tuple
+                # Timestamp is the first element of the tuple
                 created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S.%f")
             except ValueError:
                 try:
@@ -31,15 +56,15 @@ def get_data():
                 except ValueError:
                     continue
 
-            # Grouper par heure pour 24h, par jour pour 7d et 30d
+            # Group by hour for 24h, by day for 7d and 30d
             if timeline == "24h":
                 period_key = created_at.replace(minute=0, second=0, microsecond=0)
-            else:  # 7d ou 30d
+            else:  # 7d or 30d
                 period_key = created_at.replace(hour=0, minute=0, second=0, microsecond=0)
 
             period_counts[period_key] += 1
 
-    # Générer la timeline complète avec des zéros pour les périodes sans logs
+    # Generate complete timeline with zeros for periods without logs
     if timeline == "24h":
         periods = 24
         for i in range(periods - 1, -1, -1):
@@ -82,10 +107,16 @@ def get_data():
 
     return jsonify(data)
 
+
 @log_analyse_bp.route("/alerts", methods=["GET"])
-def get_alerts():
+def get_alerts() -> Tuple[Response, int]:
     """
-    Récupère la liste des alertes
+    Retrieve the list of recent alerts.
+
+    Returns:
+        JSON array of alert objects with details including timestamp,
+        source IP, target port, service type, and country.
+        HTTP status code 200.
     """
     alerts = get_alerts_list(limit=50)
     return jsonify(alerts), 200

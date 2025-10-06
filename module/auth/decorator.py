@@ -1,22 +1,47 @@
+"""
+Authentication Decorator Module.
+
+This module provides Flask decorators for protecting routes that require
+JWT-based agent authentication.
+"""
+
 from functools import wraps
-from flask import request, current_app, jsonify, g
+from typing import Callable, Any, Tuple
+from flask import request, current_app, jsonify, g, Response
 import jwt
 from jwt import ExpiredSignatureError, InvalidTokenError
 
-def agent_jwt_required(fn):
+
+def agent_jwt_required(fn: Callable[..., Any]) -> Callable[..., Any]:
     """
-    Décorateur : exige un JWT valide contenant 'agent_id' et que l'agent existe.
-    Pose l'agent dans flask.g.agent (et g.agent_id).
+    Decorator requiring a valid JWT containing 'agent_id'.
+
+    This decorator validates JWT tokens for agent authentication and stores
+    the agent information in Flask's g object for use in the protected route.
+
+    The token can be provided in three ways:
+    1. Authorization header: "Bearer <token>"
+    2. JSON body field: {"token": "<token>"}
+    3. Query parameter: ?token=<token>
+
+    Args:
+        fn: The Flask route function to protect.
+
+    Returns:
+        The wrapped function that performs JWT validation before execution.
+
+    Notes:
+        Sets g.agent_id and g.agent_token_payload on successful authentication.
     """
     @wraps(fn)
-    def wrapper(*args, **kwargs):
-        # 1) Récupérer le token (header Bearer ou champ JSON 'token')
+    def wrapper(*args: Any, **kwargs: Any) -> Tuple[Response, int]:
+        # 1) Get the token (Bearer header or JSON field 'token')
         auth_header = request.headers.get('Authorization', '')
         token = None
         if auth_header and auth_header.lower().startswith('bearer '):
             token = auth_header.split(None, 1)[1].strip()
         else:
-            # fallback : token dans JSON body ou param GET
+            # fallback: token in JSON body or GET param
             try:
                 token = (request.get_json(silent=True) or {}).get('token') or request.args.get('token')
             except Exception:
@@ -29,7 +54,7 @@ def agent_jwt_required(fn):
         if not secret:
             return jsonify({'success': False, 'error': 'Server misconfiguration: SECRET_KEY missing'}), 500
 
-        # 2) Décoder et valider le JWT
+        # 2) Decode and validate the JWT
         try:
             payload = jwt.decode(token, secret, algorithms=['HS256'])
         except ExpiredSignatureError:
@@ -39,21 +64,21 @@ def agent_jwt_required(fn):
         except Exception as e:
             return jsonify({'success': False, 'error': f'Token decode error: {str(e)}'}), 401
 
-        # 3) Récupérer agent_id dans le payload
+        # 3) Get agent_id from the payload
         agent_id = payload.get('agent_id')
         if not agent_id:
             return jsonify({'success': False, 'error': 'Token missing agent_id'}), 401
 
-        # 4) Vérifier existence de l'agent en DB
+        # 4) Verify agent existence in DB (currently commented out)
         '''        agent = get_agent_by_id(agent_id)
                 if not agent:
                     return jsonify({'success': False, 'error': 'Agent not found'}), 401'''
 
-        # 5) Attacher l'agent à flask.g pour la route
+        # 5) Attach agent to flask.g for the route
         g.agent_id = agent_id
         g.agent_token_payload = payload
 
-        # Appel de la vue protégée
+        # Call the protected view
         return fn(*args, **kwargs)
 
     return wrapper

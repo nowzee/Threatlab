@@ -60,7 +60,7 @@ Exemple de commandes (adaptées à votre environnement):
   - python app.py
 ---
 
-## ⚙️ Configuration
+## ⚙ Configuration
 
 Variables et paramètres utiles (exemples):
 - SECRET_KEY: clé secrète pour les sessions côté Flask
@@ -288,10 +288,10 @@ Remarques sur l’authentification et l’A2F:
   - Design permettant d’ajouter facilement HMAC/token par agent, filtrage IP, rate limiting.
 
 ---
-## 📝 Licence
+##  Licence
 
 Ce projet est sous licence [MIT](LICENSE).
 
 ## Me
 
-Dev with ❤️ by Insomnia
+Dev with ❤ by Insomnia

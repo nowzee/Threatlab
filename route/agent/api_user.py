@@ -1,45 +1,88 @@
+"""
+Agent User API Route Module.
+
+This module provides Flask routes for retrieving agent metrics, logs,
+rankings, and generating reports for the user dashboard.
+"""
+
+from typing import Tuple
 from flask import Blueprint, jsonify, Response
 from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking
 from datetime import datetime
-import os, traceback
+import os
+import traceback
 from jinja2 import Template
 
 agent_user_api_bp = Blueprint('agent_user_api', __name__, url_prefix='/api/agent/user')
 
 
 @agent_user_api_bp.route("/metric_dashboard", methods=['GET'])
-def get_default_metric_data_agent():
+def get_default_metric_data_agent() -> Response:
+    """
+    Retrieve default dashboard metrics.
 
+    Returns:
+        JSON response with dashboard metrics including IP count,
+        attack attempts, active honeypots, and samples downloaded.
+    """
     data = get_default_metric_data()
 
     return jsonify(data)
 
 
 @agent_user_api_bp.route("/new_logs", methods=['GET'])
-def get_new_logs_agent():
+def get_new_logs_agent() -> Response:
+    """
+    Retrieve recent logs and agent details.
 
+    Returns:
+        JSON response with agent activity logs and details.
+    """
     data = get_agent_details()
 
     return jsonify(data)
 
 
 @agent_user_api_bp.route("/country_ranking", methods=['GET'])
-def get_country_ranking_data():
+def get_country_ranking_data() -> Response:
+    """
+    Retrieve country-based attack ranking statistics.
 
+    Returns:
+        JSON response with countries ranked by attack frequency.
+    """
     data = get_country_ranking()
 
     return jsonify(data)
 
-@agent_user_api_bp.route("/password_ranking", methods=['GET'])
-def get_password_ranking_data():
 
+@agent_user_api_bp.route("/password_ranking", methods=['GET'])
+def get_password_ranking_data() -> Response:
+    """
+    Retrieve most commonly attempted passwords.
+
+    Returns:
+        JSON response with password ranking statistics.
+    """
     data = get_password_ranking()
 
     return jsonify(data)
 
 
 @agent_user_api_bp.route("/generated_rapport", methods=['GET'])
-def generate_rapport():
+def generate_rapport() -> Tuple[Response, int]:
+    """
+    Generate a complete HTML report with attack statistics and analysis.
+
+    This endpoint collects comprehensive data from the database including
+    metrics, country rankings, password statistics, and agent details,
+    then generates an HTML report file for download.
+
+    Returns:
+        An HTML file as download with complete threat intelligence report,
+        or JSON error response on failure.
+        HTTP status codes: 200 (success), 500 (generation error).
+    """
     try:
         report_data = get_complete_report_data()
         generation_date = datetime.now().strftime('%d/%m/%Y à %H:%M')
