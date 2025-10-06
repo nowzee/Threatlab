@@ -84,7 +84,7 @@ def login() -> Tuple[Response, int]:
 
 
 @auth_bp.route("/a2f", methods=['GET', 'POST'])
-def a2f() -> Tuple[Response, int]:
+def a2f() -> tuple[Response, int] | None:
     """
     Handle two-factor authentication verification.
 
