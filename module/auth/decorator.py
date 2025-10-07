@@ -38,7 +38,6 @@ def agent_jwt_required(fn: Callable[..., Any]) -> Callable[..., Any]:
         # Step 1: Extract token from three possible locations
         # Priority: Authorization header > JSON body > Query parameter
         auth_header = request.headers.get('Authorization', '')
-        token = None
         if auth_header and auth_header.lower().startswith('bearer '):
             # Extract token from "Bearer <token>" format
             token = auth_header.split(None, 1)[1].strip()
