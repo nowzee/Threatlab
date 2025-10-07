@@ -29,6 +29,6 @@
     "vite": "^7.1.9",
     "vite-plugin-vue-devtools": "^8.0.2",
     "vue-chartjs": "^5.3.2",
-    "vue-tsc": "^3.1.0"
+    "vue-tsc": "^3.1.1"
   }
 }
