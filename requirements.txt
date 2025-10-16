@@ -21,7 +21,7 @@ Markdown==3.9
 MarkupSafe==3.0.3
 numpy==2.3.3
 packaging==25.0
-pillow==11.3.0
+pillow==12.0.0
 pycparser==2.23
 pycryptodome==3.23.0
 pydyf==0.11.0
