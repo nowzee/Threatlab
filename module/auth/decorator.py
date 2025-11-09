@@ -35,10 +35,8 @@ def agent_jwt_required(fn: Callable[..., Any]) -> Callable[..., Any]:
     """
     @wraps(fn)
     def wrapper(*args: Any, **kwargs: Any) -> Tuple[Response, int]:
-        # Step 1: Extract token from three possible locations
-        # Priority: Authorization header > JSON body > Query parameter
+        # extract token from three possible locations
         auth_header = request.headers.get('Authorization', '')
-        token = None
         if auth_header and auth_header.lower().startswith('bearer '):
             # Extract token from "Bearer <token>" format
             token = auth_header.split(None, 1)[1].strip()
@@ -57,7 +55,7 @@ def agent_jwt_required(fn: Callable[..., Any]) -> Callable[..., Any]:
         if not secret:
             return jsonify({'success': False, 'error': 'Server misconfiguration: SECRET_KEY missing'}), 500
 
-        # Step 2: Decode and validate JWT signature and structure
+        # Decode and validate JWT signature and structure
         try:
             payload = jwt.decode(token, secret, algorithms=['HS256'])
         except ExpiredSignatureError:
@@ -70,17 +68,17 @@ def agent_jwt_required(fn: Callable[..., Any]) -> Callable[..., Any]:
             # Catch-all for other decode errors
             return jsonify({'success': False, 'error': f'Token decode error: {str(e)}'}), 401
 
-        # Step 3: Extract agent_id from payload and verify it exists
+        # Extract agent_id from payload and verify it exists
         agent_id = payload.get('agent_id')
         if not agent_id:
             return jsonify({'success': False, 'error': 'Token missing agent_id'}), 401
 
-        # Step 4: Database verification disabled (would check if agent_id exists in DB)
+        # Database verification disabled, just for test haah
         '''        agent = get_agent_by_id(agent_id)
                 if not agent:
                     return jsonify({'success': False, 'error': 'Agent not found'}), 401'''
 
-        # Step 5: Store agent info in Flask's g object for access in route handlers
+        # Store agent info in Flask g object for access in route handlers
         g.agent_id = agent_id
         g.agent_token_payload = payload
 

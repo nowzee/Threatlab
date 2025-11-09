@@ -43,9 +43,6 @@ def update_agent() -> Tuple[Response, int]:
     Returns:
         JSON response with success status.
         HTTP status code 200.
-
-    Note:
-        This endpoint is currently a placeholder and always returns success.
     """
     data = request.json
 
