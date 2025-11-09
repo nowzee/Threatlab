@@ -13,7 +13,7 @@ cycler==0.12.1
 Flask==3.1.2
 flask-cors==6.0.1
 fonttools==4.60.1
-idna==3.10
+idna==3.11
 itsdangerous==2.2.0
 Jinja2==3.1.6
 kiwisolver==1.4.9
