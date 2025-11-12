@@ -288,10 +288,6 @@ Remarques sur l’authentification et l’A2F:
   - Design permettant d’ajouter facilement HMAC/token par agent, filtrage IP, rate limiting.
 
 ---
-##  Licence
-
-Ce projet est sous licence [MIT](LICENSE).
-
 ## Me
 
 Dev with ❤ by Insomnia
