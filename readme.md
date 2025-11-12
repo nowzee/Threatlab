@@ -3,6 +3,7 @@
 
 ---
 Under in development, need to convert in english and pass to rust, the python version is open-source.
+Some feature need to be developed and you can find some bugs.
 
 
 ![image_banner](https://github.com/user-attachments/assets/4721f90b-7ea8-486c-a294-47e80a87ac41)
