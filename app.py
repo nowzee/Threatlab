@@ -22,8 +22,18 @@ import secrets
 # Initialize Flask app with Vue.js frontend static files
 app = Flask(__name__, static_folder='./frontend/dist', static_url_path='')
 
-# Generate a secure random secret key for session management
 app.config['SECRET_KEY'] = secrets.token_hex(4096)
+
+# Configure persistent agent authentication key
+AGENT_KEY_FILE = os.path.join(app.root_path, '.agent_secret_key')
+if os.path.exists(AGENT_KEY_FILE):
+    with open(AGENT_KEY_FILE, 'r') as f:
+        app.config['AGENT_SECRET_KEY'] = f.read().strip()
+else:
+    agent_key = secrets.token_hex(4096)
+    with open(AGENT_KEY_FILE, 'w') as f:
+        f.write(agent_key)
+    app.config['AGENT_SECRET_KEY'] = agent_key
 
 # Configure database path
 app.config['DATABASE'] = os.path.join(app.root_path, 'honeypot.db')

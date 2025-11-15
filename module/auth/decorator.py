@@ -50,10 +50,10 @@ def agent_jwt_required(fn: Callable[..., Any]) -> Callable[..., Any]:
         if not token:
             return jsonify({'success': False, 'error': 'Missing authentication token'}), 401
 
-        # Retrieve server secret key for JWT validation
-        secret = current_app.config.get('SECRET_KEY')
+        # Retrieve agent secret key for JWT validation (separate from user sessions)
+        secret = current_app.config.get('AGENT_SECRET_KEY')
         if not secret:
-            return jsonify({'success': False, 'error': 'Server misconfiguration: SECRET_KEY missing'}), 500
+            return jsonify({'success': False, 'error': 'Server misconfiguration: AGENT_SECRET_KEY missing'}), 500
 
         # Decode and validate JWT signature and structure
         try:

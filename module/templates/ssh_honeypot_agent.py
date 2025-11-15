@@ -41,6 +41,7 @@ logger = logging.getLogger(__name__)
 collected_attacks = []
 attacks_lock = threading.Lock()
 
+HOST_KEY = None
 
 class SSHServerHandler(paramiko.ServerInterface):
     """Handles SSH authentication attempts"""
@@ -167,9 +168,8 @@ def handle_client(client_socket, client_address):
         # Create SSH transport
         transport = paramiko.Transport(client_socket)
 
-        # Generate server key
-        host_key = paramiko.RSAKey.generate(2048)
-        transport.add_server_key(host_key)
+        # Use the global host key
+        transport.add_server_key(HOST_KEY)
 
         # Set custom SSH banner
         transport.local_version = SSH_BANNER
@@ -196,9 +196,16 @@ def handle_client(client_socket, client_address):
 
 def start_ssh_honeypot():
     """Start the SSH honeypot server"""
+    global HOST_KEY
+
     logger.info(f"Starting SSH Honeypot on {SSH_HOST}:{SSH_PORT}")
     logger.info(f"Agent ID: {AGENT_ID}")
     logger.info(f"Reporting to: {REPORT_ENDPOINT}")
+
+    # Generate host key once
+    logger.info("Generating host key...")
+    HOST_KEY = paramiko.RSAKey.generate(2048)
+    logger.info("Host key generated")
 
     # Create server socket
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

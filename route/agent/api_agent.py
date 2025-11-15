@@ -27,7 +27,7 @@ def generate_jwt(agent_id: int) -> str:
     Returns:
         A JWT token string containing the agent_id and a random nonce.
     """
-    secret_key = current_app.config['SECRET_KEY']
+    secret_key = current_app.config['AGENT_SECRET_KEY']
     payload_to_encode = {
         'agent_id': agent_id,
         'nonce': os.urandom(16).hex()  # Random nonce prevents token reuse
