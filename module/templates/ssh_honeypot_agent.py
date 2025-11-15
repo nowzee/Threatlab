@@ -9,7 +9,7 @@ import socket
 import threading
 import time
 import requests
-import json
+import os
 import sys
 from datetime import datetime
 import logging
@@ -27,6 +27,7 @@ SSH_BANNER = "$ssh_banner"
 # Honeypot Configuration
 SSH_HOST = "0.0.0.0"
 REPORT_INTERVAL = 30  # seconds
+HOST_KEY_FILE = "ssh_host_key.pem"
 
 # ===================================
 
@@ -40,8 +41,6 @@ logger = logging.getLogger(__name__)
 # Storage for collected attacks
 collected_attacks = []
 attacks_lock = threading.Lock()
-
-HOST_KEY = None
 
 class SSHServerHandler(paramiko.ServerInterface):
     """Handles SSH authentication attempts"""
@@ -162,14 +161,42 @@ def report_attacks():
                     collected_attacks.append(attack)
 
 
+def load_or_generate_host_key():
+    """Load existing host key or generate a new one"""
+    if os.path.exists(HOST_KEY_FILE):
+        try:
+            logger.info(f"Loading host key from {HOST_KEY_FILE}")
+            host_key = paramiko.RSAKey.from_private_key_file(HOST_KEY_FILE)
+            logger.info("Host key loaded successfully")
+            return host_key
+        except Exception as e:
+            logger.error(f"Failed to load host key: {e}")
+            logger.info("Generating new host key...")
+    else:
+        logger.info("Host key file not found, generating new key...")
+
+    # Generate new host key
+    host_key = paramiko.RSAKey.generate(2048)
+
+    # Save to file
+    try:
+        host_key.write_private_key_file(HOST_KEY_FILE)
+        logger.info(f"Host key saved to {HOST_KEY_FILE}")
+    except Exception as e:
+        logger.error(f"Failed to save host key: {e}")
+
+    return host_key
+
+
 def handle_client(client_socket, client_address):
     """Handle individual SSH client connections"""
     try:
         # Create SSH transport
         transport = paramiko.Transport(client_socket)
 
-        # Use the global host key
-        transport.add_server_key(HOST_KEY)
+        # Load host key from file for each connection
+        host_key = load_or_generate_host_key()
+        transport.add_server_key(host_key)
 
         # Set custom SSH banner
         transport.local_version = SSH_BANNER
@@ -196,16 +223,12 @@ def handle_client(client_socket, client_address):
 
 def start_ssh_honeypot():
     """Start the SSH honeypot server"""
-    global HOST_KEY
-
     logger.info(f"Starting SSH Honeypot on {SSH_HOST}:{SSH_PORT}")
     logger.info(f"Agent ID: {AGENT_ID}")
     logger.info(f"Reporting to: {REPORT_ENDPOINT}")
 
-    # Generate host key once
-    logger.info("Generating host key...")
-    HOST_KEY = paramiko.RSAKey.generate(2048)
-    logger.info("Host key generated")
+    # Ensure host key exists
+    load_or_generate_host_key()
 
     # Create server socket
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
