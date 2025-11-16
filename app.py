@@ -24,6 +24,11 @@ app = Flask(__name__, static_folder='./frontend/dist', static_url_path='')
 
 app.config['SECRET_KEY'] = secrets.token_hex(4096)
 
+# Configure secure session cookies
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
+
 # Configure persistent agent authentication key
 AGENT_KEY_FILE = os.path.join(app.root_path, '.agent_secret_key')
 if os.path.exists(AGENT_KEY_FILE):
@@ -48,6 +53,16 @@ app.register_blueprint(agent_create_bp)
 app.register_blueprint(config_account_bp)
 app.register_blueprint(agent_user_api_bp)
 app.register_blueprint(config_api_key_bp)
+
+@app.after_request
+def set_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:; connect-src 'self'"
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    return response
 
 @app.before_request
 def before_request() -> Optional[Tuple[dict, int]]:
@@ -109,4 +124,4 @@ if __name__ == '__main__':
     # Start Flask development server
     # Listen on all interfaces (0.0.0.0) on port 5000
     # Debug mode disabled for production-like behavior
-    app.run(host='0.0.0.0', port=5000, debug=False)
+    app.run(host='0.0.0.0', port=5000, debug=False, ssl_context='adhoc' )

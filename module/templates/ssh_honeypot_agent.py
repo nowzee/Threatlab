@@ -143,7 +143,8 @@ def report_attacks():
                     REPORT_ENDPOINT,
                     json=attack,
                     headers=headers,
-                    timeout=10
+                    timeout=10,
+                    verify=False
                 )
 
                 if response.status_code == 200:
