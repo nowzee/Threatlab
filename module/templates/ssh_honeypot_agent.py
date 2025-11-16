@@ -33,6 +33,7 @@ HOST_KEY_FILE = "ssh_host_key.pem"
 
 # Setup logging
 logging.basicConfig(
+    filename='app.log',
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
