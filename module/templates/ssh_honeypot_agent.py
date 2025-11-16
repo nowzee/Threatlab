@@ -25,7 +25,7 @@ SSH_BANNER = "$ssh_banner"
 
 
 # Honeypot Configuration
-SSH_HOST = "0.0.0.0"
+SSH_HOST = "$ip_address"
 REPORT_INTERVAL = 30  # seconds
 HOST_KEY_FILE = "ssh_host_key.pem"
 

@@ -187,7 +187,7 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
     try:
         # Get agent details from database
         with DatabaseManagerHoneypot() as db:
-            db.execute("""SELECT agent_name, banner
+            db.execute("""SELECT agent_name, banner, ip_address
                          FROM honey_agents
                          WHERE id = ?""", (agent_id,))
             result = db.fetchone()
@@ -195,7 +195,7 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
             if not result:
                 return jsonify({'error': 'Agent not found'}), 404
 
-            agent_name, banner = result
+            agent_name, banner, ip_address = result
 
         # Read the template file
         template_path = os.path.join(
@@ -229,7 +229,8 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
             agent_token=secret_token,
             server_url=server_url,
             ssh_port=ssh_port,
-            ssh_banner=banner
+            ssh_banner=banner,
+            ip_address=ip_address
         )
 
         # Write to temporary file
