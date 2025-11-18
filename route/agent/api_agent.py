@@ -82,20 +82,21 @@ def agent_create() -> Tuple[Response, int]:
 
 @agent_create_bp.route("/report", methods=['POST'])
 @agent_jwt_required
-def agent_report() -> Tuple[Response, int]:
+def agent_report() -> tuple[Response, int] | Response:
     """
     Receive and process attack reports from honeypot agents.
 
     This endpoint is protected by JWT authentication and processes attack data
-    based on the service type (SSH, SMTP, etc.).
+    based on the service type (SSH, FTP, SMTP, port_scan, etc.).
 
     Required fields in JSON body:
     - source_ip: The attacker's IP address
-    - service_type: The service being attacked (ssh, smtp, etc.)
+    - service_type: The service being attacked (ssh, ftp, smtp, port_scan, etc.)
 
     Optional fields vary by service type:
-    - For SSH: username_attempt, password_attempt
+    - For SSH/FTP: username_attempt, password_attempt
     - For SMTP: sender_email, recipient_email, subject, message_content, attachments
+    - For port_scan: ports_scanned, scan_count
 
     Returns:
         JSON response with success status and message.
@@ -114,6 +115,7 @@ def agent_report() -> Tuple[Response, int]:
         source_ip = data.get('source_ip')
         service_type = data.get('service_type')
         country_name = data.get('country_name')
+        attack_type = data.get('attack_type', 'auth_attempt')
 
         # Build attack data dictionary with all available fields
         attack_data = {
@@ -140,8 +142,8 @@ def agent_report() -> Tuple[Response, int]:
         if not add_attack_log(attack_data):
             return jsonify({'success': False, 'error': 'Failed to add attack log'}), 500
 
-        # Process service-specific data (SSH credentials, SMTP emails, etc.)
-        if service_type == 'ssh':
+        # Process service-specific data
+        if service_type in ['ssh', 'ftp']:
             username_attempt = data.get('username_attempt')
             password_attempt = data.get('password_attempt')
 
@@ -162,6 +164,10 @@ def agent_report() -> Tuple[Response, int]:
                                         subject, message_content, attachments):
                 return jsonify({'success': False, 'error': 'Failed to add SMTP interaction'}), 500
 
+        elif service_type == 'port_scan':
+            # Port scan specific logging already handled in attack_log
+            pass
+
         return jsonify({'success': True, 'message': f'{service_type.upper()} attack data processed successfully'})
 
     except Exception as e:
@@ -175,7 +181,8 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
     Generate and download the Python honeypot agent script for a specific agent.
 
     This endpoint creates a customized honeypot agent script based on a template,
-    filling in the agent's specific configuration (ID, token, banner, etc.).
+    filling in the agent's specific configuration (ID, token, banner, etc.) and
+    configuring features based on the agent's service type.
 
     Args:
         agent_id: The ID of the agent to generate a script for.
@@ -185,9 +192,9 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
         HTTP status codes: 200 (success), 404 (agent not found), 500 (generation error).
     """
     try:
-        # Get agent details from database
+        # Get agent details from database including service_type
         with DatabaseManagerHoneypot() as db:
-            db.execute("""SELECT agent_name, banner, ip_address
+            db.execute("""SELECT agent_name, banner, ip_address, service_type
                          FROM honey_agents
                          WHERE id = ?""", (agent_id,))
             result = db.fetchone()
@@ -195,7 +202,7 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
             if not result:
                 return jsonify({'error': 'Agent not found'}), 404
 
-            agent_name, banner, ip_address = result
+            agent_name, banner, ip_address, service_type = result
 
         # Read the template file
         template_path = os.path.join(
@@ -211,12 +218,76 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
         secret_token = generate_jwt(agent_id)
 
         # Extract server URL from current request for agent to report back to
-        server_url = request.host_url.rstrip('/')
+        # Use request.url_root which includes protocol and host
+        server_url = request.url_root.rstrip('/')
 
-        # Set default configuration values
-        ssh_port = 22  # Default SSH port for honeypot
-        if not banner:
-            banner = "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5"  # Default SSH banner
+        # If server_url is empty or None, use a fallback
+        if not server_url:
+            # Try to construct from request
+            scheme = request.scheme or 'https'
+            host = request.host or 'localhost:5000'
+            server_url = f"{scheme}://{host}"
+
+        # Default configuration template
+        default_config = {
+            "agent_id": agent_id,
+            "agent_token": secret_token,
+            "server_url": server_url,
+            "features": {
+                "ssh_enabled": True,
+                "ftp_enabled": False,
+                "port_scan_detection": True,
+                "auth_detection": True
+            },
+            "ssh": {
+                "host": ip_address if ip_address else "0.0.0.0",
+                "port": 22,
+                "banner": "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5",
+                "host_key_file": "ssh_host_key.pem"
+            },
+            "ftp": {
+                "host": ip_address if ip_address else "0.0.0.0",
+                "port": 21,
+                "banner": "220 FTP server ready"
+            },
+            "reporting": {
+                "interval": 30,
+                "endpoint": "/api/agent/report"
+            },
+            "port_scan": {
+                "threshold": 5,
+                "time_window": 10
+            }
+        }
+
+        # Configure features based on service_type
+        if service_type == 'ssh':
+            # SSH only configuration
+            default_config['features']['ssh_enabled'] = True
+            default_config['features']['ftp_enabled'] = False
+            if banner:
+                default_config['ssh']['banner'] = banner
+
+        elif service_type == 'ftp':
+            # FTP only configuration
+            default_config['features']['ssh_enabled'] = False
+            default_config['features']['ftp_enabled'] = True
+            if banner:
+                default_config['ftp']['banner'] = banner
+
+        else:
+            # Default to SSH configuration for unknown types
+            default_config['features']['ssh_enabled'] = True
+            default_config['features']['ftp_enabled'] = False
+            if banner:
+                default_config['ssh']['banner'] = banner
+
+        # Convert config to JSON string for injection into template
+        import json
+        config_json = json.dumps(default_config, indent=4)
+
+        # Replace JSON booleans (true/false/null) with Python equivalents (True/False/None)
+        config_json = config_json.replace('true', 'True').replace('false', 'False').replace('null', 'None')
 
         # Load template and substitute placeholders with actual values
         with open(template_path, 'r') as f:
@@ -224,14 +295,15 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
 
         # Use Template for safe variable substitution
         t = Template(template_content)
-        agent_content = t.substitute(
-            agent_id=agent_id,
-            agent_token=secret_token,
-            server_url=server_url,
-            ssh_port=ssh_port,
-            ssh_banner=banner,
-            ip_address=ip_address
-        )
+
+        try:
+            agent_content = t.substitute(
+                default_config_json=config_json
+            )
+        except KeyError as ke:
+            print(f"Missing template variable: {ke}")
+            print(f"Config JSON: {config_json[:200]}...")
+            raise
 
         # Write to temporary file
         import tempfile
@@ -239,16 +311,19 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
         temp_file.write(agent_content)
         temp_file.close()
 
-        # Send file as download
         filename = f"agent_{agent_name.replace(' ', '_')}.py"
 
-        return send_file(
+        response = send_file(
             temp_file.name,
             as_attachment=True,
             download_name=filename,
             mimetype='text/x-python'
         )
 
+        return response
+
     except Exception as e:
+        import traceback
         print(f"Error generating agent download: {e}")
-        return jsonify({'error': 'Failed to generate agent file'}), 500
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'error': f'Failed to generate agent file: {str(e)}'}), 500
