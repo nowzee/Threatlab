@@ -521,6 +521,16 @@ class ManagerAgent:
     """
 
     @staticmethod
+    def get_agent_by_id(agent_id: int) -> bool:
+        with DatabaseManagerHoneypot() as db:
+
+            db.execute('''SELECT id FROM honey_agents WHERE id = ?''', (int(agent_id),))
+            agent = db.fetchone()
+            if agent:
+                return True
+            return False
+
+    @staticmethod
     def remove(agent_id: int) -> bool:
         """
         Supprime un agent honeypot de la base de données.

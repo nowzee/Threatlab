@@ -9,6 +9,7 @@ from functools import wraps
 from typing import Callable, Any, Tuple
 from flask import request, current_app, jsonify, g, Response
 import jwt
+from module.database.agent import ManagerAgent
 from jwt import ExpiredSignatureError, InvalidTokenError
 
 
@@ -73,10 +74,9 @@ def agent_jwt_required(fn: Callable[..., Any]) -> Callable[..., Any]:
         if not agent_id:
             return jsonify({'success': False, 'error': 'Token missing agent_id'}), 401
 
-        # Database verification disabled, just for test haah
-        '''        agent = get_agent_by_id(agent_id)
-                if not agent:
-                    return jsonify({'success': False, 'error': 'Agent not found'}), 401'''
+        manager = ManagerAgent()
+        if not manager.get_agent_by_id(agent_id):
+            return jsonify({'success': False, 'error': 'Agent not found'}), 401
 
         # Store agent info in Flask g object for access in route handlers
         g.agent_id = agent_id
