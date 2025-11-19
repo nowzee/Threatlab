@@ -5,7 +5,6 @@ import { useRouter } from 'vue-router'
 interface AgentConfig {
   name: string
   description: string
-  honeypotType: string
   ipAddress: string
   country: string
   group: string
@@ -31,18 +30,17 @@ interface AgentConfig {
 }
 
 export default defineComponent({
-  name: "AgentCreation",
+  name: "FTPAgentCreation",
   setup() {
     const router = useRouter()
-    
+
     const agentConfig = reactive<AgentConfig>({
       name: '',
       description: '',
-      honeypotType: 'SSH',
       ipAddress: '',
       country: '',
       group: '',
-      banner: 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5',
+      banner: '220 FTP Server ready',
       integrations: {
         elk: false,
         opencti: false,
@@ -51,13 +49,13 @@ export default defineComponent({
       },
       settings: {
         telemetryInterval: 30,
-        maxConnections: 3,
+        maxConnections: 5,
         enableLogging: true,
         autoUpdates: true
       },
       networkConfig: {
         host: '0.0.0.0',
-        port: 22,
+        port: 21,
         interface: 'eth0'
       }
     })
@@ -124,7 +122,7 @@ export default defineComponent({
           credentials: 'include',
           body: JSON.stringify({
             agent_name: agentConfig.name,
-            agent_type: agentConfig.honeypotType.toLowerCase(),
+            agent_type: 'ftp',
             ip_address: agentConfig.ipAddress || '0.0.0.0',
             country_name: agentConfig.country,
             groupe: agentConfig.group,
@@ -136,7 +134,7 @@ export default defineComponent({
 
         if (response.ok && data.success) {
           createdAgentId.value = data.agent_id
-          alert('Agent créé avec succès! Vous pouvez maintenant télécharger le fichier agent.')
+          alert('Agent FTP créé avec succès! Vous pouvez maintenant télécharger le fichier agent.')
         } else {
           alert('Erreur lors de la création de l\'agent: ' + (data.error || 'Erreur inconnue'))
         }
@@ -177,7 +175,7 @@ export default defineComponent({
   <div class="content-wrapper">
     <div class="page-header">
       <h1 class="page-title">
-        Créer un Agent SSH
+        Créer un Agent FTP
       </h1>
     </div>
 
@@ -200,7 +198,7 @@ export default defineComponent({
                     v-model="agentConfig.name"
                     type="text"
                     class="form-input"
-                    placeholder="Ex: SSH-Prod-01"
+                    placeholder="Ex: FTP-Prod-01"
                     required
                   />
                 </div>
@@ -251,16 +249,16 @@ export default defineComponent({
                 </div>
 
                 <div class="form-group full-width">
-                  <label for="agent-banner">Bannière SSH</label>
+                  <label for="agent-banner">Bannière FTP</label>
                   <input
                     id="agent-banner"
                     v-model="agentConfig.banner"
                     type="text"
                     class="form-input"
-                    placeholder="SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5"
+                    placeholder="220 FTP Server ready"
                   />
                   <small style="color: #888; font-size: 12px; margin-top: 4px;">
-                    Bannière SSH affichée aux attaquants pour simuler un serveur spécifique
+                    Bannière FTP affichée aux attaquants pour simuler un serveur spécifique
                   </small>
                 </div>
               </div>
@@ -294,12 +292,12 @@ export default defineComponent({
                         <rect x="2" y="3" width="20" height="14" rx="2" ry="2" v-if="integration.icon === 'monitor'"></rect>
                         <line x1="8" y1="21" x2="16" y2="21" v-if="integration.icon === 'monitor'"></line>
                         <line x1="12" y1="17" x2="12" y2="21" v-if="integration.icon === 'monitor'"></line>
-                        
+
                         <circle cx="12" cy="12" r="3" v-if="integration.icon === 'database'"></circle>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" v-if="integration.icon === 'database'"></path>
-                        
+
                         <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" v-if="integration.icon === 'shield'"></path>
-                        
+
                         <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" v-if="integration.icon === 'link'"></path>
                         <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" v-if="integration.icon === 'link'"></path>
                       </svg>
@@ -356,7 +354,7 @@ export default defineComponent({
                     placeholder="30"
                   />
                 </div>
-                
+
                 <div class="form-group">
                   <label for="max-connections">Connexions max</label>
                   <input
@@ -365,7 +363,7 @@ export default defineComponent({
                     type="number"
                     class="form-input"
                     min="1"
-                    placeholder="3"
+                    placeholder="5"
                   />
                 </div>
 
@@ -418,7 +416,7 @@ export default defineComponent({
                     placeholder="0.0.0.0"
                   />
                 </div>
-                
+
                 <div class="form-group">
                   <label for="network-port">Port</label>
                   <input
@@ -428,7 +426,7 @@ export default defineComponent({
                     class="form-input"
                     min="1"
                     max="65535"
-                    placeholder="22"
+                    placeholder="21"
                   />
                 </div>
 
@@ -459,7 +457,7 @@ export default defineComponent({
                 <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
                 <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
               </svg>
-              {{ isSubmitting ? 'Création...' : (createdAgentId ? 'Agent créé ✓' : 'Créer l\'agent') }}
+              {{ isSubmitting ? 'Création...' : (createdAgentId ? 'Agent créé ' : 'Créer l\'agent') }}
             </button>
 
             <button v-if="createdAgentId" type="button" class="btn btn-primary btn-block" @click="downloadAgent">
@@ -734,18 +732,18 @@ export default defineComponent({
     grid-template-columns: 1fr;
     gap: 24px;
   }
-  
+
   .sidebar-content {
     position: static;
     order: -1;
   }
-  
+
   .sidebar-actions {
     position: static;
     order: 1;
     margin-top: 24px;
   }
-  
+
   .integrations-grid {
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   }
@@ -755,11 +753,11 @@ export default defineComponent({
   .form-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .integrations-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .page-header {
     flex-direction: column;
     align-items: flex-start;

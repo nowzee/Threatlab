@@ -9,8 +9,9 @@ export default defineComponent({
 
     const deployHoneypot = (type: string) => {
       if (type === 'SSH') {
-        // Rediriger vers la page de création d'agent pour SSH, Modifier pour plus tard apres pour adapter en fonction du type
-        router.push({ name: 'agent-creation' })
+        router.push({ name: 'ssh-agent-creation' })
+      } else if (type === 'FTP') {
+        router.push({ name: 'ftp-agent-creation' })
       }
     }
 
@@ -111,7 +112,7 @@ export default defineComponent({
                 </div>
             </div>
             <div class="card-footer">
-                <button class="btn btn-primary deploy-honeypot-btn" data-type="FTP">Déployer</button>
+                <button class="btn btn-primary deploy-honeypot-btn" @click="deployHoneypot('FTP')">Déployer</button>
                 <button class="btn btn-secondary">Détails</button>
             </div>
         </div>
