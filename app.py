@@ -4,7 +4,7 @@ Threatlabs Flask Application.
 Main application module for the Threatlabs honeypot management platform.
 Handles authentication, agent management, threat intelligence and log analysis.
 """
-from flask import Flask, request, session, jsonify, send_from_directory
+from flask import Flask, request, session, jsonify, send_from_directory, Response
 from typing import Tuple, Optional
 import os
 from route.auth.login import auth_bp
@@ -65,7 +65,7 @@ def set_security_headers(response):
     return response
 
 @app.before_request
-def before_request() -> Optional[Tuple[dict, int]]:
+def before_request() -> tuple[Response, int] | None:
     """
     Execute authentication checks before each request.
 
@@ -94,7 +94,7 @@ def before_request() -> Optional[Tuple[dict, int]]:
             return jsonify({"requires_a2f": True}), 200
 
 @app.route('/')
-def serve_vue_app() -> str:
+def serve_vue_app() -> Response:
     """
     Serve the main Vue.js application index page.
 
@@ -104,7 +104,7 @@ def serve_vue_app() -> str:
     return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/<path>', methods=['GET', 'POST'])
-def serve_static_or_index(path) -> str:
+def serve_static_or_index(path) -> Response:
     return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
