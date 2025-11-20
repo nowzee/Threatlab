@@ -176,35 +176,6 @@ export default defineComponent({
             </div>
         </div>
 
-        <!-- LLM Honeypot -->
-        <div class="honeypot-template card">
-            <div class="card-header">
-                <h3 class="card-title">LLM</h3>
-                <span class="badge badge-warning">Avancé</span>
-            </div>
-            <div class="card-body">
-                <div class="template-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="3" y1="9" x2="21" y2="9"></line>
-                        <line x1="9" y1="21" x2="9" y2="9"></line>
-                    </svg>
-                </div>
-                <div class="template-description">
-                    <p>Émule un serveur llm pour détecter les types d'attaque réalisé sur les llm vulnérables</p>
-                    <ul class="feature-list">
-                        <li>Capture des payloads</li>
-                        <li>Journalisation</li>
-                        <li>Émulation d'application</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="card-footer">
-                <button class="btn btn-primary deploy-honeypot-btn" data-type="SSH">Déployer</button>
-                <button class="btn btn-secondary">Détails</button>
-            </div>
-        </div>
-
         <!-- Custom Honeypot -->
         <div class="honeypot-template card">
             <div class="card-header">
