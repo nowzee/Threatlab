@@ -487,6 +487,15 @@ export default defineComponent({
                 </td>
                 <td class="actions-cell">
                   <div class="action-buttons">
+                    <router-link
+                      :to="{ name: 'honeypot-detail', params: { id: honeypot.id } }"
+                      class="action-btn view"
+                      title="Voir les détails">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                        <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    </router-link>
                     <button
                       class="action-btn integration"
                       @click="openIntegrationModal(honeypot)"
@@ -850,6 +859,16 @@ export default defineComponent({
 }
 
 .action-btn.toggle:hover {
+  background: rgba(0, 230, 118, 0.3);
+}
+
+.action-btn.view {
+  background: rgba(0, 230, 118, 0.2);
+  color: #00e676;
+  text-decoration: none;
+}
+
+.action-btn.view:hover {
   background: rgba(0, 230, 118, 0.3);
 }
 

@@ -16,7 +16,6 @@ from module.auth.decorator import agent_jwt_required
 
 agent_create_bp = Blueprint('agent_create', __name__, url_prefix='/api/agent')
 
-
 def generate_jwt(agent_id: int) -> str:
     """
     Generate a unique JWT token for a specific agent.
@@ -327,3 +326,16 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
         print(f"Error generating agent download: {e}")
         print(f"Traceback: {traceback.format_exc()}")
         return jsonify({'error': f'Failed to generate agent file: {str(e)}'}), 500
+
+@agent_create_bp.route("/about/<int:agent_id>", methods=['GET'])
+def about_agent(agent_id: int):
+    """
+    Generate and download the Python honeypot agent script for a specific agent.
+
+    Arg:
+        agent_id: The ID of the agent to generate a script for.
+
+    Returns:
+        The data about the agent, like country, ip, amount of attack, type of country ranking, service type, etc.
+    """
+    pass

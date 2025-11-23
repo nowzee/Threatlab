@@ -13,6 +13,7 @@ import threatIntel from '@/views/dashboard/CTI/threat-intel.vue'
 import alerts from '@/views/dashboard/alert/alerts.vue'
 import alertDetails from '@/views/dashboard/alert/alert-details.vue'
 import honeypotManagement from '@/views/dashboard/honeypot/honeypot-management.vue'
+import honeypotDetail from '@/views/dashboard/honeypot/honeypot-detail.vue'
 import settings from '@/views/dashboard/settings/settings.vue'
 import security_settings from "@/views/dashboard/settings/security.vue";
 import api_settings from "@/views/dashboard/settings/api.vue";
@@ -33,6 +34,7 @@ const routes = [
         { path: 'ssh-agent-creation', name: 'ssh-agent-creation', component: sshAgentCreation },
         { path: 'ftp-agent-creation', name: 'ftp-agent-creation', component: ftpAgentCreation },
         { path: 'honeypot-management', name: 'honeypot-management', component: honeypotManagement },
+        { path: 'honeypot-detail/:id', name: 'honeypot-detail', component: honeypotDetail },
         { path: 'threat-intel', name: 'threat-intel', component: threatIntel },
         { path: 'alerts', name: 'alerts', component: alerts },
         { path: 'alert-details/:id', name: 'alert-details', component: alertDetails },
