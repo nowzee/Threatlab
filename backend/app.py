@@ -29,8 +29,13 @@ app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
 
-# Configure persistent agent authentication key
-AGENT_KEY_FILE = os.path.join(app.root_path, '.agent_secret_key')
+SECRETS_DIR = os.path.join(app.root_path, 'secrets')
+os.makedirs(SECRETS_DIR, exist_ok=True)
+
+# Fichier de la clé agent
+AGENT_KEY_FILE = os.path.join(SECRETS_DIR, '.agent_secret_key')
+
+# Charger ou générer la clé
 if os.path.exists(AGENT_KEY_FILE):
     with open(AGENT_KEY_FILE, 'r') as f:
         app.config['AGENT_SECRET_KEY'] = f.read().strip()

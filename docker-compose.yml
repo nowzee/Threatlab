@@ -38,6 +38,10 @@ services:
       - DB_TYPE=mysql
     ports:
       - "5000:5000"
+
+    volumes:
+      - backend_secrets:/app/secrets
+
     networks:
       - threatlabs-network
 
@@ -47,3 +51,4 @@ networks:
 
 volumes:
   mysql_data:
+  backend_secrets:

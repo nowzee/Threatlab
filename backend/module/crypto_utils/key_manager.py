@@ -29,14 +29,15 @@ class Key_manager_db:
         Charge la clé AES depuis le fichier '.key' ou en crée une nouvelle
         si le fichier n'existe pas.
         """
-        if not os.path.exists('.key'):
+
+        if not os.path.exists('secrets/.key'):
             # Generate a new 256-bit (32 bytes) AES key for first-time setup
-            with open('.key', 'wb') as f:
+            with open('secrets/.key', 'wb') as f:
                 # Store key as base64 for easier file handling
                 f.write(base64.b64encode(get_random_bytes(32)))
 
         # Load and decode the AES key from file
-        with open('.key', 'rb') as f:
+        with open('secrets/.key', 'rb') as f:
             self.AES_KEY = base64.b64decode(f.read())
 
     def encrypt(self, data: str) -> str:
