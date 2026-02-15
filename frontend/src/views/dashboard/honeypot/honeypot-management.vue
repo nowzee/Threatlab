@@ -456,17 +456,6 @@ export default defineComponent({
                         <circle cx="12" cy="12" r="3"></circle>
                       </svg>
                     </router-link>
-                    <button
-                      class="action-btn integration"
-                      @click="openIntegrationModal(honeypot)"
-                      title="Configurer les intégrations">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                        <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
-                        <polyline points="7.5 19.79 7.5 14.6 3 12"></polyline>
-                        <polyline points="21 12 16.5 14.6 16.5 19.79"></polyline>
-                      </svg>
-                    </button>
                   </div>
                 </td>
               </tr>
@@ -492,70 +481,6 @@ export default defineComponent({
         <div class="modal-actions">
           <button class="btn btn-secondary" @click="closeModals">Annuler</button>
           <button class="btn btn-primary" @click="createGroup">Créer</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal Intégrations -->
-    <div v-if="showIntegrationModal" class="modal-overlay" @click="closeModals">
-      <div class="modal-container large" @click.stop>
-        <div class="modal-header">
-          <h3>Configurer les Intégrations - {{ currentHoneypot?.name }}</h3>
-          <button class="modal-close-btn" @click="closeModals">×</button>
-        </div>
-        <div class="modal-content">
-          <div class="integration-section">
-            <div class="integration-header">
-              <div class="integration-icon elk">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path>
-                  <path d="M13 13l6 6"></path>
-                </svg>
-              </div>
-              <div class="integration-info">
-                <h4>Elastic Stack (ELK)</h4>
-                <p>Redirection des logs vers Elasticsearch</p>
-              </div>
-              <label class="switch">
-                <input type="checkbox" v-model="integrationForm.elk_enabled">
-                <span class="slider"></span>
-              </label>
-            </div>
-            <div v-if="integrationForm.elk_enabled" class="integration-config">
-              <div class="form-group">
-                <label>URL Elasticsearch</label>
-                <input type="url" v-model="integrationForm.elk_url" placeholder="https://elastic.company.com:9200">
-              </div>
-            </div>
-          </div>
-
-          <div class="integration-section">
-            <div class="integration-header">
-              <div class="integration-icon opencti">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                </svg>
-              </div>
-              <div class="integration-info">
-                <h4>OpenCTI</h4>
-                <p>Enrichissement avec la Threat Intelligence</p>
-              </div>
-              <label class="switch">
-                <input type="checkbox" v-model="integrationForm.opencti_enabled">
-                <span class="slider"></span>
-              </label>
-            </div>
-            <div v-if="integrationForm.opencti_enabled" class="integration-config">
-              <div class="form-group">
-                <label>URL OpenCTI</label>
-                <input type="url" v-model="integrationForm.opencti_url" placeholder="https://opencti.company.com">
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" @click="closeModals">Annuler</button>
-          <button class="btn btn-primary" @click="saveIntegrations">Enregistrer</button>
         </div>
       </div>
     </div>
