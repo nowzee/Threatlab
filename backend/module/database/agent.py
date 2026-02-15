@@ -403,26 +403,26 @@ def get_default_metric_data() -> Dict[str, int]:
             - ip_count: Nombre d'IPs malveillantes uniques
             - Sample_downloaded: Nombre de samples/payloads uniques
             - tentative_access: Nombre total de tentatives d'accès
-            - active_honeypot: Nombre d'agents honeypot actifs
+            - number_agents: Nombre d'agents honeypot actifs
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute("SELECT COUNT(*) FROM malicious_ips")
+        db.execute("SELECT COUNT(id) FROM malicious_ips")
         ip_count = db.fetchone()
 
-        db.execute("SELECT COUNT(*) FROM payloads")
+        db.execute("SELECT COUNT(id) FROM payloads")
         unique_sample_count = db.fetchone()
 
-        db.execute("SELECT COUNT(*) FROM honey_agents WHERE is_active = 1;")
-        active_agents = db.fetchone()
+        db.execute("SELECT COUNT(id) FROM honey_agents")
+        number_agents = db.fetchone()
 
-        db.execute("SELECT COUNT(*) FROM attack_logs")
+        db.execute("SELECT COUNT(id) FROM attack_logs")
         tentative_attacks = db.fetchone()
 
         data = {
             "ip_count": ip_count[0],
             "Sample_downloaded": unique_sample_count[0],
             "tentative_access": tentative_attacks[0],
-            "active_honeypot": active_agents[0]
+            "number_honeypot": number_agents[0]
         }
 
         return data

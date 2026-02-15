@@ -5,7 +5,6 @@ interface Honeypot {
   id: number
   name: string
   type: 'SSH' | 'HTTP' | 'FTP' | 'SMTP' | 'Telnet'
-  status: 'active' | 'inactive' | 'error'
   ip: string
   group: string
   created_at: string
@@ -101,9 +100,6 @@ export default defineComponent({
       let filtered = honeypots.value
       if (filterGroup.value !== 'all') {
         filtered = filtered.filter(h => h.group === filterGroup.value)
-      }
-      if (filterStatus.value !== 'all') {
-        filtered = filtered.filter(h => h.status === filterStatus.value)
       }
       if (searchQuery.value.trim()) {
         const query = searchQuery.value.toLowerCase()
@@ -202,13 +198,6 @@ export default defineComponent({
       showIntegrationModal.value = false
     }
 
-    const toggleHoneypot = (honeypot: Honeypot) => {
-      const index = honeypots.value.findIndex(h => h.id === honeypot.id)
-      if (index !== -1 && honeypots.value[index]) {
-        honeypots.value[index].status = honeypot.status === 'active' ? 'inactive' : 'active'
-      }
-    }
-
     const deleteSelected = async () => {
     try {
     for (const id of selectedHoneypots.value) {
@@ -283,7 +272,6 @@ export default defineComponent({
       openGroupModal,
       createGroup,
       saveIntegrations,
-      toggleHoneypot,
       deleteSelected,
       selectAll,
       closeModals
@@ -302,18 +290,6 @@ export default defineComponent({
 
     <!-- Statistiques rapides -->
       <div class="stats-grid">
-        <div class="card active card-body stat-card">
-          <div class="stat-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="8 12 12 16 16 12"></polyline>
-            </svg>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ honeypots.filter(h => h.status === 'active').length }}</div>
-            <div class="stat-label">Honeypots Actifs</div>
-          </div>
-        </div>
 
       <div class="card active card-body stat-card total">
         <div class="stat-icon">
@@ -434,7 +410,6 @@ export default defineComponent({
                 </th>
                 <th>Nom</th>
                 <th>Type</th>
-                <th>Statut</th>
                 <th>Adresse IP</th>
                 <th>Groupe</th>
                 <th>Alertes</th>
@@ -445,8 +420,7 @@ export default defineComponent({
             <tbody>
               <tr v-for="honeypot in filteredHoneypots"
                   :key="honeypot.id"
-                  class="honeypot-row"
-                  :class="'status-' + honeypot.status">
+                  class="honeypot-row">
                 <td>
                   <input
                     type="checkbox"
@@ -465,13 +439,6 @@ export default defineComponent({
                   <span class="type-badge" :class="'type-' + honeypot.type.toLowerCase()">
                     {{ honeypot.type }}
                   </span>
-                </td>
-                <td>
-                  <div class="status-cell">
-                    <span class="status-indicator" :class="getStatusClass(honeypot.status)">
-                      {{ getStatusText(honeypot.status) }}
-                    </span>
-                  </div>
                 </td>
                 <td>
                   <code class="ip-address">{{ honeypot.ip }}</code>
