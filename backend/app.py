@@ -16,7 +16,7 @@ from route.agent.manage_agent import agent_manage_bp
 from route.log_analyse.alerte_dashboard import log_analyse_bp
 from route.log_analyse.alerte_details import alert_details_bp
 from route.CTI.threat_intelligence import threat_intel_bp
-from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser, DB_TYPE
+from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser
 import secrets
 
 # Initialize Flask app with Vue.js frontend static files
@@ -44,9 +44,6 @@ else:
     with open(AGENT_KEY_FILE, 'w') as f:
         f.write(agent_key)
     app.config['AGENT_SECRET_KEY'] = agent_key
-
-# Configure database path
-app.config['DATABASE'] = os.path.join(app.root_path, 'honeypot.db')
 
 # Register all application blueprints (routes modules)
 app.register_blueprint(log_analyse_bp)
