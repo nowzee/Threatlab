@@ -78,7 +78,7 @@ def login() -> Tuple[Response, int]:
             log_attempt_account(username, request.remote_addr, 'A2F required')
             return jsonify({"authenticated": True, "requires_a2f": True}), 200
 
-        # No 2FA required - grant full access
+        # No 2FA required grant full access
         log_attempt_account(username, request.remote_addr, 'Successful login')
         return jsonify({"authenticated": True}), 200
 
