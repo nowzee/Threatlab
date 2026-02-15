@@ -45,7 +45,7 @@ Threatlab est une plateforme centralisée pour déployer, superviser et orchestr
 
 ### Prérequis
 - Python 3.10+
-- Node.js et npm (pour builder le frontend)
+- Node.js et npm
 - Accès internet pour installer les dépendances
 - docker compose
 
