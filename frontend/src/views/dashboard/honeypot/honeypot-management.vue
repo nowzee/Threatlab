@@ -381,13 +381,6 @@ export default defineComponent({
             {{ group.name }}
           </option>
         </select>
-
-        <select v-model="filterStatus" class="filter-select">
-          <option value="all">Tous les statuts</option>
-          <option value="active">Actif</option>
-          <option value="inactive">Inactif</option>
-          <option value="error">Erreur</option>
-        </select>
       </div>
     </div>
 
