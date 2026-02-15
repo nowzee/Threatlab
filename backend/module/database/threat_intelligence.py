@@ -120,7 +120,7 @@ def search_ip(ip_address: str) -> dict:
             SELECT COUNT(*)
             FROM attack_logs
             WHERE source_ip = ?
-            AND created_at >= datetime('now', '-1 day')
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
         """, (ip_address,))
         last_24h = db.fetchone()[0]
 
@@ -129,7 +129,7 @@ def search_ip(ip_address: str) -> dict:
             SELECT COUNT(*)
             FROM attack_logs
             WHERE source_ip = ?
-            AND created_at >= datetime('now', '-7 day')
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
         """, (ip_address,))
         last_7d = db.fetchone()[0]
 
@@ -138,7 +138,7 @@ def search_ip(ip_address: str) -> dict:
             SELECT COUNT(*)
             FROM attack_logs
             WHERE source_ip = ?
-            AND created_at >= datetime('now', '-30 day')
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
         """, (ip_address,))
         last_30d = db.fetchone()[0]
 
@@ -279,7 +279,7 @@ def search_password(password: str) -> dict:
             SELECT COUNT(*)
             FROM attack_logs
             WHERE password_attempt = ?
-            AND created_at >= datetime('now', '-1 day')
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
         """, (password,))
         last_24h = db.fetchone()[0]
 
@@ -287,7 +287,7 @@ def search_password(password: str) -> dict:
             SELECT COUNT(*)
             FROM attack_logs
             WHERE password_attempt = ?
-            AND created_at >= datetime('now', '-7 day')
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
         """, (password,))
         last_7d = db.fetchone()[0]
 
@@ -295,7 +295,7 @@ def search_password(password: str) -> dict:
             SELECT COUNT(*)
             FROM attack_logs
             WHERE password_attempt = ?
-            AND created_at >= datetime('now', '-30 day')
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
         """, (password,))
         last_30d = db.fetchone()[0]
 
@@ -434,7 +434,7 @@ def search_username(username: str) -> dict:
             SELECT COUNT(*)
             FROM attack_logs
             WHERE username_attempt = ?
-            AND created_at >= datetime('now', '-1 day')
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
         """, (username,))
         last_24h = db.fetchone()[0]
 
@@ -442,7 +442,7 @@ def search_username(username: str) -> dict:
             SELECT COUNT(*)
             FROM attack_logs
             WHERE username_attempt = ?
-            AND created_at >= datetime('now', '-7 day')
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
         """, (username,))
         last_7d = db.fetchone()[0]
 
@@ -450,7 +450,7 @@ def search_username(username: str) -> dict:
             SELECT COUNT(*)
             FROM attack_logs
             WHERE username_attempt = ?
-            AND created_at >= datetime('now', '-30 day')
+            AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
         """, (username,))
         last_30d = db.fetchone()[0]
 
@@ -477,15 +477,15 @@ def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
     Récupère les données temporelles pour une IP spécifique
     """
     with DatabaseManagerHoneypot() as db:
-        # Map timeline parameter to SQLite datetime expression
+        # Map timeline parameter to MySQL datetime expression
         if timeline == "24h":
-            time_filter = "datetime('now', '-1 day')"
+            time_filter = "DATE_SUB(NOW(), INTERVAL 1 DAY)"
         elif timeline == "7d":
-            time_filter = "datetime('now', '-7 day')"
+            time_filter = "DATE_SUB(NOW(), INTERVAL 7 DAY)"
         elif timeline == "30d":
-            time_filter = "datetime('now', '-30 day')"
+            time_filter = "DATE_SUB(NOW(), INTERVAL 30 DAY)"
         else:  # "all" or other - get all historical data
-            time_filter = "datetime('1970-01-01')"  # Unix epoch start
+            time_filter = "'1970-01-01 00:00:00'"  # Unix epoch start
 
         # Fetch all attack timestamps for this IP in the time range
         db.execute(f"""
@@ -505,15 +505,19 @@ def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
 
         if logs:
             for log in logs:
-                try:
-                    # Try parsing with microseconds first
-                    created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S.%f")
-                except ValueError:
+                # Handle both datetime objects (MySQL) and strings (SQLite)
+                if isinstance(log[0], datetime):
+                    created_at = log[0]
+                else:
                     try:
-                        # Fallback to parsing without microseconds
-                        created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S")
+                        # Try parsing with microseconds first
+                        created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S.%f")
                     except ValueError:
-                        continue
+                        try:
+                            # Fallback to parsing without microseconds
+                            created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S")
+                        except ValueError:
+                            continue
 
                 # Group attacks into time buckets: hourly for 24h, daily for longer periods
                 if timeline == "24h":
@@ -569,11 +573,14 @@ def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
                 })
         else:  # "all" - grouper par jour depuis le début
             if logs and len(logs) > 0:
-                # Trouver la première date
-                try:
-                    first_date = datetime.strptime(logs[0][0], "%Y-%m-%d %H:%M:%S.%f")
-                except ValueError:
-                    first_date = datetime.strptime(logs[0][0], "%Y-%m-%d %H:%M:%S")
+                # Trouver la première date - handle both datetime objects and strings
+                if isinstance(logs[0][0], datetime):
+                    first_date = logs[0][0]
+                else:
+                    try:
+                        first_date = datetime.strptime(logs[0][0], "%Y-%m-%d %H:%M:%S.%f")
+                    except ValueError:
+                        first_date = datetime.strptime(logs[0][0], "%Y-%m-%d %H:%M:%S")
 
                 first_date = first_date.replace(hour=0, minute=0, second=0, microsecond=0)
                 current_date = now.replace(hour=0, minute=0, second=0, microsecond=0)

@@ -5,7 +5,7 @@ This module provides Flask routes for security-related account settings,
 including password changes and two-factor authentication (A2F) management.
 """
 
-from typing import Tuple, Dict, Any
+from typing import Tuple
 from flask import Blueprint, request, session, jsonify, Response
 from module.database.account import change_password_account
 from module.database.auth import auth_user, get_otp_secret, update_otp_status, a2f_active

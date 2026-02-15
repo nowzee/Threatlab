@@ -47,14 +47,18 @@ def get_data() -> Response:
 
     if logs:
         for log in logs:
-            try:
-                # Parse timestamp (handle both microsecond and non-microsecond formats)
-                created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S.%f")
-            except ValueError:
+            # Handle both datetime objects (MySQL) and strings (SQLite)
+            if isinstance(log[0], datetime):
+                created_at = log[0]
+            else:
                 try:
-                    created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S")
+                    # Parse timestamp (handle both microsecond and non-microsecond formats)
+                    created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S.%f")
                 except ValueError:
-                    continue
+                    try:
+                        created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S")
+                    except ValueError:
+                        continue
 
             # Determine time bucket granularity based on timeline
             if timeline == "24h":

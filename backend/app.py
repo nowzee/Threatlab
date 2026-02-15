@@ -16,7 +16,7 @@ from route.agent.manage_agent import agent_manage_bp
 from route.log_analyse.alerte_dashboard import log_analyse_bp
 from route.log_analyse.alerte_details import alert_details_bp
 from route.CTI.threat_intelligence import threat_intel_bp
-from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser
+from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser, DB_TYPE
 import secrets
 
 # Initialize Flask app with Vue.js frontend static files
@@ -108,18 +108,13 @@ def serve_static_or_index(path) -> Response:
     return send_from_directory(app.static_folder, 'index.html')
 
 if __name__ == '__main__':
-    # Database initialization on first run
-    # Check if database directory exists, if not create it and initialize databases
-    if not os.path.exists('db'):
-        os.makedirs('db')
+    # Initialize user database (accounts, API keys, login attempts)
+    with DatabaseManagerUser() as db:
+        db.create_db()
 
-        # Initialize user database (accounts, API keys, login attempts)
-        with DatabaseManagerUser() as db:
-            db.create_db()
-
-        # Initialize honeypot database (agents, attack logs, malicious IPs, payloads)
-        with DatabaseManagerHoneypot() as db:
-            db.create_db()
+    # Initialize honeypot database (agents, attack logs, malicious IPs, payloads)
+    with DatabaseManagerHoneypot() as db:
+        db.create_db()
 
     # Start Flask development server
     # Listen on all interfaces (0.0.0.0) on port 5000

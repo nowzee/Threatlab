@@ -22,7 +22,7 @@ def generate_jwt(agent_id: int) -> str:
     Returns:
         str: Token JWT signé contenant l'ID de l'agent et un nonce.
     """
-    secret_key = current_app.config['SECRET_KEY']
+    secret_key = current_app.config.get('AGENT_SECRET_KEY') or current_app.config['SECRET_KEY']
     payload_to_encode = {
         'agent_id': agent_id,
         'nonce': os.urandom(16).hex()  # Add random nonce for uniqueness and replay protection
@@ -53,6 +53,7 @@ def create_agent_token(agent_name: str,
         Tuple[Optional[int], Optional[str]]: (agent_id, secret_token) si succès, sinon (None, None).
     """
     try:
+        print(f"[DEBUG] Starting create_agent_token for: {agent_name}")
         with DatabaseManagerHoneypot() as db:
             # Step 1: Insert new agent with configuration but without token
             db.execute("""
@@ -61,9 +62,7 @@ def create_agent_token(agent_name: str,
             """, (agent_name, ip_address, country_name, service_type, groupe, banner))
 
             # Step 2: Get the auto-generated ID of the newly inserted agent
-            db.execute("SELECT last_insert_rowid()")
-            agent_id = db.fetchone()[0]
-
+            agent_id = db.cursor.lastrowid
             # Step 3: Generate JWT token using agent_id and hash it with SHA-256
             # We store the hash only for security, return plaintext token to agent
             secret_token = generate_jwt(agent_id)
@@ -76,10 +75,15 @@ def create_agent_token(agent_name: str,
                 WHERE id = ?
             """, (secret_token_sha256, agent_id))
 
+            print(f"Agent {agent_id} created with token {secret_token}")
+
             return agent_id, secret_token
 
     except Exception as e:
-        print(f"Error creating agent token: {e}")
+        import traceback
+        print(f"[ERROR] Error creating agent token: {e}")
+        print(f"[ERROR] Full traceback:")
+        print(traceback.format_exc())
         return None, None
 
 def add_malicious_ip_address(agent_id: int,
@@ -502,7 +506,7 @@ def get_password_ranking() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: Liste des 5 mots de passe les plus populaires.
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''SELECT password, count FROM password_attempted GROUP BY password ORDER BY count DESC LIMIT 5''')
+        db.execute('''SELECT password, MAX(count) as count FROM password_attempted GROUP BY password ORDER BY count DESC LIMIT 5''')
         results = db.fetchall()
 
         data = []
@@ -761,7 +765,7 @@ def get_attacks_by_day(days: int = 7) -> List[Dict[str, Any]]:
                 DATE(created_at) as date,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE created_at >= datetime('now', '-' || ? || ' days')
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL %s DAY)
             GROUP BY DATE(created_at)
             ORDER BY date ASC
         ''', (days,))
@@ -786,11 +790,11 @@ def get_attacks_by_hour() -> List[Dict[str, Any]]:
     with DatabaseManagerHoneypot() as db:
         db.execute('''
             SELECT
-                strftime('%H', created_at) as hour,
+                HOUR(created_at) as hour,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE created_at >= datetime('now', '-1 day')
-            GROUP BY hour
+            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
+            GROUP BY HOUR(created_at)
             ORDER BY hour ASC
         ''')
         results = db.fetchall()
@@ -798,7 +802,7 @@ def get_attacks_by_hour() -> List[Dict[str, Any]]:
         data = []
         for row in results:
             data.append({
-                'hour': row[0] + ':00',
+                'hour': f"{row[0]:02d}:00",  # Format hour with leading zero
                 'count': row[1]
             })
         return data

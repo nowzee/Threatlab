@@ -20,21 +20,20 @@ def last_log_analyse(timeline: str) -> Union[List[tuple], bool]:
         A list of tuples containing (created_at, country_code, country_name, agent_id)
         for each log entry, or False if no results are found.
     """
-    global interval
-
-    # Map timeline strings to SQLite datetime intervals
+    # Map timeline strings to days
     if timeline == '24h':
-        interval = "-1 day"
+        days = 1
     elif timeline == '7d':
-        interval = "-7 day"
+        days = 7
     elif timeline == '30d':
-        interval = "-30 day"
+        days = 30
+    else:
+        days = 1
 
     with DatabaseManagerHoneypot() as db:
-        # Query logs from specified time period using SQLite's datetime functions
-        # datetime('now', interval) calculates timestamp for N days/hours ago
+        # Query logs from specified time period using MySQL's DATE_SUB
         db.execute("SELECT created_at, country_code, country_name, agent_id  "
-                   "FROM attack_logs WHERE created_at >= datetime('now', ?) ORDER BY created_at DESC", (interval,))
+                   "FROM attack_logs WHERE created_at >= DATE_SUB(NOW(), INTERVAL %s DAY) ORDER BY created_at DESC", (days,))
         result = db.fetchall()
         if not result:
             return False

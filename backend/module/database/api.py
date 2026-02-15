@@ -4,7 +4,7 @@ Module de gestion des clés API pour les intégrations externes.
 Ce module fournit des fonctions pour créer, lister et mettre à jour les clés API
 stockées de manière chiffrée dans la base de données.
 """
-from typing import Optional, List, Dict, Any
+from typing import List, Dict, Any
 from module.database.db_manager import DatabaseManagerUser
 from module.crypto_utils.key_manager import Key_manager_db
 from datetime import datetime
@@ -21,8 +21,8 @@ def verify_api_key(api_key: str) -> bool:
         bool: True si la clé existe, False sinon.
     """
     with DatabaseManagerUser() as db:
-        # Query database for existing encrypted API key
-        db.execute("SELECT id FROM api_keys WHERE key = ?", (api_key,))
+        # Query database for existing encrypted API key (use backticks for 'key' reserved word)
+        db.execute("SELECT id FROM api_keys WHERE `key` = ?", (api_key,))
         result = db.fetchone()
         return result is not None
 
@@ -60,9 +60,9 @@ class ManageApiKey:
         now = datetime.now()
 
         with DatabaseManagerUser() as db:
-            # Store encrypted key with metadata
+            # Store encrypted key with metadata (use backticks for 'key' reserved word)
             db.execute(
-                "INSERT INTO api_keys (key, name, integration, created_at) VALUES (?, ?, ?, ?)",
+                "INSERT INTO api_keys (`key`, name, integration, created_at) VALUES (?, ?, ?, ?)",
                 (cypher_api_key, name, integration, now)
             )
         return True
@@ -82,8 +82,8 @@ class ManageApiKey:
         """
         key_manager = Key_manager_db()
         with DatabaseManagerUser() as db:
-            # Retrieve all encrypted API keys from database
-            db.execute("SELECT id, key, name, integration FROM api_keys")
+            # Retrieve all encrypted API keys from database (use backticks for 'key' reserved word)
+            db.execute("SELECT id, `key`, name, integration FROM api_keys")
             result = db.fetchall()
 
         # Decrypt each key before returning to user
@@ -119,9 +119,9 @@ class ManageApiKey:
             return False
 
         with DatabaseManagerUser() as db:
-            # Update metadata only, key itself remains unchanged
+            # Update metadata only, key itself remains unchanged (use backticks for 'key' reserved word)
             db.execute(
-                "UPDATE api_keys SET name = ?, integration = ? WHERE key = ?",
+                "UPDATE api_keys SET name = ?, integration = ? WHERE `key` = ?",
                 (name, integration, cypher_api_key)
             )
         return True

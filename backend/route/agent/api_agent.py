@@ -53,30 +53,37 @@ def agent_create() -> Tuple[Response, int]:
         JSON response with agent_id and secret_token on success.
         HTTP status codes: 200 (success), 500 (creation failed).
     """
-    agent_name = request.json.get('agent_name')
-    agent_type = request.json.get('agent_type', 'ssh')
-    ip_address = request.json.get('ip_address', '0.0.0.0')
-    country_name = request.json.get('country_name')
-    groupe = request.json.get('groupe')
-    banner = request.json.get('banner', 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
+    try:
+        agent_name = request.json.get('agent_name')
+        agent_type = request.json.get('agent_type', 'ssh')
+        ip_address = request.json.get('ip_address', '0.0.0.0')
+        country_name = request.json.get('country_name')
+        groupe = request.json.get('groupe')
+        banner = request.json.get('banner', 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
 
-    agent_id, secret_token = create_agent_token(
-        agent_name,
-        ip_address=ip_address,
-        country_name=country_name,
-        service_type=agent_type,
-        groupe=groupe,
-        banner=banner
-    )
+        agent_id, secret_token = create_agent_token(
+            agent_name,
+            ip_address=ip_address,
+            country_name=country_name,
+            service_type=agent_type,
+            groupe=groupe,
+            banner=banner
+        )
 
-    if agent_id:
-        return jsonify({
-            'success': True,
-            'secret_token': secret_token,
-            'agent_id': agent_id
-        }), 200
-    else:
-        return jsonify({'success': False, 'error': 'Failed to create agent'}), 500
+        if agent_id:
+            return jsonify({
+                'success': True,
+                'secret_token': secret_token,
+                'agent_id': agent_id
+            }), 200
+        else:
+            print(f"Failed to create agent for {agent_id} with IP {ip_address}")
+            return jsonify({'success': False, 'error': 'Failed to create agent'}), 500
+    except Exception as e:
+        import traceback
+        print(f"Error in agent_create: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'success': False, 'error': f'Internal error: {str(e)}'}), 500
 
 
 @agent_create_bp.route("/report", methods=['POST'])
