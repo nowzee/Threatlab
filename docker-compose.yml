@@ -38,12 +38,16 @@ services:
       - DB_TYPE=mysql
     ports:
       - "5000:5000"
-
     volumes:
       - backend_secrets:/app/secrets
-
     networks:
       - threatlabs-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000').read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
 
 networks:
   threatlabs-network:

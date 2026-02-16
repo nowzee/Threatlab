@@ -35,8 +35,5 @@ COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 # Expose the port the app runs on
 EXPOSE 5000
 
-# Run with Gunicorn (production WSGI server)
-# -w: number of worker processes
-# --threads: threads per worker (useful for I/O heavy workloads like DB writes)
-# --timeout: kill workers stuck too long (prevents "hang forever")
-CMD ["gunicorn", "-w", "4", "--threads", "8", "-b", "0.0.0.0:5000", "--timeout", "60", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
+# Run with Flask development server
+CMD ["python", "app.py"]
