@@ -1,16 +1,22 @@
 # Stage 1: Build the frontend
 FROM node:20-alpine AS frontend-builder
+
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
+
 # Stage 2: Backend
 FROM python:3.11-slim
 
-# Install system dependencies for mysql-connector and other potential needs
-RUN apt update && apt install -y \
+# Avoid .pyc files and enable unbuffered logs (better for Docker logs)
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+
+# Install system dependencies (keep minimal; add others only if needed)
+RUN apt update && apt install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
@@ -24,11 +30,13 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY backend/ .
 
 # Copy built frontend from Stage 1
-# This ensures that the frontend is built and placed where app.py expects it
 COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 
 # Expose the port the app runs on
 EXPOSE 5000
 
-# Run the application
-CMD ["python", "app.py"]
+# Run with Gunicorn (production WSGI server)
+# -w: number of worker processes
+# --threads: threads per worker (useful for I/O heavy workloads like DB writes)
+# --timeout: kill workers stuck too long (prevents "hang forever")
+CMD ["gunicorn", "-w", "4", "--threads", "8", "-b", "0.0.0.0:5000", "--timeout", "60", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
