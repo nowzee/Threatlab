@@ -21,6 +21,7 @@ import secrets
 
 # Initialize Flask app with Vue.js frontend static files
 app = Flask(__name__, static_folder='./frontend/dist', static_url_path='')
+SECRETS_DIR = os.path.join(app.root_path, 'secrets')
 
 def _load_or_create_secret_key() -> str:
     SECRETS_DIR.mkdir(parents=True, exist_ok=True)
@@ -44,7 +45,6 @@ app.config['SESSION_COOKIE_SECURE'] = True
 app.config['SESSION_COOKIE_HTTPONLY'] = True
 app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
 
-SECRETS_DIR = os.path.join(app.root_path, 'secrets')
 os.makedirs(SECRETS_DIR, exist_ok=True)
 
 # Fichier de la clé agent
