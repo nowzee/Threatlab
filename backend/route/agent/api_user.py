@@ -115,7 +115,7 @@ def generate_rapport() -> Tuple[Response, int]:
             # High-level metrics for executive summary
             'total_ips': report_data['metrics']['ip_count'],
             'total_attacks': report_data['metrics']['tentative_access'],
-            'active_agents': report_data['metrics']['active_honeypot'],
+            'active_agents': report_data['metrics']['number_honeypot'],
             'payloads_collected': report_data['metrics']['Sample_downloaded'],
 
             # Detailed analysis tables (limit to top N for readability)
