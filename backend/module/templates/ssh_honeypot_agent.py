@@ -118,7 +118,7 @@ class SSHServerHandler(paramiko.ServerInterface):
 def get_ip_geolocation(ip_address):
     """Get geolocation data for an IP address"""
     try:
-        response = requests.get(f"https://ipapi.co/{ip_address}/json/", timeout=5)
+        response = requests.get(f"https://ipapi.co/{ip_address}/json/", timeout=2)
         if response.status_code == 200:
             data = response.json()
             return {
@@ -128,7 +128,7 @@ def get_ip_geolocation(ip_address):
                 'region': data.get('region')
             }
     except Exception as e:
-        logger.warning(f"Failed to get geolocation for {ip_address}: {e}")
+        logger.debug(f"Geolocation skipped for {ip_address}: {e}")
 
     return {
         'country_name': None,
@@ -177,7 +177,7 @@ def report_attacks():
                     report_url,
                     json=attack,
                     headers=headers,
-                    timeout=10,
+                    timeout=5,
                     verify=False
                 )
 
@@ -227,6 +227,8 @@ def load_or_generate_host_key():
 def handle_client_ssh(client_socket, client_address):
     """Handle individual SSH client connections"""
     try:
+        # Set socket timeout to prevent hanging connections
+        client_socket.settimeout(30)
 
         # Create SSH transport
         transport = paramiko.Transport(client_socket)
@@ -272,7 +274,7 @@ def handle_client_ftp(conn, addr):
         username = None
         password = None
         buf = b""
-        conn.settimeout(300)
+        conn.settimeout(30)
 
         while True:
             data = conn.recv(4096)

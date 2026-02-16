@@ -1,4 +1,5 @@
 import mysql.connector
+from mysql.connector import pooling
 import os
 import time
 import string
@@ -11,6 +12,17 @@ DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_USER = os.getenv('DB_USER', 'threatlabs_user')
 DB_PASSWORD = os.getenv('DB_PASSWORD', 'threatlabs_password')
 DB_NAME = os.getenv('DB_NAME', 'threatlabs')
+
+# Créer le pool de connexions une seule fois
+connection_pool = pooling.MySQLConnectionPool(
+    pool_name="threatlabs_pool",
+    pool_size=10,
+    pool_reset_session=True,
+    host=DB_HOST,
+    user=DB_USER,
+    password=DB_PASSWORD,
+    database=DB_NAME
+)
 
 
 def generate_custom_snowflake(username: str) -> int:
@@ -58,12 +70,7 @@ def generate_random_string(length=12):
 
 class DatabaseManagerHoneypot:
     def __init__(self):
-        self.conn = mysql.connector.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME
-        )
+        self.conn = connection_pool.get_connection()
         self.cursor = self.conn.cursor()
 
     def __enter__(self):
@@ -104,12 +111,7 @@ class DatabaseManagerHoneypot:
 
 class DatabaseManagerUser:
     def __init__(self):
-        self.conn = mysql.connector.connect(
-            host=DB_HOST,
-            user=DB_USER,
-            password=DB_PASSWORD,
-            database=DB_NAME
-        )
+        self.conn = connection_pool.get_connection()
         self.cursor = self.conn.cursor()
 
     def __enter__(self):
