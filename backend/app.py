@@ -24,6 +24,7 @@ app = Flask(__name__, static_folder='./frontend/dist', static_url_path='')
 SECRETS_DIR = os.path.join(app.root_path, 'secrets')
 
 def _load_or_create_secret_key() -> str:
+    os.makedirs(SECRETS_DIR, exist_ok=True)
     app_KEY_FILE = os.path.join(SECRETS_DIR, '.app_secret_key')
 
     # Charger ou générer la clé
@@ -34,7 +35,7 @@ def _load_or_create_secret_key() -> str:
         app_key = secrets.token_hex(4096)
         with open(app_KEY_FILE, 'w') as f:
             f.write(app_key)
-            return f.read().strip()
+        return app_key
 
 app.config["SECRET_KEY"] = _load_or_create_secret_key()
 
