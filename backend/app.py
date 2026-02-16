@@ -22,7 +22,22 @@ import secrets
 # Initialize Flask app with Vue.js frontend static files
 app = Flask(__name__, static_folder='./frontend/dist', static_url_path='')
 
-app.config['SECRET_KEY'] = secrets.token_hex(4096)
+def _load_or_create_secret_key() -> str:
+    SECRETS_DIR.mkdir(parents=True, exist_ok=True)
+    SECRET_KEY_FILE = SECRETS_DIR / "flask_secret_key"
+
+    if SECRET_KEY_FILE.exists():
+        value = SECRET_KEY_FILE.read_text(encoding="utf-8").strip()
+        if value:
+            return value
+
+    value = secrets.token_hex(4096)
+    tmp = SECRET_KEY_FILE.with_suffix(".tmp")
+    tmp.write_text(value, encoding="utf-8")
+    tmp.replace(SECRET_KEY_FILE)
+    return value
+
+app.config["SECRET_KEY"] = _load_or_create_secret_key()
 
 # Configure secure session cookies
 app.config['SESSION_COOKIE_SECURE'] = True
