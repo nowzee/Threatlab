@@ -1,4 +1,3 @@
-import mysql.connector
 from mysql.connector import pooling
 import os
 import time
@@ -71,7 +70,7 @@ def generate_random_string(length=12):
 class DatabaseManagerHoneypot:
     def __init__(self):
         self.conn = connection_pool.get_connection()
-        self.cursor = self.conn.cursor()
+        self.cursor = self.conn.cursor(dictionary=True)
 
     def __enter__(self):
         return self

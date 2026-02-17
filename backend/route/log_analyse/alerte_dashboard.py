@@ -48,15 +48,15 @@ def get_data() -> Response:
     if logs:
         for log in logs:
             # Handle both datetime objects (MySQL) and strings (SQLite)
-            if isinstance(log[0], datetime):
-                created_at = log[0]
+            if isinstance(log['created_at'], datetime):
+                created_at = log['created_at']
             else:
                 try:
                     # Parse timestamp (handle both microsecond and non-microsecond formats)
-                    created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S.%f")
+                    created_at = datetime.strptime(log['created_at'], "%Y-%m-%d %H:%M:%S.%f")
                 except ValueError:
                     try:
-                        created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S")
+                        created_at = datetime.strptime(log['created_at'], "%Y-%m-%d %H:%M:%S")
                     except ValueError:
                         continue
 

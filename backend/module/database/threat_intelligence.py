@@ -31,7 +31,7 @@ def search_ip(ip_address: str) -> dict:
                 total_attack_count,
                 classification
             FROM malicious_ips
-            WHERE ip_address = ?
+            WHERE ip_address = %s
         """, (ip_address,))
 
         ip_info = db.fetchone()
@@ -47,7 +47,7 @@ def search_ip(ip_address: str) -> dict:
                     MAX(created_at) as last_seen,
                     COUNT(*) as total_count
                 FROM attack_logs
-                WHERE source_ip = ?
+                WHERE source_ip = %s
                 GROUP BY source_ip, country_name, country_code
             """, (ip_address,))
 
@@ -62,7 +62,7 @@ def search_ip(ip_address: str) -> dict:
                 password_attempt,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE source_ip = ? AND password_attempt IS NOT NULL AND password_attempt != ''
+            WHERE source_ip = %s AND password_attempt IS NOT NULL AND password_attempt != ''
             GROUP BY password_attempt
             ORDER BY count DESC
             LIMIT 20
@@ -71,8 +71,8 @@ def search_ip(ip_address: str) -> dict:
         passwords = []
         for row in db.fetchall():
             passwords.append({
-                "password": row[0],
-                "count": row[1]
+                "password": row['password_attempt'],
+                "count": row['count']
             })
 
         # Usernames utilisés par cette IP
@@ -81,7 +81,7 @@ def search_ip(ip_address: str) -> dict:
                 username_attempt,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE source_ip = ? AND username_attempt IS NOT NULL AND username_attempt != ''
+            WHERE source_ip = %s AND username_attempt IS NOT NULL AND username_attempt != ''
             GROUP BY username_attempt
             ORDER BY count DESC
             LIMIT 20
@@ -90,8 +90,8 @@ def search_ip(ip_address: str) -> dict:
         usernames = []
         for row in db.fetchall():
             usernames.append({
-                "username": row[0],
-                "count": row[1]
+                "username": row['username_attempt'],
+                "count": row['count']
             })
 
         # Services ciblés
@@ -100,7 +100,7 @@ def search_ip(ip_address: str) -> dict:
                 service_type,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE source_ip = ?
+            WHERE source_ip = %s
             GROUP BY service_type
             ORDER BY count DESC
         """, (ip_address,))
@@ -108,8 +108,8 @@ def search_ip(ip_address: str) -> dict:
         services = []
         for row in db.fetchall():
             services.append({
-                "service": row[0],
-                "count": row[1]
+                "service": row['service_type'],
+                "count": row['count']
             })
 
         # Calculate activity metrics across different time periods for trending
@@ -117,40 +117,40 @@ def search_ip(ip_address: str) -> dict:
 
         # Count attacks in last 24 hours
         db.execute("""
-            SELECT COUNT(*)
+            SELECT COUNT(*) as count
             FROM attack_logs
-            WHERE source_ip = ?
+            WHERE source_ip = %s
             AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
         """, (ip_address,))
-        last_24h = db.fetchone()[0]
+        last_24h = db.fetchone()['count']
 
         # Count attacks in last 7 days
         db.execute("""
-            SELECT COUNT(*)
+            SELECT COUNT(*) as count
             FROM attack_logs
-            WHERE source_ip = ?
+            WHERE source_ip = %s
             AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
         """, (ip_address,))
-        last_7d = db.fetchone()[0]
+        last_7d = db.fetchone()['count']
 
         # Count attacks in last 30 days
         db.execute("""
-            SELECT COUNT(*)
+            SELECT COUNT(*) as count
             FROM attack_logs
-            WHERE source_ip = ?
+            WHERE source_ip = %s
             AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
         """, (ip_address,))
-        last_30d = db.fetchone()[0]
+        last_30d = db.fetchone()['count']
 
         return {
             "type": "ip",
-            "value": ip_info[0],
-            "country": ip_info[1] if ip_info[1] else "Inconnu",
-            "country_code": ip_info[2] if len(ip_info) > 2 and ip_info[2] else None,
-            "first_seen": ip_info[3],
-            "last_seen": ip_info[4],
-            "total_count": ip_info[5] if len(ip_info) > 5 else ip_info[5],
-            "classification": ip_info[6] if len(ip_info) > 6 and ip_info[6] else "IP Malveillante",
+            "value": ip_info['ip_address'],
+            "country": ip_info['country_name'] if ip_info.get('country_name') else "Inconnu",
+            "country_code": ip_info.get('country_code'),
+            "first_seen": ip_info['first_seen'],
+            "last_seen": ip_info['last_seen'],
+            "total_count": ip_info.get('total_attack_count', ip_info.get('total_count', 0)),
+            "classification": ip_info.get('classification', 'IP Malveillante'),
             "related_passwords": passwords,
             "related_usernames": usernames,
             "targeted_services": services,
@@ -174,12 +174,12 @@ def search_password(password: str) -> dict:
                 MIN(created_at) as first_seen,
                 MAX(created_at) as last_seen
             FROM attack_logs
-            WHERE password_attempt = ?
+            WHERE password_attempt = %s
         """, (password,))
 
         info = db.fetchone()
 
-        if not info or info[0] == 0:
+        if not info or info['total_count'] == 0:
             return None
 
         # IPs qui ont utilisé ce password
@@ -189,7 +189,7 @@ def search_password(password: str) -> dict:
                 country_name,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE password_attempt = ?
+            WHERE password_attempt = %s
             GROUP BY source_ip, country_name
             ORDER BY count DESC
             LIMIT 30
@@ -198,9 +198,9 @@ def search_password(password: str) -> dict:
         ips = []
         for row in db.fetchall():
             ips.append({
-                "ip": row[0],
-                "country": row[1] if row[1] else "Inconnu",
-                "count": row[2]
+                "ip": row['source_ip'],
+                "country": row['country_name'] if row.get('country_name') else "Inconnu",
+                "count": row['count']
             })
 
         # Usernames associés
@@ -209,7 +209,7 @@ def search_password(password: str) -> dict:
                 username_attempt,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE password_attempt = ? AND username_attempt IS NOT NULL AND username_attempt != ''
+            WHERE password_attempt = %s AND username_attempt IS NOT NULL AND username_attempt != ''
             GROUP BY username_attempt
             ORDER BY count DESC
             LIMIT 20
@@ -218,8 +218,8 @@ def search_password(password: str) -> dict:
         usernames = []
         for row in db.fetchall():
             usernames.append({
-                "username": row[0],
-                "count": row[1]
+                "username": row['username_attempt'],
+                "count": row['count']
             })
 
         # Services où ce password a été tenté
@@ -228,7 +228,7 @@ def search_password(password: str) -> dict:
                 service_type,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE password_attempt = ?
+            WHERE password_attempt = %s
             GROUP BY service_type
             ORDER BY count DESC
         """, (password,))
@@ -236,8 +236,8 @@ def search_password(password: str) -> dict:
         services = []
         for row in db.fetchall():
             services.append({
-                "service": row[0],
-                "count": row[1]
+                "service": row['service_type'],
+                "count": row['count']
             })
 
         # Pays d'origine
@@ -246,65 +246,65 @@ def search_password(password: str) -> dict:
                 country_name,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE password_attempt = ? AND country_name IS NOT NULL
+            WHERE password_attempt = %s AND country_name IS NOT NULL
             GROUP BY country_name
             ORDER BY count DESC
             LIMIT 10
         """, (password,))
 
         countries = []
-        total_with_country = sum([row[1] for row in db.fetchall()])
+        total_with_country = sum([row['count'] for row in db.fetchall()])
 
         db.execute("""
             SELECT
                 country_name,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE password_attempt = ? AND country_name IS NOT NULL
+            WHERE password_attempt = %s AND country_name IS NOT NULL
             GROUP BY country_name
             ORDER BY count DESC
             LIMIT 10
         """, (password,))
 
         for row in db.fetchall():
-            percentage = (row[1] / total_with_country * 100) if total_with_country > 0 else 0
+            percentage = (row['count'] / total_with_country * 100) if total_with_country > 0 else 0
             countries.append({
-                "country": row[0],
-                "count": row[1],
+                "country": row['country_name'],
+                "count": row['count'],
                 "percentage": round(percentage, 1)
             })
 
         # Timeline d'activité
         db.execute("""
-            SELECT COUNT(*)
+            SELECT COUNT(*) as count
             FROM attack_logs
-            WHERE password_attempt = ?
+            WHERE password_attempt = %s
             AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
         """, (password,))
-        last_24h = db.fetchone()[0]
+        last_24h = db.fetchone()['count']
 
         db.execute("""
-            SELECT COUNT(*)
+            SELECT COUNT(*) as count
             FROM attack_logs
-            WHERE password_attempt = ?
+            WHERE password_attempt = %s
             AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
         """, (password,))
-        last_7d = db.fetchone()[0]
+        last_7d = db.fetchone()['count']
 
         db.execute("""
-            SELECT COUNT(*)
+            SELECT COUNT(*) as count
             FROM attack_logs
-            WHERE password_attempt = ?
+            WHERE password_attempt = %s
             AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
         """, (password,))
-        last_30d = db.fetchone()[0]
+        last_30d = db.fetchone()['count']
 
         return {
             "type": "password",
             "value": password,
-            "total_count": info[0],
-            "first_seen": info[1],
-            "last_seen": info[2],
+            "total_count": info['total_count'],
+            "first_seen": info['first_seen'],
+            "last_seen": info['last_seen'],
             "related_ips": ips,
             "related_usernames": usernames,
             "targeted_services": services,
@@ -329,12 +329,12 @@ def search_username(username: str) -> dict:
                 MIN(created_at) as first_seen,
                 MAX(created_at) as last_seen
             FROM attack_logs
-            WHERE username_attempt = ?
+            WHERE username_attempt = %s
         """, (username,))
 
         info = db.fetchone()
 
-        if not info or info[0] == 0:
+        if not info or info['total_count'] == 0:
             return None
 
         # IPs qui ont utilisé ce username
@@ -344,7 +344,7 @@ def search_username(username: str) -> dict:
                 country_name,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE username_attempt = ?
+            WHERE username_attempt = %s
             GROUP BY source_ip, country_name
             ORDER BY count DESC
             LIMIT 30
@@ -353,9 +353,9 @@ def search_username(username: str) -> dict:
         ips = []
         for row in db.fetchall():
             ips.append({
-                "ip": row[0],
-                "country": row[1] if row[1] else "Inconnu",
-                "count": row[2]
+                "ip": row['source_ip'],
+                "country": row['country_name'] if row.get('country_name') else "Inconnu",
+                "count": row['count']
             })
 
         # Passwords associés
@@ -364,7 +364,7 @@ def search_username(username: str) -> dict:
                 password_attempt,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE username_attempt = ? AND password_attempt IS NOT NULL AND password_attempt != ''
+            WHERE username_attempt = %s AND password_attempt IS NOT NULL AND password_attempt != ''
             GROUP BY password_attempt
             ORDER BY count DESC
             LIMIT 20
@@ -373,8 +373,8 @@ def search_username(username: str) -> dict:
         passwords = []
         for row in db.fetchall():
             passwords.append({
-                "password": row[0],
-                "count": row[1]
+                "password": row['password_attempt'],
+                "count": row['count']
             })
 
         # Services où ce username a été tenté
@@ -383,7 +383,7 @@ def search_username(username: str) -> dict:
                 service_type,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE username_attempt = ?
+            WHERE username_attempt = %s
             GROUP BY service_type
             ORDER BY count DESC
         """, (username,))
@@ -391,8 +391,8 @@ def search_username(username: str) -> dict:
         services = []
         for row in db.fetchall():
             services.append({
-                "service": row[0],
-                "count": row[1]
+                "service": row['service_type'],
+                "count": row['count']
             })
 
         # Pays d'origine
@@ -401,65 +401,65 @@ def search_username(username: str) -> dict:
                 country_name,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE username_attempt = ? AND country_name IS NOT NULL
+            WHERE username_attempt = %s AND country_name IS NOT NULL
             GROUP BY country_name
             ORDER BY count DESC
             LIMIT 10
         """, (username,))
 
         countries = []
-        total_with_country = sum([row[1] for row in db.fetchall()])
+        total_with_country = sum([row['count'] for row in db.fetchall()])
 
         db.execute("""
             SELECT
                 country_name,
                 COUNT(*) as count
             FROM attack_logs
-            WHERE username_attempt = ? AND country_name IS NOT NULL
+            WHERE username_attempt = %s AND country_name IS NOT NULL
             GROUP BY country_name
             ORDER BY count DESC
             LIMIT 10
         """, (username,))
 
         for row in db.fetchall():
-            percentage = (row[1] / total_with_country * 100) if total_with_country > 0 else 0
+            percentage = (row['count'] / total_with_country * 100) if total_with_country > 0 else 0
             countries.append({
-                "country": row[0],
-                "count": row[1],
+                "country": row['country_name'],
+                "count": row['count'],
                 "percentage": round(percentage, 1)
             })
 
         # Timeline d'activité
         db.execute("""
-            SELECT COUNT(*)
+            SELECT COUNT(*) as count
             FROM attack_logs
-            WHERE username_attempt = ?
+            WHERE username_attempt = %s
             AND created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
         """, (username,))
-        last_24h = db.fetchone()[0]
+        last_24h = db.fetchone()['count']
 
         db.execute("""
-            SELECT COUNT(*)
+            SELECT COUNT(*) as count
             FROM attack_logs
-            WHERE username_attempt = ?
+            WHERE username_attempt = %s
             AND created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
         """, (username,))
-        last_7d = db.fetchone()[0]
+        last_7d = db.fetchone()['count']
 
         db.execute("""
-            SELECT COUNT(*)
+            SELECT COUNT(*) as count
             FROM attack_logs
-            WHERE username_attempt = ?
+            WHERE username_attempt = %s
             AND created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)
         """, (username,))
-        last_30d = db.fetchone()[0]
+        last_30d = db.fetchone()['count']
 
         return {
             "type": "username",
             "value": username,
-            "total_count": info[0],
-            "first_seen": info[1],
-            "last_seen": info[2],
+            "total_count": info['total_count'],
+            "first_seen": info['first_seen'],
+            "last_seen": info['last_seen'],
             "related_ips": ips,
             "related_passwords": passwords,
             "targeted_services": services,
@@ -491,7 +491,7 @@ def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
         db.execute(f"""
             SELECT created_at
             FROM attack_logs
-            WHERE source_ip = ?
+            WHERE source_ip = %s
             AND created_at >= {time_filter}
             ORDER BY created_at ASC
         """, (ip_address,))
@@ -506,16 +506,16 @@ def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
         if logs:
             for log in logs:
                 # Handle both datetime objects (MySQL) and strings (SQLite)
-                if isinstance(log[0], datetime):
-                    created_at = log[0]
+                if isinstance(log['created_at'], datetime):
+                    created_at = log['created_at']
                 else:
                     try:
                         # Try parsing with microseconds first
-                        created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S.%f")
+                        created_at = datetime.strptime(log['created_at'], "%Y-%m-%d %H:%M:%S.%f")
                     except ValueError:
                         try:
                             # Fallback to parsing without microseconds
-                            created_at = datetime.strptime(log[0], "%Y-%m-%d %H:%M:%S")
+                            created_at = datetime.strptime(log['created_at'], "%Y-%m-%d %H:%M:%S")
                         except ValueError:
                             continue
 
@@ -574,13 +574,13 @@ def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
         else:  # "all" - grouper par jour depuis le début
             if logs and len(logs) > 0:
                 # Trouver la première date - handle both datetime objects and strings
-                if isinstance(logs[0][0], datetime):
-                    first_date = logs[0][0]
+                if isinstance(logs[0]['created_at'], datetime):
+                    first_date = logs[0]['created_at']
                 else:
                     try:
-                        first_date = datetime.strptime(logs[0][0], "%Y-%m-%d %H:%M:%S.%f")
+                        first_date = datetime.strptime(logs[0]['created_at'], "%Y-%m-%d %H:%M:%S.%f")
                     except ValueError:
-                        first_date = datetime.strptime(logs[0][0], "%Y-%m-%d %H:%M:%S")
+                        first_date = datetime.strptime(logs[0]['created_at'], "%Y-%m-%d %H:%M:%S")
 
                 first_date = first_date.replace(hour=0, minute=0, second=0, microsecond=0)
                 current_date = now.replace(hour=0, minute=0, second=0, microsecond=0)

@@ -70,7 +70,7 @@ def get_alerts_list(limit: int = 50) -> List[Dict[str, Any]]:
                 country_name
             FROM attack_logs
             ORDER BY id DESC
-            LIMIT ?
+            LIMIT %s
         """, (limit,))
 
         results = db.fetchall()
@@ -78,13 +78,13 @@ def get_alerts_list(limit: int = 50) -> List[Dict[str, Any]]:
         alerts = []
         for row in results:
             alerts.append({
-                "id": row[0],
-                "timestamp": row[1],
-                "agent_id": row[2],
-                "source_ip": row[3],
-                "target_port": row[4],
-                "service_type": row[5],
-                "country_name": row[6] if row[6] else "Inconnu"
+                "id": row['id'],
+                "timestamp": row['created_at'],
+                "agent_id": row['agent_id'],
+                "source_ip": row['source_ip'],
+                "target_port": row['target_port'],
+                "service_type": row['service_type'],
+                "country_name": row['country_name'] if row.get('country_name') else "Inconnu"
             })
 
         return alerts
@@ -125,7 +125,7 @@ def get_alert_detail_by_id(alert_id: int) -> Optional[Dict[str, Any]]:
                 ha.agent_name
             FROM attack_logs al
             LEFT JOIN honey_agents ha ON al.agent_id = ha.id
-            WHERE al.id = ?
+            WHERE al.id = %s
         """, (alert_id,))
 
         result = db.fetchone()
@@ -134,21 +134,21 @@ def get_alert_detail_by_id(alert_id: int) -> Optional[Dict[str, Any]]:
             return None
 
         alert_detail = {
-            "id": result[0],
-            "timestamp": result[1],
-            "agent_id": result[2],
-            "agent_name": result[14] if result[14] else f"Agent {result[2]}",
-            "source_ip": result[3],
-            "source_port": result[4],
-            "target_port": result[5],
-            "service_type": result[6],
-            "username_attempt": result[7],
-            "password_attempt": result[8],
-            "payload": result[9],
-            "command": result[10],
-            "country_code": result[11],
-            "country_name": result[12] if result[12] else "Inconnu",
-            "attack_type": result[13]
+            "id": result['id'],
+            "timestamp": result['created_at'],
+            "agent_id": result['agent_id'],
+            "agent_name": result['agent_name'] if result.get('agent_name') else f"Agent {result['agent_id']}",
+            "source_ip": result['source_ip'],
+            "source_port": result['source_port'],
+            "target_port": result['target_port'],
+            "service_type": result['service_type'],
+            "username_attempt": result['username_attempt'],
+            "password_attempt": result['password_attempt'],
+            "payload": result['payload'],
+            "command": result['command'],
+            "country_code": result['country_code'],
+            "country_name": result['country_name'] if result.get('country_name') else "Inconnu",
+            "attack_type": result['attack_type']
         }
 
         return alert_detail

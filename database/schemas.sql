@@ -9,7 +9,6 @@ CREATE TABLE IF NOT EXISTS honey_agents (
     groupe VARCHAR(100),
     banner TEXT,
     alert_generated INT DEFAULT 0,
-    is_active INT DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     secret_token_sha256 VARCHAR(255) UNIQUE

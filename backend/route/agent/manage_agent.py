@@ -33,22 +33,6 @@ def delete_agent() -> Tuple[Response, int]:
     return jsonify({'success': False}), 400
 
 
-@agent_manage_bp.route("/update", methods=['POST'])
-def update_agent() -> Tuple[Response, int]:
-    """
-    Update a honeypot agent's configuration.
-
-    Expects JSON body with agent update parameters.
-
-    Returns:
-        JSON response with success status.
-        HTTP status code 200.
-    """
-    data = request.json
-
-    return jsonify({'success': True}), 200
-
-
 @agent_manage_bp.route("/list", methods=['GET'])
 def list_agent() -> Tuple[Response, int]:
     """

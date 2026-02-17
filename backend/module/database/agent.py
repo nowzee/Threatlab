@@ -58,7 +58,7 @@ def create_agent_token(agent_name: str,
             # Step 1: Insert new agent with configuration but without token
             db.execute("""
                 INSERT INTO honey_agents (agent_name, ip_address, country_name, service_type, groupe, banner)
-                VALUES (?, ?, ?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s, %s, %s)
             """, (agent_name, ip_address, country_name, service_type, groupe, banner))
 
             # Step 2: Get the auto-generated ID of the newly inserted agent
@@ -71,8 +71,8 @@ def create_agent_token(agent_name: str,
             # Step 4: Update agent record with token hash for future authentication
             db.execute("""
                 UPDATE honey_agents
-                SET secret_token_sha256 = ?
-                WHERE id = ?
+                SET secret_token_sha256 = %s
+                WHERE id = %s
             """, (secret_token_sha256, agent_id))
 
             print(f"Agent {agent_id} created with token {secret_token}")
@@ -111,33 +111,32 @@ def add_malicious_ip_address(agent_id: int,
     try:
         with DatabaseManagerHoneypot() as db:
             # Step 1: Check if IP already exists in malicious_ips table
-            db.execute("SELECT id, total_attack_count FROM malicious_ips WHERE ip_address = ?", (ip_address,))
+            db.execute("SELECT id, total_attack_count FROM malicious_ips WHERE ip_address = %s", (ip_address,))
             existing_ip = db.fetchone()
 
             if existing_ip:
-                # IP exists - increment attack counter and update timestamp
-                ip_id, total_attack_count = existing_ip
+                ip_id = existing_ip['id']
+                total_attack_count = existing_ip['total_attack_count']
                 new_total_count = total_attack_count + 1
 
-                # Use COALESCE to update fields only if new data provided (preserve existing if NULL)
                 db.execute("""UPDATE malicious_ips
-                             SET last_seen = CURRENT_TIMESTAMP,
-                                 total_attack_count = ?,
-                                 country_name = COALESCE(?, country_name),
-                                 country_code = COALESCE(?, country_code),
-                                 classification = COALESCE(?, classification)
-                             WHERE id = ?""",
-                          (new_total_count, country_name, country_code, classification, ip_id))
+                              SET last_seen          = CURRENT_TIMESTAMP,
+                                  total_attack_count = %s,
+                                  country_name       = COALESCE(%s, country_name),
+                                  country_code       = COALESCE(%s, country_code),
+                                  classification     = COALESCE(%s, classification)
+                              WHERE id = %s""",
+                           (new_total_count, country_name, country_code, classification, ip_id))
             else:
-                # New malicious IP - insert with initial data
+                # Insert nouvelle IP
                 db.execute("""INSERT INTO malicious_ips
-                             (ip_address, country_name, country_code, classification)
-                             VALUES (?, ?, ?, ?)""",
-                          (ip_address, country_name, country_code, classification))
+                                  (ip_address, country_name, country_code, classification)
+                              VALUES (%s, %s, %s, %s)""",
+                           (ip_address, country_name, country_code, classification))
 
-                # Retrieve the auto-generated ID for the new IP
-                db.execute("SELECT id FROM malicious_ips WHERE ip_address = ?", (ip_address,))
-                ip_id = db.fetchone()[0]
+                # Récupérer l'ID auto-généré
+                db.execute("SELECT id FROM malicious_ips WHERE ip_address = %s", (ip_address,))
+                ip_id = db.fetchone()['id']
 
             # Step 2: Update many-to-many relationship between IP and Agent
             _update_ip_agent_relation(db, ip_id, agent_id)
@@ -164,22 +163,23 @@ def _update_ip_agent_relation(db: DatabaseManagerHoneypot, ip_id: int, agent_id:
     """
     try:
         # Check if this IP has already been seen by this specific agent
-        db.execute("SELECT id, report_count FROM ip_agent_relations WHERE ip_id = ? AND agent_id = ?",
+        db.execute("SELECT id, report_count FROM ip_agent_relations WHERE ip_id = %s AND agent_id = %s",
                   (ip_id, agent_id))
         existing_relation = db.fetchone()
 
         if existing_relation:
             # Relationship exists - increment counter to track frequency
-            relation_id, report_count = existing_relation
+            relation_id = existing_relation['id']
+            report_count = existing_relation['report_count']
             new_report_count = report_count + 1
             db.execute("""UPDATE ip_agent_relations
-                         SET last_seen = CURRENT_TIMESTAMP, report_count = ?
-                         WHERE id = ?""",
+                         SET last_seen = CURRENT_TIMESTAMP, report_count = %s
+                         WHERE id = %s""",
                       (new_report_count, relation_id))
         else:
             # First time this IP has attacked this agent - create new relation
             db.execute("""INSERT INTO ip_agent_relations (ip_id, agent_id)
-                         VALUES (?, ?)""", (ip_id, agent_id))
+                         VALUES (%s, %s)""", (ip_id, agent_id))
     except Exception as e:
         print(f"Error updating IP-Agent relationship: {e}")
         raise
@@ -198,22 +198,23 @@ def _update_ip_service_attacks(db: DatabaseManagerHoneypot, ip_id: int, service_
     """
     try:
         # Check if this IP has targeted this service type before
-        db.execute("SELECT id, attack_count FROM ip_service_attacks WHERE ip_id = ? AND service_type = ?",
+        db.execute("SELECT id, attack_count FROM ip_service_attacks WHERE ip_id = %s AND service_type = %s",
                   (ip_id, service_type))
         existing_service = db.fetchone()
 
         if existing_service:
             # IP has attacked this service before - increment counter
-            service_id, attack_count = existing_service
+            service_id = existing_service['id']
+            attack_count = existing_service['attack_count']
             new_attack_count = attack_count + 1
             db.execute("""UPDATE ip_service_attacks
-                         SET last_seen = CURRENT_TIMESTAMP, attack_count = ?
-                         WHERE id = ?""",
+                         SET last_seen = CURRENT_TIMESTAMP, attack_count = %s
+                         WHERE id = %s""",
                       (new_attack_count, service_id))
         else:
             # First time this IP targets this service type - create new record
             db.execute("""INSERT INTO ip_service_attacks (ip_id, service_type)
-                         VALUES (?, ?)""", (ip_id, service_type))
+                         VALUES (%s, %s)""", (ip_id, service_type))
     except Exception as e:
         print(f"Error updating IP-Service attacks: {e}")
         raise
@@ -239,59 +240,62 @@ def add_compromised_credential(malicious_ip: str,
     try:
         with DatabaseManagerHoneypot() as db:
             # Lookup the IP ID from the malicious_ips table
-            db.execute("SELECT id FROM malicious_ips WHERE ip_address = ?", (malicious_ip,))
+            db.execute("SELECT id FROM malicious_ips WHERE ip_address = %s", (malicious_ip,))
             ip_record = db.fetchone()
 
             if not ip_record:
                 print(f"Malicious IP {malicious_ip} not found in database")
                 return False
 
-            malicious_ip_id = ip_record[0]
+            malicious_ip_id = ip_record['id']
 
             # Check if this exact credential pair has been tried by this IP before
             db.execute("""SELECT id, attempt_count FROM compromised_credentials
-                         WHERE malicious_ip_id = ? AND service_type = ? AND username = ? AND password = ?""",
+                         WHERE malicious_ip_id = %s AND service_type = %s AND username = %s AND password = %s""",
                       (malicious_ip_id, service_type, username, password))
             existing_credential = db.fetchone()
 
             if existing_credential:
                 # Credential combination exists - increment attempt counter
-                credential_id, attempt_count = existing_credential
+                credential_id = existing_credential['id']
+                attempt_count = existing_credential['attempt_count']
                 new_attempt_count = attempt_count + 1
                 db.execute("""UPDATE compromised_credentials
-                             SET last_seen = CURRENT_TIMESTAMP, attempt_count = ?
-                             WHERE id = ?""",
+                             SET last_seen = CURRENT_TIMESTAMP, attempt_count = %s
+                             WHERE id = %s""",
                           (new_attempt_count, credential_id))
             else:
                 # New credential combination - insert with initial count of 1
                 db.execute("""INSERT INTO compromised_credentials
                              (malicious_ip_id, service_type, username, password)
-                             VALUES (?, ?, ?, ?)""",
+                             VALUES (%s, %s, %s, %s)""",
                           (malicious_ip_id, service_type, username, password))
 
             # Update global username statistics for analytics
-            db.execute("SELECT id, count FROM username_viewed WHERE username = ?", (username,))
+            db.execute("SELECT id, count FROM username_viewed WHERE username = %s", (username,))
             username_record = db.fetchone()
 
             if username_record:
-                username_id, count = username_record
-                db.execute("UPDATE username_viewed SET count = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?",
+                username_id = username_record['id']
+                count = username_record['count']
+                db.execute("UPDATE username_viewed SET count = %s, last_seen = CURRENT_TIMESTAMP WHERE id = %s",
                           (count + 1, username_id))
             else:
                 # First time seeing this username globally
-                db.execute("INSERT INTO username_viewed (username) VALUES (?)", (username,))
+                db.execute("INSERT INTO username_viewed (username) VALUES (%s)", (username,))
 
             # Update global password statistics for analytics
-            db.execute("SELECT id, count FROM password_attempted WHERE password = ?", (password,))
+            db.execute("SELECT id, count FROM password_attempted WHERE password = %s", (password,))
             password_record = db.fetchone()
 
             if password_record:
-                password_id, count = password_record
-                db.execute("UPDATE password_attempted SET count = ?, last_seen = CURRENT_TIMESTAMP WHERE id = ?",
+                password_id = password_record['id']
+                count = password_record['count']
+                db.execute("UPDATE password_attempted SET count = %s, last_seen = CURRENT_TIMESTAMP WHERE id = %s",
                           (count + 1, password_id))
             else:
                 # First time seeing this password globally
-                db.execute("INSERT INTO password_attempted (password) VALUES (?)", (password,))
+                db.execute("INSERT INTO password_attempted (password) VALUES (%s)", (password,))
 
             return True
     except Exception as e:
@@ -328,7 +332,7 @@ def add_attack_log(attack_data: Dict[str, Any]) -> bool:
                          (created_at, agent_id, source_ip, source_port, target_port, service_type,
                           username_attempt, password_attempt, payload, malware_hash,
                           attack_type, country_code, country_name)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                       (now,
                        attack_data.get('agent_id'),
                        attack_data.get('source_ip'),
@@ -370,14 +374,14 @@ def add_smtp_interaction(malicious_ip: str,
     try:
         with DatabaseManagerHoneypot() as db:
             # Get malicious IP ID
-            db.execute("SELECT id FROM malicious_ips WHERE ip_address = ?", (malicious_ip,))
+            db.execute("SELECT id FROM malicious_ips WHERE ip_address = %s", (malicious_ip,))
             ip_record = db.fetchone()
 
             if not ip_record:
                 print(f"Malicious IP {malicious_ip} not found in database")
                 return False
 
-            malicious_ip_id = ip_record[0]
+            malicious_ip_id = ip_record['id']
 
             # Insert SMTP interaction
             import json
@@ -386,7 +390,7 @@ def add_smtp_interaction(malicious_ip: str,
             db.execute("""INSERT INTO smtp_interactions
                          (malicious_server_ip_id, sender_email, recipient_email, subject,
                           message_content, attachments)
-                         VALUES (?, ?, ?, ?, ?, ?)""",
+                         VALUES (%s, %s, %s, %s, %s, %s)""",
                       (malicious_ip_id, sender_email, recipient_email, subject,
                        message_content, attachments_json))
             return True
@@ -406,26 +410,16 @@ def get_default_metric_data() -> Dict[str, int]:
             - number_agents: Nombre d'agents honeypot actifs
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute("SELECT COUNT(id) FROM malicious_ips")
-        ip_count = db.fetchone()
+        db.execute('''
+                   SELECT (SELECT COUNT(id) FROM malicious_ips) AS ip_count,
+                          (SELECT COUNT(id) FROM payloads)      AS Sample_downloaded,
+                          (SELECT COUNT(id) FROM honey_agents)  AS number_honeypot,
+                          (SELECT COUNT(id) FROM attack_logs)   AS tentative_access
+                   ''')
 
-        db.execute("SELECT COUNT(id) FROM payloads")
-        unique_sample_count = db.fetchone()
+        result = db.fetchone()
+        return result
 
-        db.execute("SELECT COUNT(id) FROM honey_agents")
-        number_agents = db.fetchone()
-
-        db.execute("SELECT COUNT(id) FROM attack_logs")
-        tentative_attacks = db.fetchone()
-
-        data = {
-            "ip_count": ip_count[0],
-            "Sample_downloaded": unique_sample_count[0],
-            "tentative_access": tentative_attacks[0],
-            "number_honeypot": number_agents[0]
-        }
-
-        return data
 
 def get_agent_details() -> List[Dict[str, Any]]:
     """
@@ -435,38 +429,22 @@ def get_agent_details() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: Liste de dictionnaires contenant les informations des logs.
     """
     with DatabaseManagerHoneypot() as db:
-        # Récupérer les 5 derniers logs
         db.execute('''
-            SELECT country_name, source_ip, target_port, service_type, agent_id, created_at, id
-            FROM attack_logs
-            ORDER BY id DESC
-            LIMIT 5
-        ''')
-        logs = db.fetchall()
+                   SELECT al.country_name,
+                          al.source_ip,
+                          al.target_port,
+                          al.service_type,
+                          al.agent_id,
+                          ha.agent_name,
+                          al.created_at,
+                          al.id
+                   FROM attack_logs al
+                            LEFT JOIN honey_agents ha ON al.agent_id = ha.id
+                   ORDER BY al.id DESC
+                   LIMIT 5
+                   ''')
 
-        if not logs:
-            return []
-
-        data = []
-        for log in logs:
-            agent_id = log[4]
-            # Récupérer le nom de l'agent pour chaque log
-            db.execute("SELECT agent_name FROM honey_agents WHERE id = ?", (agent_id,))
-            result = db.fetchone()
-            agent_name = result[0] if result else None
-
-            data.append({
-                "agent_id": agent_id,
-                "agent_name": agent_name,
-                "country_name": log[0],
-                "source_ip": log[1],
-                "target_port": log[2],
-                "service_type": log[3],
-                "created_at": log[5],
-                "id": log[6]
-            })
-
-    return data
+        return db.fetchall()
 
 
 def get_country_ranking() -> List[Dict[str, Any]]:
@@ -477,26 +455,19 @@ def get_country_ranking() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: Liste des 10 pays avec le plus d'attaques, triés par ordre décroissant.
     """
     with DatabaseManagerHoneypot() as db:
-        # Aggregate attack counts by country, filtering out NULL and empty values
-        # GROUP BY groups all attacks by country, COUNT(*) tallies total per country
         db.execute('''
-            SELECT country_name, COUNT(*) as attack_count
-            FROM attack_logs
-            WHERE country_name IS NOT NULL AND country_name != ''
-            GROUP BY country_name
-            ORDER BY attack_count DESC
-            LIMIT 10
-        ''')
-        countries = db.fetchall()
+                   SELECT country_name AS country_name,
+                          COUNT(*)     AS attack_count
+                   FROM attack_logs
+                   WHERE country_name IS NOT NULL
+                     AND country_name != ''
+                   GROUP BY country_name
+                   ORDER BY attack_count DESC
+                   LIMIT 10
+                   ''')
 
-        data = []
-        for country in countries:
-            data.append({
-                "country_name": country[0],
-                "attack_count": country[1]
-            })
+        return db.fetchall()
 
-        return data
 
 def get_password_ranking() -> List[Dict[str, Any]]:
     """
@@ -506,17 +477,18 @@ def get_password_ranking() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: Liste des 5 mots de passe les plus populaires.
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''SELECT password, MAX(count) as count FROM password_attempted GROUP BY password ORDER BY count DESC LIMIT 5''')
-        results = db.fetchall()
+        db.execute('''
+            SELECT
+                password,
+                MAX(count) AS count
+            FROM password_attempted
+            GROUP BY password
+            ORDER BY count DESC
+            LIMIT 5
+        ''')
 
-        data = []
-        for password in results:
-            data.append({
-                'password': password[0],
-                'count': password[1]
-            })
+        return db.fetchall()
 
-        return data
 
 
 class ManagerAgent:
@@ -528,7 +500,7 @@ class ManagerAgent:
     def get_agent_by_id(agent_id: int) -> bool:
         with DatabaseManagerHoneypot() as db:
 
-            db.execute('''SELECT id FROM honey_agents WHERE id = ?''', (int(agent_id),))
+            db.execute('''SELECT id FROM honey_agents WHERE id = %s''', (int(agent_id),))
             agent = db.fetchone()
             if agent:
                 return True
@@ -547,23 +519,12 @@ class ManagerAgent:
         """
         with DatabaseManagerHoneypot() as db:
 
-            db.execute('''SELECT id FROM honey_agents WHERE id = ?''', (int(agent_id),))
+            db.execute('''SELECT id FROM honey_agents WHERE id = %s''', (int(agent_id),))
             agent = db.fetchone()
             if agent:
-                db.execute("DELETE FROM honey_agents WHERE id = ?", (int(agent_id),))
+                db.execute("DELETE FROM honey_agents WHERE id = %s", (int(agent_id),))
                 return True
             return False
-
-    def update(self, agent_id: int, agent_name: str, is_active: int) -> None:
-        """
-        Met à jour les informations d'un agent honeypot.
-
-        Args:
-            agent_id (int): Identifiant de l'agent.
-            agent_name (str): Nouveau nom de l'agent.
-            is_active (int): Statut d'activation (0 ou 1).
-        """
-        pass
 
     @staticmethod
     def list() -> List[Dict[str, Any]]:
@@ -574,34 +535,19 @@ class ManagerAgent:
             List[Dict[str, Any]]: Liste de dictionnaires contenant les informations des agents.
         """
         with DatabaseManagerHoneypot() as db:
-            db.execute('''SELECT id,
-                                 agent_name,
-                                 ip_address,
-                                 service_type,
-                                 updated_at,
-                                 is_active,
-                                 groupe,
-                                 alert_generated,
-                                 created_at
-                          FROM honey_agents''')
-            result = db.fetchall()
+            db.execute("""
+                       SELECT id,
+                              agent_name,
+                              ip_address,
+                              service_type,
+                              updated_at,
+                              groupe,
+                              alert_generated,
+                              created_at
+                       FROM honey_agents
+                       """)
 
-            # Convertir les tuples en dictionnaires
-            agents = []
-            for row in result:
-                agent = {
-                    'id': row[0],
-                    'agent_name': row[1],
-                    'ip_address': row[2],
-                    'service_type': row[3],
-                    'updated_at': row[4],
-                    'is_active': row[5] if len(row) > 5 else 1,
-                    'groupe': row[6] if len(row) > 6 else 'default',
-                    'alert_generated': row[7] if len(row) > 7 else 0,
-                    'created_at': row[8] if len(row) > 8 else row[4]
-                }
-                agents.append(agent)
-
+            agents = db.fetchall()
             return agents
 
     @staticmethod
@@ -616,12 +562,12 @@ class ManagerAgent:
             bool: True si le groupe a été créé, False s'il existe déjà.
         """
         with DatabaseManagerHoneypot() as db:
-            db.execute("SELECT id FROM groups_agent WHERE group_name = ?", (str(group_name),))
+            db.execute("SELECT id FROM groups_agent WHERE group_name = %s", (str(group_name),))
             result = db.fetchone()
             if result:
                 return False
 
-            db.execute("INSERT INTO groups_agent (group_name) VALUES (?)", (str(group_name),))
+            db.execute("INSERT INTO groups_agent (group_name) VALUES (%s)", (str(group_name),))
             return True
 
 
@@ -639,21 +585,14 @@ def get_top_passwords(limit: int = 20) -> List[Dict[str, Any]]:
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
-            SELECT password, count
-            FROM password_attempted
-            ORDER BY count DESC
-            LIMIT ?
-        ''', (limit,))
-        results = db.fetchall()
+                   SELECT password, count
+                   FROM password_attempted
+                   WHERE password IS NOT NULL
+                   ORDER BY count DESC
+                   LIMIT %s
+                   ''', (limit,))
 
-        data = []
-        for row in results:
-            if row[0]:  # Skip null passwords
-                data.append({
-                    'password': row[0],
-                    'count': row[1]
-                })
-        return data
+        return db.fetchall()
 
 
 def get_top_usernames(limit: int = 20) -> List[Dict[str, Any]]:
@@ -668,21 +607,14 @@ def get_top_usernames(limit: int = 20) -> List[Dict[str, Any]]:
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
-            SELECT username, count
-            FROM username_viewed
-            ORDER BY count DESC
-            LIMIT ?
-        ''', (limit,))
-        results = db.fetchall()
+                   SELECT username, count
+                   FROM username_viewed
+                   WHERE username IS NOT NULL
+                   ORDER BY count DESC
+                   LIMIT %s
+                   ''', (limit,))
 
-        data = []
-        for row in results:
-            if row[0]:  # Skip null usernames
-                data.append({
-                    'username': row[0],
-                    'count': row[1]
-                })
-        return data
+        return db.fetchall()
 
 
 def get_service_distribution() -> List[Dict[str, Any]]:
@@ -694,21 +626,14 @@ def get_service_distribution() -> List[Dict[str, Any]]:
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
-            SELECT service_type, COUNT(*) as count
-            FROM attack_logs
-            WHERE service_type IS NOT NULL
-            GROUP BY service_type
-            ORDER BY count DESC
-        ''')
-        results = db.fetchall()
+                   SELECT service_type, COUNT(*) as count
+                   FROM attack_logs
+                   WHERE service_type IS NOT NULL
+                   GROUP BY service_type
+                   ORDER BY count DESC
+                   ''')
 
-        data = []
-        for row in results:
-            data.append({
-                'service': row[0],
-                'count': row[1]
-            })
-        return data
+        return db.fetchall()
 
 
 def get_top_malicious_ips(limit: int = 20) -> List[Dict[str, Any]]:
@@ -723,30 +648,18 @@ def get_top_malicious_ips(limit: int = 20) -> List[Dict[str, Any]]:
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
-            SELECT
-                m.ip_address,
-                m.country_name,
-                m.total_attack_count,
-                m.classification,
-                m.first_seen,
-                m.last_seen
-            FROM malicious_ips m
-            ORDER BY m.total_attack_count DESC
-            LIMIT ?
-        ''', (limit,))
-        results = db.fetchall()
+                   SELECT m.ip_address                               AS ip,
+                          COALESCE(m.country_name, 'Unknown')        AS country,
+                          m.total_attack_count                       AS attacks,
+                          COALESCE(m.classification, 'Unclassified') AS classification,
+                          m.first_seen,
+                          m.last_seen
+                   FROM malicious_ips m
+                   ORDER BY m.total_attack_count DESC
+                   LIMIT %s
+                   ''', (limit,))
 
-        data = []
-        for row in results:
-            data.append({
-                'ip': row[0],
-                'country': row[1] or 'Unknown',
-                'attacks': row[2],
-                'classification': row[3] or 'Unclassified',
-                'first_seen': row[4],
-                'last_seen': row[5]
-            })
-        return data
+        return db.fetchall()
 
 
 def get_attacks_by_day(days: int = 7) -> List[Dict[str, Any]]:
@@ -761,23 +674,15 @@ def get_attacks_by_day(days: int = 7) -> List[Dict[str, Any]]:
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
-            SELECT
-                DATE(created_at) as date,
-                COUNT(*) as count
-            FROM attack_logs
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL %s DAY)
-            GROUP BY DATE(created_at)
-            ORDER BY date ASC
-        ''', (days,))
-        results = db.fetchall()
+                   SELECT DATE(created_at) AS date,
+                          COUNT(*)         AS count
+                   FROM attack_logs
+                   WHERE created_at >= DATE_SUB(NOW(), INTERVAL %s DAY)
+                   GROUP BY DATE(created_at)
+                   ORDER BY date ASC
+                   ''', (days,))
 
-        data = []
-        for row in results:
-            data.append({
-                'date': row[0],
-                'count': row[1]
-            })
-        return data
+        return db.fetchall()
 
 
 def get_attacks_by_hour() -> List[Dict[str, Any]]:
@@ -789,22 +694,24 @@ def get_attacks_by_hour() -> List[Dict[str, Any]]:
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
-            SELECT
-                HOUR(created_at) as hour,
-                COUNT(*) as count
-            FROM attack_logs
-            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
-            GROUP BY HOUR(created_at)
-            ORDER BY hour ASC
-        ''')
+                   SELECT HOUR(created_at) AS hour,
+                          COUNT(*)         AS count
+                   FROM attack_logs
+                   WHERE created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY)
+                   GROUP BY HOUR(created_at)
+                   ORDER BY hour ASC
+                   ''')
+
         results = db.fetchall()
 
-        data = []
-        for row in results:
-            data.append({
-                'hour': f"{row[0]:02d}:00",  # Format hour with leading zero
-                'count': row[1]
-            })
+        data = [
+            {
+                'hour': f"{row['hour']:02d}:00",
+                'count': row['count']
+            }
+            for row in results
+        ]
+
         return data
 
 
@@ -816,39 +723,21 @@ def get_agent_statistics() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: Liste des agents avec leurs statistiques détaillées.
     """
     with DatabaseManagerHoneypot() as db:
-        # Join agents with attack logs to calculate total logs per agent
-        # LEFT JOIN ensures all agents are included even with zero logs
-        # GROUP BY aggregates logs per agent, COUNT tallies total per agent
         db.execute('''
-            SELECT
-                ha.id,
-                ha.agent_name,
-                ha.country_name,
-                ha.service_type,
-                ha.is_active,
-                ha.alert_generated,
-                ha.created_at,
-                COUNT(al.id) as total_logs
-            FROM honey_agents ha
-            LEFT JOIN attack_logs al ON ha.id = al.agent_id
-            GROUP BY ha.id
-            ORDER BY total_logs DESC
-        ''')
-        results = db.fetchall()
+                   SELECT ha.id                                AS id,
+                          ha.agent_name                        AS name,
+                          COALESCE(ha.country_name, 'Unknown') AS country,
+                          ha.service_type                      AS service,
+                          ha.alert_generated                   AS alerts,
+                          ha.created_at                        AS created_at,
+                          COUNT(al.id)                         AS total_logs
+                   FROM honey_agents ha
+                            LEFT JOIN attack_logs al ON ha.id = al.agent_id
+                   GROUP BY ha.id
+                   ORDER BY total_logs DESC
+                   ''')
 
-        data = []
-        for row in results:
-            data.append({
-                'id': row[0],
-                'name': row[1],
-                'country': row[2] or 'Unknown',
-                'service': row[3],
-                'is_active': row[4],
-                'alerts': row[5],
-                'created_at': row[6],
-                'total_logs': row[7]
-            })
-        return data
+        return db.fetchall()
 
 
 def get_payload_statistics() -> List[Dict[str, Any]]:
@@ -860,26 +749,18 @@ def get_payload_statistics() -> List[Dict[str, Any]]:
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
-            SELECT
-                payload_type,
-                malware_family,
-                COUNT(*) as count
-            FROM payloads
-            WHERE payload_type IS NOT NULL OR malware_family IS NOT NULL
-            GROUP BY payload_type, malware_family
-            ORDER BY count DESC
-            LIMIT 20
-        ''')
-        results = db.fetchall()
+                   SELECT COALESCE(payload_type, 'Unknown')   AS type,
+                          COALESCE(malware_family, 'Unknown') AS family,
+                          COUNT(*)                            AS count
+                   FROM payloads
+                   WHERE payload_type IS NOT NULL
+                      OR malware_family IS NOT NULL
+                   GROUP BY payload_type, malware_family
+                   ORDER BY count DESC
+                   LIMIT 20
+                   ''')
 
-        data = []
-        for row in results:
-            data.append({
-                'type': row[0] or 'Unknown',
-                'family': row[1] or 'Unknown',
-                'count': row[2]
-            })
-        return data
+        return db.fetchall()
 
 
 def get_port_distribution() -> List[Dict[str, Any]]:
@@ -891,24 +772,16 @@ def get_port_distribution() -> List[Dict[str, Any]]:
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
-            SELECT
-                target_port,
-                COUNT(*) as count
-            FROM attack_logs
-            WHERE target_port IS NOT NULL
-            GROUP BY target_port
-            ORDER BY count DESC
-            LIMIT 10
-        ''')
-        results = db.fetchall()
+                   SELECT target_port AS port,
+                          COUNT(*)    AS count
+                   FROM attack_logs
+                   WHERE target_port IS NOT NULL
+                   GROUP BY target_port
+                   ORDER BY count DESC
+                   LIMIT 10
+                   ''')
 
-        data = []
-        for row in results:
-            data.append({
-                'port': row[0],
-                'count': row[1]
-            })
-        return data
+        return db.fetchall()
 
 
 def get_credential_combinations() -> List[Dict[str, Any]]:
@@ -919,30 +792,17 @@ def get_credential_combinations() -> List[Dict[str, Any]]:
         List[Dict[str, Any]]: Liste des combinaisons de credentials avec leur compteur.
     """
     with DatabaseManagerHoneypot() as db:
-        # Aggregate credentials by username/password pairs
-        # SUM(attempt_count) totals all attempts for each unique pair across all IPs
         db.execute('''
-            SELECT
-                username,
-                password,
-                SUM(attempt_count) as total_attempts
-            FROM compromised_credentials
-            GROUP BY username, password
-            ORDER BY total_attempts DESC
-            LIMIT 15
-        ''')
-        results = db.fetchall()
+                   SELECT username,
+                          password,
+                          SUM(attempt_count) AS count
+                   FROM compromised_credentials
+                   GROUP BY username, password
+                   ORDER BY count DESC
+                   LIMIT 15
+                   ''')
 
-        data = [
-            {
-                'username': row[0],
-                'password': row[1],
-                'count': row[2]
-            }
-            for row in results
-        ]
-        return data
-
+        return db.fetchall()
 
 
 def get_complete_report_data() -> Dict[str, Any]:

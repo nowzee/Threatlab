@@ -200,15 +200,21 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
     try:
         # Get agent details from database including service_type
         with DatabaseManagerHoneypot() as db:
-            db.execute("""SELECT agent_name, banner, ip_address, service_type
-                         FROM honey_agents
-                         WHERE id = ?""", (agent_id,))
+            db.execute("""
+                       SELECT agent_name, banner, ip_address, service_type
+                       FROM honey_agents
+                       WHERE id = %s
+                       """, (agent_id,))
+
             result = db.fetchone()
 
             if not result:
                 return jsonify({'error': 'Agent not found'}), 404
 
-            agent_name, banner, ip_address, service_type = result
+            agent_name = result['agent_name']
+            banner = result['banner']
+            ip_address = result['ip_address']
+            service_type = result['service_type']
 
         # Read the template file
         template_path = os.path.join(
