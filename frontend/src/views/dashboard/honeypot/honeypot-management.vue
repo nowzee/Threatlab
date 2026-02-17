@@ -10,12 +10,6 @@ interface Honeypot {
   created_at: string
   last_activity: string
   alerts_count: number
-  integrations: {
-    elk_enabled: boolean
-    elk_url: string
-    opencti_enabled: boolean
-    opencti_url: string
-  }
 }
 
 interface HoneypotGroup {
@@ -71,13 +65,7 @@ export default defineComponent({
           group: item.groupe || 'default',
           created_at: item.created_at || '',
           last_activity: item.updated_at || '',
-          alerts_count: item.alert_generated || 0,
-          integrations: {
-            elk_enabled: false,
-            elk_url: '',
-            opencti_enabled: false,
-            opencti_url: ''
-          }
+          alerts_count: item.alert_generated || 0
         }))
         const names = new Set<string>()
 
@@ -142,17 +130,6 @@ export default defineComponent({
       }
     }
 
-    const openIntegrationModal = (honeypot: Honeypot) => {
-      currentHoneypot.value = honeypot
-      integrationForm.value = {
-        elk_enabled: honeypot.integrations.elk_enabled,
-        elk_url: honeypot.integrations.elk_url,
-        opencti_enabled: honeypot.integrations.opencti_enabled,
-        opencti_url: honeypot.integrations.opencti_url
-      }
-      showIntegrationModal.value = true
-    }
-
     const openGroupModal = () => {
       groupForm.value = { name: '', description: ''}
       showGroupModal.value = true
@@ -182,21 +159,6 @@ export default defineComponent({
     const groupsSet = new Set(honeypots.value.map(h => h.group))
         return groupsSet.size
     })
-
-    const saveIntegrations = () => {
-      if (currentHoneypot.value) {
-        const index = honeypots.value.findIndex(h => h.id === currentHoneypot.value!.id)
-        if (index !== -1 && honeypots.value[index]) {
-          honeypots.value[index].integrations = {
-            elk_enabled: integrationForm.value.elk_enabled,
-            elk_url: integrationForm.value.elk_url,
-            opencti_enabled: integrationForm.value.opencti_enabled,
-            opencti_url: integrationForm.value.opencti_url
-          }
-        }
-      }
-      showIntegrationModal.value = false
-    }
 
     const deleteSelected = async () => {
     try {
@@ -268,10 +230,8 @@ export default defineComponent({
       getStatusClass,
       getStatusText,
       getTypeIcon,
-      openIntegrationModal,
       openGroupModal,
       createGroup,
-      saveIntegrations,
       deleteSelected,
       selectAll,
       closeModals
