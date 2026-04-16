@@ -7,7 +7,7 @@ rankings, and generating reports for the user dashboard.
 
 from typing import Tuple
 from flask import Blueprint, jsonify, Response
-from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking, get_top_passwords, get_top_usernames, get_credential_combinations
+from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking, get_top_passwords, get_top_usernames, get_credential_combinations, get_wordlist_stats
 from datetime import datetime
 import os
 import traceback
@@ -167,29 +167,26 @@ def get_wordlists_stats() -> Response:
         JSON with stats and top entries for preview.
     """
     try:
-        passwords = get_top_passwords(10)
-        usernames = get_top_usernames(10)
-        combos = get_credential_combinations()
-
-        total_passwords = sum(p.get('count', 0) for p in get_top_passwords(9999))
-        total_usernames = sum(u.get('count', 0) for u in get_top_usernames(9999))
-        total_combos = sum(c.get('count', 0) for c in get_credential_combinations())
+        stats = get_wordlist_stats()
+        passwords_top = get_top_passwords(10)
+        usernames_top = get_top_usernames(10)
+        combos_top = get_credential_combinations()
 
         return jsonify({
             'passwords': {
-                'count': len(get_top_passwords(9999)),
-                'total_attempts': total_passwords,
-                'top': passwords
+                'count': stats['password_count'],
+                'total_attempts': stats['password_attempts'],
+                'top': passwords_top
             },
             'usernames': {
-                'count': len(get_top_usernames(9999)),
-                'total_attempts': total_usernames,
-                'top': usernames
+                'count': stats['username_count'],
+                'total_attempts': stats['username_attempts'],
+                'top': usernames_top
             },
             'combinations': {
-                'count': len(get_credential_combinations()),
-                'total_attempts': total_combos,
-                'top': combos
+                'count': stats['combo_count'],
+                'total_attempts': stats['combo_attempts'],
+                'top': combos_top
             }
         })
     except Exception as e:
@@ -212,12 +209,12 @@ def download_wordlist(wordlist_type: str) -> Tuple[Response, int]:
         timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
 
         if wordlist_type == 'passwords':
-            data = get_top_passwords(9999)
+            data = get_top_passwords(None)
             lines = [entry['password'] for entry in data if entry.get('password')]
             filename = f"threatlab_passwords_{timestamp}.txt"
 
         elif wordlist_type == 'usernames':
-            data = get_top_usernames(9999)
+            data = get_top_usernames(None)
             lines = [entry['username'] for entry in data if entry.get('username')]
             filename = f"threatlab_usernames_{timestamp}.txt"
 
@@ -228,12 +225,12 @@ def download_wordlist(wordlist_type: str) -> Tuple[Response, int]:
             filename = f"threatlab_credentials_{timestamp}.txt"
 
         elif wordlist_type == 'passwords-ranked':
-            data = get_top_passwords(9999)
+            data = get_top_passwords(None)
             lines = [f"{entry['password']}\t{entry['count']}" for entry in data if entry.get('password')]
             filename = f"threatlab_passwords_ranked_{timestamp}.csv"
 
         elif wordlist_type == 'usernames-ranked':
-            data = get_top_usernames(9999)
+            data = get_top_usernames(None)
             lines = [f"{entry['username']}\t{entry['count']}" for entry in data if entry.get('username')]
             filename = f"threatlab_usernames_ranked_{timestamp}.csv"
 

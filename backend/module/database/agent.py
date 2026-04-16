@@ -550,46 +550,60 @@ class ManagerAgent:
 
 # ============= FUNCTIONS FOR REPORT GENERATION =============
 
-def get_top_passwords(limit: int = 20) -> List[Dict[str, Any]]:
+def get_wordlist_stats() -> Dict[str, Any]:
+    """
+    Recupere les statistiques globales des wordlists (count + total attempts) via COUNT/SUM SQL.
+    """
+    with DatabaseManagerHoneypot() as db:
+        db.execute('''
+            SELECT
+                (SELECT COUNT(*) FROM password_attempted) AS password_count,
+                (SELECT COALESCE(SUM(count), 0) FROM password_attempted) AS password_attempts,
+                (SELECT COUNT(*) FROM username_viewed) AS username_count,
+                (SELECT COALESCE(SUM(count), 0) FROM username_viewed) AS username_attempts,
+                (SELECT COUNT(*) FROM compromised_credentials) AS combo_count,
+                (SELECT COALESCE(SUM(attempt_count), 0) FROM compromised_credentials) AS combo_attempts
+        ''')
+        return db.fetchone()
+
+
+def get_top_passwords(limit: Optional[int] = 20) -> List[Dict[str, Any]]:
     """
     Récupère les mots de passe les plus tentés.
 
     Args:
-        limit (int, optional): Nombre maximum de résultats. Par défaut 20.
+        limit: Nombre maximum de résultats. None = tous.
 
     Returns:
         List[Dict[str, Any]]: Liste des mots de passe avec leur nombre d'occurrences.
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''
-                   SELECT password, count
-                   FROM password_attempted
-                   WHERE password IS NOT NULL
-                   ORDER BY count DESC
-                   LIMIT %s
-                   ''', (limit,))
-
+        query = 'SELECT password, count FROM password_attempted WHERE password IS NOT NULL ORDER BY count DESC'
+        if limit is not None:
+            query += ' LIMIT %s'
+            db.execute(query, (limit,))
+        else:
+            db.execute(query)
         return db.fetchall()
 
 
-def get_top_usernames(limit: int = 20) -> List[Dict[str, Any]]:
+def get_top_usernames(limit: Optional[int] = 20) -> List[Dict[str, Any]]:
     """
     Récupère les noms d'utilisateur les plus tentés.
 
     Args:
-        limit (int, optional): Nombre maximum de résultats. Par défaut 20.
+        limit: Nombre maximum de résultats. None = tous.
 
     Returns:
         List[Dict[str, Any]]: Liste des usernames avec leur nombre d'occurrences.
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''
-                   SELECT username, count
-                   FROM username_viewed
-                   WHERE username IS NOT NULL
-                   ORDER BY count DESC
-                   LIMIT %s
-                   ''', (limit,))
+        query = 'SELECT username, count FROM username_viewed WHERE username IS NOT NULL ORDER BY count DESC'
+        if limit is not None:
+            query += ' LIMIT %s'
+            db.execute(query, (limit,))
+        else:
+            db.execute(query)
 
         return db.fetchall()
 
