@@ -36,7 +36,6 @@ def create_agent_token(agent_name: str,
                        ip_address: str = "0.0.0.0",
                        country_name: Optional[str] = None,
                        service_type: str = "ssh",
-                       groupe: Optional[str] = None,
                        banner: Optional[str] = None) -> Tuple[Optional[int], Optional[str]]:
     """
     Crée un enregistrement pour un nouvel agent honeypot et génère un token unique.
@@ -46,7 +45,6 @@ def create_agent_token(agent_name: str,
         ip_address (str, optional): Adresse IP de l'agent. Par défaut "0.0.0.0".
         country_name (Optional[str], optional): Nom du pays où l'agent est déployé. Par défaut None.
         service_type (str, optional): Type de service simulé (ssh, smtp, ftp, etc.). Par défaut "ssh".
-        groupe (Optional[str], optional): Groupe d'appartenance de l'agent. Par défaut None.
         banner (Optional[str], optional): Banner du service simulé. Par défaut None.
 
     Returns:
@@ -55,11 +53,10 @@ def create_agent_token(agent_name: str,
     try:
         print(f"[DEBUG] Starting create_agent_token for: {agent_name}")
         with DatabaseManagerHoneypot() as db:
-            # Step 1: Insert new agent with configuration but without token
             db.execute("""
-                INSERT INTO honey_agents (agent_name, ip_address, country_name, service_type, groupe, banner)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (agent_name, ip_address, country_name, service_type, groupe, banner))
+                INSERT INTO honey_agents (agent_name, ip_address, country_name, service_type, banner)
+                VALUES (%s, %s, %s, %s, %s)
+            """, (agent_name, ip_address, country_name, service_type, banner))
 
             # Step 2: Get the auto-generated ID of the newly inserted agent
             agent_id = db.cursor.lastrowid
@@ -541,7 +538,6 @@ class ManagerAgent:
                               ip_address,
                               service_type,
                               updated_at,
-                              groupe,
                               alert_generated,
                               created_at
                        FROM honey_agents
@@ -550,25 +546,6 @@ class ManagerAgent:
             agents = db.fetchall()
             return agents
 
-    @staticmethod
-    def create_group(group_name: str) -> bool:
-        """
-        Crée un nouveau groupe d'agents.
-
-        Args:
-            group_name (str): Nom du groupe à créer.
-
-        Returns:
-            bool: True si le groupe a été créé, False s'il existe déjà.
-        """
-        with DatabaseManagerHoneypot() as db:
-            db.execute("SELECT id FROM groups_agent WHERE group_name = %s", (str(group_name),))
-            result = db.fetchone()
-            if result:
-                return False
-
-            db.execute("INSERT INTO groups_agent (group_name) VALUES (%s)", (str(group_name),))
-            return True
 
 
 # ============= FUNCTIONS FOR REPORT GENERATION =============
@@ -820,7 +797,7 @@ def get_agent_about(agent_id: int) -> Optional[Dict[str, Any]]:
             # 1. Agent base info
             db.execute("""
                 SELECT id, agent_name, ip_address, country_name, service_type,
-                       groupe, banner, alert_generated, created_at, updated_at
+                       banner, alert_generated, created_at, updated_at
                 FROM honey_agents
                 WHERE id = %s
             """, (agent_id,))
@@ -905,7 +882,6 @@ def get_agent_about(agent_id: int) -> Optional[Dict[str, Any]]:
                 'status': 'active',
                 'ip': agent['ip_address'],
                 'country': agent['country_name'],
-                'group': agent['groupe'] or 'Default',
                 'banner': agent['banner'],
                 'alert_generated': agent['alert_generated'],
                 'created_at': agent['created_at'].isoformat() if agent['created_at'] else None,

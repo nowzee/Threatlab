@@ -46,7 +46,6 @@ def agent_create() -> Tuple[Response, int]:
     - agent_type: Service type (default: 'ssh')
     - ip_address: Agent's IP address (default: '0.0.0.0')
     - country_name: Country where the agent is deployed
-    - groupe: Group name for organizing agents
     - banner: Service banner to display (default: SSH banner)
 
     Returns:
@@ -58,7 +57,6 @@ def agent_create() -> Tuple[Response, int]:
         agent_type = request.json.get('agent_type', 'ssh')
         ip_address = request.json.get('ip_address', '0.0.0.0')
         country_name = request.json.get('country_name')
-        groupe = request.json.get('groupe')
         banner = request.json.get('banner', 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
 
         agent_id, secret_token = create_agent_token(
@@ -66,7 +64,6 @@ def agent_create() -> Tuple[Response, int]:
             ip_address=ip_address,
             country_name=country_name,
             service_type=agent_type,
-            groupe=groupe,
             banner=banner
         )
 

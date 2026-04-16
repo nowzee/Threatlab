@@ -22,7 +22,6 @@ interface HoneypotDetail {
   status: string
   ip: string
   country: string
-  group: string
   banner: string
   alert_generated: number
   created_at: string
@@ -252,10 +251,6 @@ export default defineComponent({
                 <div class="info-row">
                   <span class="info-label">Type</span>
                   <span class="info-value">{{ honeypot.type.toUpperCase() }}</span>
-                </div>
-                <div class="info-row">
-                  <span class="info-label">Groupe</span>
-                  <span class="info-value">{{ honeypot.group }}</span>
                 </div>
                 <div class="info-row">
                   <span class="info-label">Pays</span>

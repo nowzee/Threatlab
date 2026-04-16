@@ -117,25 +117,6 @@ export default defineComponent({
             </a>
           <a
                 class="btn-sidebar"
-                :class="{ active: route.path === '/dashboard/malware-analyse' }"
-                @click="navigateTo('/dashboard/malware-analyse')">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-  <!-- Corps du malware -->
-  <circle cx="12" cy="12" r="5"></circle>
-  <!-- Antennes -->
-  <line x1="9" y1="7" x2="7" y2="5"></line>
-  <line x1="15" y1="7" x2="17" y2="5"></line>
-  <!-- Pattes -->
-  <line x1="8" y1="14" x2="4" y2="16"></line>
-  <line x1="16" y1="14" x2="20" y2="16"></line>
-  <line x1="8" y1="10" x2="4" y2="8"></line>
-  <line x1="16" y1="10" x2="20" y2="8"></line>
-</svg>
-
-                <span>Malware Analyse</span>
-            </a>
-          <a
-                class="btn-sidebar"
                 :class="{ active: route.path === '/dashboard/wordlists' }"
                 @click="navigateTo('/dashboard/wordlists')">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">

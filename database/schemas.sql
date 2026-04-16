@@ -6,17 +6,11 @@ CREATE TABLE IF NOT EXISTS honey_agents (
     ip_address VARCHAR(45) NOT NULL,
     country_name VARCHAR(100),
     service_type VARCHAR(50) NOT NULL,
-    groupe VARCHAR(100),
     banner TEXT,
     alert_generated INT DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     secret_token_sha256 VARCHAR(255) UNIQUE
-);
-
-CREATE TABLE IF NOT EXISTS groups_agent (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    group_name VARCHAR(100) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS attack_logs (
@@ -27,7 +21,6 @@ CREATE TABLE IF NOT EXISTS attack_logs (
     source_port INT,
     target_port INT,
     service_type VARCHAR(50) NOT NULL,
-    command TEXT,
     username_attempt VARCHAR(255),
     password_attempt VARCHAR(255),
     payload TEXT,
@@ -47,8 +40,7 @@ CREATE TABLE IF NOT EXISTS malicious_ips (
     country_code VARCHAR(10),
     country_name VARCHAR(100),
     reputation_score INT DEFAULT 0,
-    classification VARCHAR(100),
-    notes TEXT
+    classification VARCHAR(100)
 );
 
 CREATE TABLE IF NOT EXISTS ip_agent_relations (
@@ -72,35 +64,6 @@ CREATE TABLE IF NOT EXISTS ip_service_attacks (
     last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (ip_id) REFERENCES malicious_ips (id),
     UNIQUE(ip_id, service_type)
-);
-
-CREATE TABLE IF NOT EXISTS payloads (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    malicious_ip_id INT,
-    service_type VARCHAR(50) NOT NULL,
-    payload_name VARCHAR(255) NOT NULL,
-    payload_hash VARCHAR(255) UNIQUE NOT NULL,
-    file_extension VARCHAR(10),
-    file_size INT,
-    payload_content LONGTEXT,
-    payload_type VARCHAR(50),
-    malware_family VARCHAR(100),
-    first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
-    detection_count INT DEFAULT 1,
-    FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
-);
-
-CREATE TABLE IF NOT EXISTS smtp_interactions (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    malicious_server_ip_id INT,
-    sender_email VARCHAR(255),
-    recipient_email VARCHAR(255),
-    subject TEXT,
-    message_content LONGTEXT,
-    attachments TEXT,
-    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (malicious_server_ip_id) REFERENCES malicious_ips (id)
 );
 
 CREATE TABLE IF NOT EXISTS compromised_credentials (

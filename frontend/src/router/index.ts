@@ -7,8 +7,7 @@ import A2FView from '@/views/auth/a2f.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import home from '@/views/dashboard/home.vue'
 import deploy from '@/views/dashboard/honeypot/deploy.vue'
-import sshAgentCreation from '@/views/dashboard/honeypot/ssh-agent-creation.vue'
-import ftpAgentCreation from '@/views/dashboard/honeypot/ftp-agent-creation.vue'
+import agentCreationWizard from '@/views/dashboard/honeypot/agent-creation-wizard.vue'
 import threatIntel from '@/views/dashboard/CTI/threat-intel.vue'
 import alerts from '@/views/dashboard/alert/alerts.vue'
 import alertDetails from '@/views/dashboard/alert/alert-details.vue'
@@ -17,7 +16,6 @@ import honeypotDetail from '@/views/dashboard/honeypot/honeypot-detail.vue'
 import settings from '@/views/dashboard/settings/settings.vue'
 import security_settings from "@/views/dashboard/settings/security.vue";
 import api_settings from "@/views/dashboard/settings/api.vue";
-import malware_analyse from "@/views/dashboard/Malware_Analyse/mlab.vue"
 import wordlists from "@/views/dashboard/wordlists/wordlists.vue"
 
 
@@ -32,14 +30,12 @@ const routes = [
         { path: '', redirect: { name: 'home' } },
         { path: 'home', name: 'home', component: home },
         { path: 'deploy', name: 'deploy', component: deploy },
-        { path: 'ssh-agent-creation', name: 'ssh-agent-creation', component: sshAgentCreation },
-        { path: 'ftp-agent-creation', name: 'ftp-agent-creation', component: ftpAgentCreation },
+        { path: 'agent-creation/:type', name: 'agent-creation', component: agentCreationWizard },
         { path: 'honeypot-management', name: 'honeypot-management', component: honeypotManagement },
         { path: 'honeypot-detail/:id', name: 'honeypot-detail', component: honeypotDetail },
         { path: 'threat-intel', name: 'threat-intel', component: threatIntel },
         { path: 'alerts', name: 'alerts', component: alerts },
         { path: 'alert-details/:id', name: 'alert-details', component: alertDetails },
-        { path: 'malware-analyse', name: 'malware-analyse', component: malware_analyse },
         { path: 'wordlists', name: 'wordlists', component: wordlists },
         { path: 'settings', name: 'settings', component: settings,
         children: [

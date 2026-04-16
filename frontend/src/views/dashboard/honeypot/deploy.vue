@@ -8,11 +8,7 @@ export default defineComponent({
     const router = useRouter()
 
     const deployHoneypot = (type: string) => {
-      if (type === 'SSH') {
-        router.push({ name: 'ssh-agent-creation' })
-      } else if (type === 'FTP') {
-        router.push({ name: 'ftp-agent-creation' })
-      }
+      router.push({ name: 'agent-creation', params: { type: type.toLowerCase() } })
     }
 
     return {

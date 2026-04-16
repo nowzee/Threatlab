@@ -307,38 +307,6 @@ export default defineComponent({
           </table>
         </div>
       </div>
-
-      <!-- Info Section -->
-      <div class="section-card info-section">
-        <div class="card-header" style="padding: 0 0 16px 0;">
-          <h3 class="card-title">
-            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="16" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12.01" y2="8"></line>
-            </svg>
-            A propos des wordlists
-          </h3>
-        </div>
-        <div class="info-grid">
-          <div class="info-item">
-            <h4>Mots de passe (.txt)</h4>
-            <p>Un mot de passe par ligne, trie par frequence. Ideal pour les tests d'intrusion et l'audit de securite.</p>
-          </div>
-          <div class="info-item">
-            <h4>Avec compteur (.csv)</h4>
-            <p>Format TSV avec le nombre de tentatives. Utile pour l'analyse statistique et la priorisation.</p>
-          </div>
-          <div class="info-item">
-            <h4>Combinaisons (user:pass)</h4>
-            <p>Paires identifiants collectees, format user:password. Pour le credential stuffing defensif.</p>
-          </div>
-          <div class="info-item">
-            <h4>Source des donnees</h4>
-            <p>Collectees en temps reel par vos honeypots SSH et FTP. Mises a jour a chaque nouvelle attaque.</p>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 </template>

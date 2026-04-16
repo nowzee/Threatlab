@@ -2,7 +2,7 @@
 Agent Management Route Module.
 
 This module provides Flask routes for managing honeypot agents,
-including delete, update, list, and group creation operations.
+including delete, update, and list operations.
 """
 
 from typing import Tuple
@@ -46,25 +46,3 @@ def list_agent() -> Tuple[Response, int]:
     agents = manager.list()
 
     return jsonify(agents), 200
-
-
-@agent_manage_bp.route("/create_group", methods=['POST'])
-def create_group() -> Tuple[Response, int]:
-    """
-    Create a new agent group.
-
-    Expects JSON body with:
-    - group_name: The name of the group to create
-
-    Returns:
-        JSON response with success status.
-        HTTP status codes: 200 (success), 400 (failure).
-    """
-    data = request.json
-    group_name = data.get('group_name')
-
-    manager = ManagerAgent()
-    if manager.create_group(group_name):
-        return jsonify({'success': True}), 200
-
-    return jsonify({'success': False}), 400
