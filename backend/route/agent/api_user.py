@@ -7,7 +7,7 @@ rankings, and generating reports for the user dashboard.
 
 from typing import Tuple
 from flask import Blueprint, jsonify, Response
-from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking
+from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking, get_top_passwords, get_top_usernames, get_credential_combinations
 from datetime import datetime
 import os
 import traceback
@@ -156,3 +156,99 @@ def generate_rapport() -> Tuple[Response, int]:
         print(f"Error generating report: {e}")
         traceback.print_exc()
         return jsonify({'error': f'Failed to generate report'}), 500
+
+
+@agent_user_api_bp.route("/wordlists", methods=['GET'])
+def get_wordlists_stats() -> Response:
+    """
+    Get wordlist statistics: counts of passwords, usernames, and combinations.
+
+    Returns:
+        JSON with stats and top entries for preview.
+    """
+    try:
+        passwords = get_top_passwords(10)
+        usernames = get_top_usernames(10)
+        combos = get_credential_combinations()
+
+        total_passwords = sum(p.get('count', 0) for p in get_top_passwords(9999))
+        total_usernames = sum(u.get('count', 0) for u in get_top_usernames(9999))
+        total_combos = sum(c.get('count', 0) for c in get_credential_combinations())
+
+        return jsonify({
+            'passwords': {
+                'count': len(get_top_passwords(9999)),
+                'total_attempts': total_passwords,
+                'top': passwords
+            },
+            'usernames': {
+                'count': len(get_top_usernames(9999)),
+                'total_attempts': total_usernames,
+                'top': usernames
+            },
+            'combinations': {
+                'count': len(get_credential_combinations()),
+                'total_attempts': total_combos,
+                'top': combos
+            }
+        })
+    except Exception as e:
+        print(f"Error getting wordlists: {e}")
+        return jsonify({'error': 'Failed to get wordlist stats'}), 500
+
+
+@agent_user_api_bp.route("/wordlists/download/<wordlist_type>", methods=['GET'])
+def download_wordlist(wordlist_type: str) -> Tuple[Response, int]:
+    """
+    Download a wordlist as a text file.
+
+    Args:
+        wordlist_type: 'passwords', 'usernames', or 'combinations'
+
+    Returns:
+        A text file download.
+    """
+    try:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+
+        if wordlist_type == 'passwords':
+            data = get_top_passwords(9999)
+            lines = [entry['password'] for entry in data if entry.get('password')]
+            filename = f"threatlab_passwords_{timestamp}.txt"
+
+        elif wordlist_type == 'usernames':
+            data = get_top_usernames(9999)
+            lines = [entry['username'] for entry in data if entry.get('username')]
+            filename = f"threatlab_usernames_{timestamp}.txt"
+
+        elif wordlist_type == 'combinations':
+            data = get_credential_combinations()
+            lines = [f"{entry['username']}:{entry['password']}" for entry in data
+                     if entry.get('username') and entry.get('password')]
+            filename = f"threatlab_credentials_{timestamp}.txt"
+
+        elif wordlist_type == 'passwords-ranked':
+            data = get_top_passwords(9999)
+            lines = [f"{entry['password']}\t{entry['count']}" for entry in data if entry.get('password')]
+            filename = f"threatlab_passwords_ranked_{timestamp}.csv"
+
+        elif wordlist_type == 'usernames-ranked':
+            data = get_top_usernames(9999)
+            lines = [f"{entry['username']}\t{entry['count']}" for entry in data if entry.get('username')]
+            filename = f"threatlab_usernames_ranked_{timestamp}.csv"
+
+        else:
+            return jsonify({'error': 'Invalid wordlist type'}), 400
+
+        content = '\n'.join(lines) + '\n'
+
+        response = Response(content, mimetype='text/plain')
+        response.headers['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response.headers['Content-Type'] = 'text/plain; charset=utf-8'
+
+        return response, 200
+
+    except Exception as e:
+        print(f"Error downloading wordlist: {e}")
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to generate wordlist'}), 500

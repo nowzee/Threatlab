@@ -9,7 +9,7 @@ from typing import Tuple
 from flask import Blueprint, jsonify, request, current_app, send_file, Response
 import jwt
 import os
-from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction
+from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction, get_agent_about
 from module.database.db_manager import DatabaseManagerHoneypot
 from string import Template
 from module.auth.decorator import agent_jwt_required
@@ -341,14 +341,94 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
         return jsonify({'error': f'Failed to generate agent file: {str(e)}'}), 500
 
 @agent_create_bp.route("/about/<int:agent_id>", methods=['GET'])
-def about_agent(agent_id: int):
+def about_agent(agent_id: int) -> Tuple[Response, int]:
     """
-    Generate and download the Python honeypot agent script for a specific agent.
+    Get detailed information about a specific honeypot agent.
 
-    Arg:
-        agent_id: The ID of the agent to generate a script for.
+    Args:
+        agent_id: The ID of the agent.
 
     Returns:
-        The data about the agent, like country, ip, amount of attack, type of country ranking, service type, etc.
+        JSON with agent details, stats, attacks, and country ranking.
     """
-    pass
+    try:
+        data = get_agent_about(agent_id)
+        if data is None:
+            return jsonify({'success': False, 'error': 'Agent not found'}), 404
+        return jsonify({'success': True, 'agent': data}), 200
+    except Exception as e:
+        print(f"Error in about_agent: {e}")
+        return jsonify({'success': False, 'error': 'Internal server error'}), 500
+
+
+@agent_create_bp.route("/install/<int:agent_id>", methods=['GET'])
+def install_agent(agent_id: int) -> Tuple[Response, int]:
+    """
+    Generate and download a bash install script for deploying a honeypot agent.
+
+    Args:
+        agent_id: The ID of the agent to generate the install script for.
+
+    Returns:
+        A bash script file as download.
+    """
+    try:
+        with DatabaseManagerHoneypot() as db:
+            db.execute("""
+                SELECT agent_name, banner, ip_address, service_type
+                FROM honey_agents
+                WHERE id = %s
+            """, (agent_id,))
+            result = db.fetchone()
+
+            if not result:
+                return jsonify({'error': 'Agent not found'}), 404
+
+        # Generate a fresh JWT token
+        secret_token = generate_jwt(agent_id)
+
+        # Build server URL
+        server_url = request.url_root.rstrip('/')
+        if not server_url:
+            scheme = request.scheme or 'https'
+            host = request.host or 'localhost:5000'
+            server_url = f"{scheme}://{host}"
+
+        # Read the install script template
+        template_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+            'module', 'templates', 'install_agent.sh'
+        )
+
+        with open(template_path, 'r') as f:
+            script_content = f.read()
+
+        # Inject values
+        script_content = script_content.replace('{{AGENT_ID}}', str(agent_id))
+        script_content = script_content.replace('{{AGENT_TOKEN}}', secret_token)
+        script_content = script_content.replace('{{SERVER_URL}}', server_url)
+        script_content = script_content.replace('{{SERVICE_TYPE}}', result['service_type'] or 'ssh')
+        script_content = script_content.replace('{{AGENT_NAME}}', result['agent_name'] or f'agent-{agent_id}')
+        script_content = script_content.replace('{{BANNER}}', result['banner'] or 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
+
+        import tempfile
+        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False)
+        temp_file.write(script_content)
+        temp_file.close()
+
+        filename = f"install_{result['agent_name'].replace(' ', '_')}.sh"
+
+        response = send_file(
+            temp_file.name,
+            as_attachment=True,
+            download_name=filename,
+            mimetype='text/x-shellscript'
+        )
+
+        return response
+
+    except Exception as e:
+        import traceback
+        print(f"Error generating install script: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return jsonify({'error': f'Failed to generate install script: {str(e)}'}), 500

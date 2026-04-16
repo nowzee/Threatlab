@@ -805,6 +805,129 @@ def get_credential_combinations() -> List[Dict[str, Any]]:
         return db.fetchall()
 
 
+def get_agent_about(agent_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Récupère toutes les informations détaillées d'un agent honeypot spécifique.
+
+    Args:
+        agent_id (int): Identifiant de l'agent.
+
+    Returns:
+        Optional[Dict[str, Any]]: Dictionnaire avec les détails de l'agent, ou None si non trouvé.
+    """
+    try:
+        with DatabaseManagerHoneypot() as db:
+            # 1. Agent base info
+            db.execute("""
+                SELECT id, agent_name, ip_address, country_name, service_type,
+                       groupe, banner, alert_generated, created_at, updated_at
+                FROM honey_agents
+                WHERE id = %s
+            """, (agent_id,))
+            agent = db.fetchone()
+
+            if not agent:
+                return None
+
+            # 2. Attack stats
+            db.execute("""
+                SELECT
+                    COUNT(*) AS total_attacks,
+                    COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 1 DAY) THEN 1 END) AS attacks_today,
+                    COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY) THEN 1 END) AS attacks_week,
+                    COUNT(CASE WHEN created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY) THEN 1 END) AS attacks_month
+                FROM attack_logs
+                WHERE agent_id = %s
+            """, (agent_id,))
+            stats = db.fetchone()
+
+            # 3. Unique IPs count
+            db.execute("""
+                SELECT COUNT(DISTINCT ip_id) AS unique_ips
+                FROM ip_agent_relations
+                WHERE agent_id = %s
+            """, (agent_id,))
+            ip_stats = db.fetchone()
+
+            # 4. Top countries for this agent
+            db.execute("""
+                SELECT country_name, COUNT(*) AS count
+                FROM attack_logs
+                WHERE agent_id = %s AND country_name IS NOT NULL AND country_name != ''
+                GROUP BY country_name
+                ORDER BY count DESC
+                LIMIT 10
+            """, (agent_id,))
+            top_countries_raw = db.fetchall()
+
+            total_with_country = sum(c['count'] for c in top_countries_raw) if top_countries_raw else 1
+            top_countries = [
+                {
+                    'country': c['country_name'],
+                    'count': c['count'],
+                    'percentage': round(c['count'] / total_with_country * 100, 1)
+                }
+                for c in top_countries_raw
+            ]
+
+            # 5. Recent attacks
+            db.execute("""
+                SELECT id, created_at, source_ip, country_code, country_name,
+                       attack_type, service_type, source_port, target_port,
+                       username_attempt, password_attempt
+                FROM attack_logs
+                WHERE agent_id = %s
+                ORDER BY id DESC
+                LIMIT 20
+            """, (agent_id,))
+            recent_attacks = db.fetchall()
+
+            # Format attacks for frontend
+            formatted_attacks = []
+            for a in recent_attacks:
+                formatted_attacks.append({
+                    'id': a['id'],
+                    'timestamp': a['created_at'].isoformat() if a['created_at'] else None,
+                    'source_ip': a['source_ip'],
+                    'country': a['country_code'] or a['country_name'] or 'N/A',
+                    'type': a['attack_type'] or a['service_type'] or 'Unknown',
+                    'service_type': a['service_type'],
+                    'source_port': a['source_port'],
+                    'target_port': a['target_port'],
+                    'username': a['username_attempt'],
+                    'password': a['password_attempt']
+                })
+
+            return {
+                'id': agent['id'],
+                'name': agent['agent_name'],
+                'type': agent['service_type'],
+                'status': 'active',
+                'ip': agent['ip_address'],
+                'country': agent['country_name'],
+                'group': agent['groupe'] or 'Default',
+                'banner': agent['banner'],
+                'alert_generated': agent['alert_generated'],
+                'created_at': agent['created_at'].isoformat() if agent['created_at'] else None,
+                'updated_at': agent['updated_at'].isoformat() if agent['updated_at'] else None,
+                'stats': {
+                    'total_attacks': stats['total_attacks'] or 0,
+                    'unique_ips': ip_stats['unique_ips'] or 0,
+                    'attacks_today': stats['attacks_today'] or 0,
+                    'attacks_week': stats['attacks_week'] or 0,
+                    'attacks_month': stats['attacks_month'] or 0,
+                },
+                'top_countries': top_countries,
+                'recent_attacks': formatted_attacks
+            }
+
+    except Exception as e:
+        print(f"Error getting agent about: {e}")
+        import traceback
+        print(traceback.format_exc())
+        return None
+
+
 def get_complete_report_data() -> Dict[str, Any]:
     """
     Récupère toutes les données nécessaires pour un rapport complet.

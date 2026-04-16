@@ -63,6 +63,34 @@ export default defineComponent({
     const isSubmitting = ref(false)
     const showAdvanced = ref(false)
     const createdAgentId = ref<number | null>(null)
+    const copiedCommand = ref<string | null>(null)
+
+    const serverUrl = window.location.origin
+
+    const getInstallCommand = (method: string) => {
+      if (!createdAgentId.value) return ''
+      const base = `curl -sSL ${serverUrl}/api/agent/install/${createdAgentId.value} | sudo bash`
+      if (method === 'interactive') return base
+      return `${base} -s -- --method ${method}`
+    }
+
+    const copyCommand = async (method: string) => {
+      const cmd = getInstallCommand(method)
+      try {
+        await navigator.clipboard.writeText(cmd)
+        copiedCommand.value = method
+        setTimeout(() => { copiedCommand.value = null }, 2000)
+      } catch {
+        const ta = document.createElement('textarea')
+        ta.value = cmd
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+        copiedCommand.value = method
+        setTimeout(() => { copiedCommand.value = null }, 2000)
+      }
+    }
 
     const integrationOptions = [
       {
@@ -163,6 +191,10 @@ export default defineComponent({
       integrationOptions,
       showAdvanced,
       createdAgentId,
+      copiedCommand,
+      serverUrl,
+      getInstallCommand,
+      copyCommand,
       createAgent,
       downloadAgent,
       goBack
@@ -444,9 +476,9 @@ export default defineComponent({
             </div>
           </div>
 
-          <!-- Actions - Fixed in sidebar -->
-          <div class="sidebar-actions">
-            <button type="submit" class="btn btn-primary btn-block" :disabled="isSubmitting || createdAgentId !== null">
+          <!-- Actions - Before creation -->
+          <div v-if="!createdAgentId" class="sidebar-actions">
+            <button type="submit" class="btn btn-primary btn-block" :disabled="isSubmitting">
               <svg v-if="isSubmitting" xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="spinner">
                 <line x1="12" y1="2" x2="12" y2="6"></line>
                 <line x1="12" y1="18" x2="12" y2="22"></line>
@@ -457,24 +489,76 @@ export default defineComponent({
                 <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
                 <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
               </svg>
-              {{ isSubmitting ? 'Création...' : (createdAgentId ? 'Agent créé ' : 'Créer l\'agent') }}
-            </button>
-
-            <button v-if="createdAgentId" type="button" class="btn btn-primary btn-block" @click="downloadAgent">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-                <polyline points="7 10 12 15 17 10"></polyline>
-                <line x1="12" y1="15" x2="12" y2="3"></line>
-              </svg>
-              Télécharger l'agent
+              {{ isSubmitting ? 'Creation...' : 'Creer l\'agent' }}
             </button>
 
             <button type="button" class="btn btn-secondary btn-block" @click="goBack">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M19 12H5M12 19l-7-7 7-7"/>
               </svg>
-              {{ createdAgentId ? 'Retour' : 'Annuler' }}
+              Annuler
             </button>
+          </div>
+
+          <!-- Deployment instructions - After creation -->
+          <div v-if="createdAgentId" class="deploy-panel">
+            <div class="deploy-success">
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                <polyline points="22 4 12 14.01 9 11.01"></polyline>
+              </svg>
+              <span>Agent cree avec succes !</span>
+            </div>
+
+            <h4 class="deploy-title">Deploiement</h4>
+
+            <!-- Docker method -->
+            <div class="deploy-method">
+              <div class="method-header">
+                <span class="method-label">Docker (recommande)</span>
+                <button class="btn-copy" @click="copyCommand('docker')">
+                  {{ copiedCommand === 'docker' ? 'Copie !' : 'Copier' }}
+                </button>
+              </div>
+              <code class="method-command">{{ getInstallCommand('docker') }}</code>
+            </div>
+
+            <!-- Direct method -->
+            <div class="deploy-method">
+              <div class="method-header">
+                <span class="method-label">Direct (systemd)</span>
+                <button class="btn-copy" @click="copyCommand('direct')">
+                  {{ copiedCommand === 'direct' ? 'Copie !' : 'Copier' }}
+                </button>
+              </div>
+              <code class="method-command">{{ getInstallCommand('direct') }}</code>
+            </div>
+
+            <!-- Manual method -->
+            <div class="deploy-method">
+              <div class="method-header">
+                <span class="method-label">Manuel</span>
+                <button class="btn-copy" @click="copyCommand('manual')">
+                  {{ copiedCommand === 'manual' ? 'Copie !' : 'Copier' }}
+                </button>
+              </div>
+              <code class="method-command">{{ getInstallCommand('manual') }}</code>
+            </div>
+
+            <div class="deploy-actions">
+              <button type="button" class="btn btn-primary btn-block" @click="downloadAgent">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                  <polyline points="7 10 12 15 17 10"></polyline>
+                  <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Telecharger le script agent
+              </button>
+
+              <button type="button" class="btn btn-secondary btn-block" @click="goBack">
+                Retour au deploiement
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -717,6 +801,88 @@ export default defineComponent({
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Deploy Panel */
+.deploy-panel {
+  background-color: #1a1a1a;
+  border-radius: 12px;
+  border: 1px solid #2a2a2a;
+  padding: 20px;
+}
+
+.deploy-success {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: rgba(0, 230, 118, 0.1);
+  border: 1px solid rgba(0, 230, 118, 0.3);
+  border-radius: 8px;
+  color: #00e676;
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 20px;
+}
+
+.deploy-title {
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 16px 0;
+}
+
+.deploy-method {
+  margin-bottom: 16px;
+  background: #111;
+  border-radius: 8px;
+  padding: 12px;
+  border: 1px solid #2a2a2a;
+}
+
+.method-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.method-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #ccc;
+}
+
+.btn-copy {
+  background: rgba(156, 77, 255, 0.15);
+  border: 1px solid rgba(156, 77, 255, 0.3);
+  color: var(--accent-color);
+  padding: 4px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-copy:hover {
+  background: rgba(156, 77, 255, 0.25);
+}
+
+.method-command {
+  display: block;
+  font-size: 11px;
+  color: #aaa;
+  word-break: break-all;
+  line-height: 1.5;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+.deploy-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 20px;
 }
 
 /* Responsive Design */

@@ -18,6 +18,7 @@ import settings from '@/views/dashboard/settings/settings.vue'
 import security_settings from "@/views/dashboard/settings/security.vue";
 import api_settings from "@/views/dashboard/settings/api.vue";
 import malware_analyse from "@/views/dashboard/Malware_Analyse/mlab.vue"
+import wordlists from "@/views/dashboard/wordlists/wordlists.vue"
 
 
 const routes = [
@@ -39,6 +40,7 @@ const routes = [
         { path: 'alerts', name: 'alerts', component: alerts },
         { path: 'alert-details/:id', name: 'alert-details', component: alertDetails },
         { path: 'malware-analyse', name: 'malware-analyse', component: malware_analyse },
+        { path: 'wordlists', name: 'wordlists', component: wordlists },
         { path: 'settings', name: 'settings', component: settings,
         children: [
             { path: '', redirect: { name: 'security_settings' } },
