@@ -1,0 +1,55 @@
+@startuml Sequence_Authentification
+!theme plain
+title Diagramme de séquence - Authentification avec 2FA
+
+skinparam backgroundColor #FFFFFF
+skinparam sequence {
+  ArrowColor #333
+  LifeLineBorderColor #333
+  ParticipantBorderColor black
+  ParticipantBackgroundColor #B3D9FF
+  ActorBackgroundColor #B3D9FF
+}
+
+actor "Utilisateur" as user
+participant "Interface\nde connexion" as front
+participant "Serveur\nd'authentification" as back
+database "Base de\ndonnées" as db
+
+autonumber
+
+user -> front : Saisit identifiants
+front -> back : Envoi des identifiants
+activate back
+
+back -> db : Recherche l'utilisateur
+db --> back : Utilisateur trouvé
+back -> back : Vérifie le mot de passe
+
+alt Identifiants valides
+  back -> db : Enregistre la tentative réussie
+  back --> front : Accès autorisé\n(2FA requise)
+
+  front -> user : Demande le code à 6 chiffres
+  user -> front : Saisit le code OTP
+  front -> back : Envoi du code
+  back -> db : Récupère la clé secrète
+  db --> back : Clé récupérée
+  back -> back : Vérifie le code OTP
+
+  alt Code valide
+    back --> front : Session validée
+    front -> user : Redirection vers le tableau de bord
+  else Code invalide
+    back --> front : Code refusé
+    front -> user : Message d'erreur
+  end
+
+else Identifiants invalides
+  back -> db : Enregistre la tentative échouée
+  back --> front : Accès refusé
+  front -> user : Message d'erreur
+end
+deactivate back
+
+@enduml

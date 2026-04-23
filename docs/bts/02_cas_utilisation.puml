@@ -1,0 +1,81 @@
+@startuml Cas_Utilisation_ThreatLab
+!theme plain
+title Diagramme de cas d'utilisation - ThreatLab
+
+left to right direction
+skinparam backgroundColor #FFFFFF
+skinparam actor {
+  BackgroundColor #B3D9FF
+}
+skinparam usecase {
+  BackgroundColor #FFF5B3
+  BorderColor black
+}
+
+actor "Administrateur SOC" as admin
+actor "Analyste" as analyst
+actor "Agent Honeypot" as agent
+actor "ELK / OpenCTI" as ext <<système>>
+
+rectangle "ThreatLab" {
+
+  package "Authentification" {
+    usecase "Se connecter" as UC1
+    usecase "Valider 2FA (OTP)" as UC2
+    usecase "Gérer son compte" as UC3
+  }
+
+  package "Gestion des honeypots" {
+    usecase "Déployer un agent" as UC4
+    usecase "Configurer un agent\n(SSH/FTP/HTTP...)" as UC5
+    usecase "Supprimer un agent" as UC6
+    usecase "Lister les agents" as UC7
+  }
+
+  package "Analyse des attaques" {
+    usecase "Consulter le dashboard" as UC8
+    usecase "Visualiser les alertes" as UC9
+    usecase "Consulter le détail\nd'une attaque" as UC10
+    usecase "Analyser un malware" as UC11
+  }
+
+  package "Threat Intelligence" {
+    usecase "Consulter les IP\nmalveillantes" as UC12
+    usecase "Consulter les\ncredentials compromis" as UC13
+    usecase "Exporter les IOC" as UC14
+  }
+
+  package "Configuration" {
+    usecase "Gérer les clés API" as UC15
+    usecase "Configurer la sécurité\n(A2F, politique mdp)" as UC16
+    usecase "Gérer les wordlists" as UC17
+  }
+
+  usecase "Remonter une attaque" as UC18
+}
+
+admin --> UC1
+admin --> UC4
+admin --> UC5
+admin --> UC6
+admin --> UC15
+admin --> UC16
+admin --> UC17
+
+analyst --> UC1
+analyst --> UC8
+analyst --> UC9
+analyst --> UC10
+analyst --> UC11
+analyst --> UC12
+analyst --> UC13
+analyst --> UC14
+
+agent --> UC18
+
+UC1 ..> UC2 : <<include>>
+UC4 ..> UC5 : <<include>>
+UC14 --> ext
+UC18 --> agent
+
+@enduml

@@ -1,0 +1,81 @@
+@startuml Activite_Traitement_Attaque
+!theme plain
+title Diagramme d'activité - Cycle de vie d'une attaque dans ThreatLab
+
+skinparam backgroundColor #FFFFFF
+skinparam activity {
+  BackgroundColor #FFF5B3
+  BorderColor black
+  DiamondBackgroundColor #FFD9B3
+  DiamondBorderColor black
+}
+
+|Attaquant|
+start
+:Scan réseau / Recherche\nde services exposés;
+:Tentative de connexion\n(SSH, FTP, HTTP...);
+
+|Agent Honeypot|
+:Accepte la connexion\n(simulation de service);
+:Capture les données :
+- IP source
+- port
+- credentials
+- payload / commandes;
+:Formate le rapport JSON;
+:Signe avec le JWT\nde l'agent;
+
+|Backend Flask|
+:Réception POST\n/api/agent/report;
+if (JWT valide ?) then (non)
+  :Retourne 401;
+  stop
+else (oui)
+endif
+
+:Normalisation du payload\n(format unifié);
+
+fork
+  :INSERT attack_logs;
+fork again
+  if (IP déjà connue ?) then (oui)
+    :UPDATE malicious_ips\n(score++, last_seen);
+  else (non)
+    :INSERT malicious_ips\n(nouvelle entrée);
+  endif
+fork again
+  :UPSERT ip_service_attacks\n(+1 attaque);
+fork again
+  :UPSERT ip_agent_relations;
+fork again
+  if (Credentials présents ?) then (oui)
+    :INSERT compromised_credentials\n+ password_attempted\n+ username_viewed;
+  else (non)
+  endif
+end fork
+
+:Retourne 200 OK à l'agent;
+
+|Backend Flask|
+if (Export auto activé ?) then (oui)
+  fork
+    :Envoi vers Elasticsearch\n(index ECS);
+  fork again
+    :Envoi vers OpenCTI\n(format STIX 2);
+  end fork
+else (non)
+endif
+
+|Analyste SOC|
+:Consulte le dashboard;
+:Visualise le graphique\ntimeline (24h / 7j / 30j);
+if (Menace critique ?) then (oui)
+  :Analyse l'attaque en détail\n(payload, malware, credentials);
+  :Exporte manuellement\nvers la CTI;
+  :Met à jour les règles\nde détection SIEM;
+else (non)
+  :Laisse l'agent collecter\nplus de données;
+endif
+stop
+
+@enduml

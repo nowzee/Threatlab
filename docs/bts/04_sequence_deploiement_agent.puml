@@ -1,0 +1,45 @@
+@startuml Sequence_Deploiement_Agent
+!theme plain
+title Diagramme de séquence - Déploiement d'un agent honeypot
+
+skinparam backgroundColor #FFFFFF
+skinparam sequence {
+  ArrowColor #333
+  LifeLineBorderColor #333
+  ParticipantBorderColor black
+  ParticipantBackgroundColor #FFD9B3
+  ActorBackgroundColor #B3D9FF
+}
+
+actor "Administrateur" as admin
+participant "Assistant\nde création" as wizard
+participant "Serveur\nd'application" as back
+database "Base de\ndonnées" as db
+participant "Agent\nHoneypot" as agent
+
+autonumber
+
+admin -> wizard : Remplit le formulaire\n(nom, IP, service, bannière)
+wizard -> wizard : Vérifie les informations
+wizard -> back : Demande de création d'agent
+activate back
+
+back -> back : Vérifie que l'utilisateur\nest connecté
+back -> back : Génère un jeton\nd'authentification unique
+back -> db : Enregistre l'agent
+db --> back : Agent enregistré
+
+back --> wizard : Agent créé\n+ jeton d'accès
+deactivate back
+
+wizard -> admin : Affiche le jeton et\nles instructions de déploiement
+
+admin -> agent : Déploie l'agent avec\nle jeton sur l'hôte cible
+activate agent
+agent -> agent : Démarre le service simulé\n(SSH, FTP, HTTP...)
+agent -> back : Signale sa présence\n(avec le jeton)
+back -> back : Vérifie le jeton
+back --> agent : Agent actif
+deactivate agent
+
+@enduml
