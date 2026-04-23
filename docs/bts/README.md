@@ -99,7 +99,7 @@ Ce dossier contient l'ensemble des diagrammes PlantUML documentant le projet **T
 **Objectif** : vue transverse du cycle de vie d'une attaque, du scan initial à la réaction SOC.
 
 **Texte à placer sous le schéma :**
-> Ce diagramme représente le cycle complet d'une attaque. L'attaquant initie un scan puis tente une connexion, capturée par l'agent honeypot qui enrichit et signe le rapport. Le backend vérifie le JWT, normalise le payload puis alimente **en parallèle** plusieurs tables pour optimiser les performances (journalisation, scoring d'IP, wordlists). Si l'export automatique est activé, les IOC sont simultanément envoyés vers Elasticsearch et OpenCTI. Côté analyste, le dashboard matérialise ces événements sous forme de timeline. En cas de menace critique, l'analyste effectue une investigation approfondie et peut enrichir les règles de détection du SIEM pour prévenir une attaque similaire en production.
+> Ce diagramme représente le cycle complet d'une attaque, de sa détection à son exploitation par l'analyste. L'attaquant tente une connexion sur un service exposé, qui est en réalité un honeypot simulant un vrai service. L'agent capture l'attaque et envoie un rapport au serveur central, qui vérifie l'authenticité de l'agent avant d'enregistrer et de catégoriser les données. Si l'export automatique est activé, les indicateurs sont transmis aux plateformes externes (SIEM et CTI). L'analyste SOC consulte ensuite le tableau de bord : si la menace est critique, il mène une investigation approfondie et met à jour les règles de détection pour prévenir une attaque similaire sur les systèmes de production.
 
 ---
 
