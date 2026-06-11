@@ -8,10 +8,7 @@ export default defineComponent({
     const router = useRouter()
 
     const deployHoneypot = (type: string) => {
-      if (type === 'SSH') {
-        // Rediriger vers la page de création d'agent pour SSH, Modifier pour plus tard apres pour adapter en fonction du type
-        router.push({ name: 'agent-creation' })
-      }
+      router.push({ name: 'agent-creation', params: { type: type.toLowerCase() } })
     }
 
     return {
@@ -54,41 +51,11 @@ export default defineComponent({
                 </div>
             </div>
             <div class="card-footer">
-                <button class="btn btn-primary deploy-honeypot-btn" @click="deployHoneypot('SSH')">Déployer</button>
-                <button class="btn btn-secondary">Détails</button>
+                <button class="btn btn-primary deploy-honeypot-btn" @click="deployHoneypot('SSH')">Deployer</button>
             </div>
         </div>
 
-        <!-- Web Server Honeypot -->
-        <div class="honeypot-template card">
-            <div class="card-header">
-                <h3 class="card-title">Serveur Web</h3>
-                <span class="badge badge-primary">Populaire</span>
-            </div>
-            <div class="card-body">
-                <div class="template-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                        <line x1="8" y1="21" x2="16" y2="21"></line>
-                        <line x1="12" y1="17" x2="12" y2="21"></line>
-                    </svg>
-                </div>
-                <div class="template-description">
-                    <p>Simule un serveur web avec des vulnérabilités connues pour détecter les tentatives d'exploitation.</p>
-                    <ul class="feature-list">
-                        <li>Détection de SQL Injection</li>
-                        <li>Détection de XSS</li>
-                        <li>Surveillance des tentatives de brute force</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="card-footer">
-                <button class="btn btn-primary deploy-honeypot-btn" data-type="Web Server">Déployer</button>
-                <button class="btn btn-secondary">Détails</button>
-            </div>
-        </div>
-
-        <!-- FTP Honeypot -->
+              <!-- FTP Honeypot -->
         <div class="honeypot-template card">
             <div class="card-header">
                 <h3 class="card-title">FTP</h3>
@@ -102,24 +69,52 @@ export default defineComponent({
                     </svg>
                 </div>
                 <div class="template-description">
-                    <p>Simule un serveur FTP avec des vulnérabilités pour surveiller les tentatives d'accès et de téléchargement.</p>
+                    <p>Simule un serveur FTP avec des vulnerabilites pour surveiller les tentatives d'acces et de telechargement.</p>
                     <ul class="feature-list">
                         <li>Capture des identifiants</li>
-                        <li>Surveillance des téléchargements</li>
+                        <li>Surveillance des telechargements</li>
                         <li>Analyse des fichiers malveillants</li>
                     </ul>
                 </div>
             </div>
             <div class="card-footer">
-                <button class="btn btn-primary deploy-honeypot-btn" data-type="FTP">Déployer</button>
-                <button class="btn btn-secondary">Détails</button>
+                <button class="btn btn-primary deploy-honeypot-btn" @click="deployHoneypot('FTP')">Deployer</button>
+            </div>
+        </div>
+
+        <!-- Web Server Honeypot -->
+        <div class="honeypot-template card template-disabled">
+            <div class="card-header">
+                <h3 class="card-title">Serveur Web</h3>
+                <span class="badge badge-secondary">Bientot disponible</span>
+            </div>
+            <div class="card-body">
+                <div class="template-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                        <line x1="8" y1="21" x2="16" y2="21"></line>
+                        <line x1="12" y1="17" x2="12" y2="21"></line>
+                    </svg>
+                </div>
+                <div class="template-description">
+                    <p>Simule un serveur web avec des vulnerabilites connues pour detecter les tentatives d'exploitation.</p>
+                    <ul class="feature-list">
+                        <li>Detection de SQL Injection</li>
+                        <li>Detection de XSS</li>
+                        <li>Surveillance des tentatives de brute force</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="card-footer">
+                <button class="btn btn-primary deploy-honeypot-btn" disabled>Bientot disponible</button>
             </div>
         </div>
 
         <!-- SMTP Honeypot -->
-        <div class="honeypot-template card">
+        <div class="honeypot-template card template-disabled">
             <div class="card-header">
                 <h3 class="card-title">SMTP</h3>
+                <span class="badge badge-secondary">Bientot disponible</span>
             </div>
             <div class="card-body">
                 <div class="template-icon">
@@ -129,25 +124,24 @@ export default defineComponent({
                     </svg>
                 </div>
                 <div class="template-description">
-                    <p>Émule un serveur de messagerie pour capturer les tentatives de spam et de phishing.</p>
+                    <p>Emule un serveur de messagerie pour capturer les tentatives de spam et de phishing.</p>
                     <ul class="feature-list">
-                        <li>Détection de spam</li>
-                        <li>Analyse des pièces jointes</li>
+                        <li>Detection de spam</li>
+                        <li>Analyse des pieces jointes</li>
                         <li>Suivi des campagnes de phishing</li>
                     </ul>
                 </div>
             </div>
             <div class="card-footer">
-                <button class="btn btn-primary deploy-honeypot-btn" data-type="SMTP">Déployer</button>
-                <button class="btn btn-secondary">Détails</button>
+                <button class="btn btn-primary deploy-honeypot-btn" disabled>Bientot disponible</button>
             </div>
         </div>
 
         <!-- IoT Honeypot -->
-        <div class="honeypot-template card">
+        <div class="honeypot-template card template-disabled">
             <div class="card-header">
                 <h3 class="card-title">IoT</h3>
-                <span class="badge badge-info">Nouveau</span>
+                <span class="badge badge-secondary">Bientot disponible</span>
             </div>
             <div class="card-body">
                 <div class="template-icon">
@@ -161,54 +155,24 @@ export default defineComponent({
                     </svg>
                 </div>
                 <div class="template-description">
-                    <p>Émule des appareils IoT vulnérables pour détecter les botnets et autres menaces ciblant l'IoT.</p>
+                    <p>Emule des appareils IoT vulnerables pour detecter les botnets et autres menaces ciblant l'IoT.</p>
                     <ul class="feature-list">
-                        <li>Émulation de caméras IP</li>
-                        <li>Émulation de routeurs</li>
-                        <li>Détection de Mirai et autres botnets</li>
+                        <li>Emulation de cameras IP</li>
+                        <li>Emulation de routeurs</li>
+                        <li>Detection de Mirai et autres botnets</li>
                     </ul>
                 </div>
             </div>
             <div class="card-footer">
-                <button class="btn btn-primary deploy-honeypot-btn" data-type="IoT">Déployer</button>
-                <button class="btn btn-secondary">Détails</button>
-            </div>
-        </div>
-
-        <!-- LLM Honeypot -->
-        <div class="honeypot-template card">
-            <div class="card-header">
-                <h3 class="card-title">LLM</h3>
-                <span class="badge badge-warning">Avancé</span>
-            </div>
-            <div class="card-body">
-                <div class="template-icon">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="3" y1="9" x2="21" y2="9"></line>
-                        <line x1="9" y1="21" x2="9" y2="9"></line>
-                    </svg>
-                </div>
-                <div class="template-description">
-                    <p>Émule un serveur llm pour détecter les types d'attaque réalisé sur les llm vulnérables</p>
-                    <ul class="feature-list">
-                        <li>Capture des payloads</li>
-                        <li>Journalisation</li>
-                        <li>Émulation d'application</li>
-                    </ul>
-                </div>
-            </div>
-            <div class="card-footer">
-                <button class="btn btn-primary deploy-honeypot-btn" data-type="SSH">Déployer</button>
-                <button class="btn btn-secondary">Détails</button>
+                <button class="btn btn-primary deploy-honeypot-btn" disabled>Bientot disponible</button>
             </div>
         </div>
 
         <!-- Custom Honeypot -->
-        <div class="honeypot-template card">
+        <div class="honeypot-template card template-disabled">
             <div class="card-header">
-                <h3 class="card-title">Personnalisé</h3>
-                <span class="badge badge-danger">Expert</span>
+                <h3 class="card-title">Personnalise</h3>
+                <span class="badge badge-secondary">Bientot disponible</span>
             </div>
             <div class="card-body">
                 <div class="template-icon">
@@ -217,17 +181,16 @@ export default defineComponent({
                     </svg>
                 </div>
                 <div class="template-description">
-                    <p>Créez un honeypot personnalisé avec des services et des vulnérabilités spécifiques.</p>
+                    <p>Creez un honeypot personnalise avec des services et des vulnerabilites specifiques.</p>
                     <ul class="feature-list">
                         <li>Choix de services multiples</li>
-                        <li>Configurations avancées</li>
-                        <li>Scripts personnalisés</li>
+                        <li>Configurations avancees</li>
+                        <li>Scripts personnalises</li>
                     </ul>
                 </div>
             </div>
             <div class="card-footer">
-                <button class="btn btn-primary deploy-honeypot-btn" data-type="Custom">Déployer</button>
-                <button class="btn btn-secondary">Détails</button>
+                <button class="btn btn-primary deploy-honeypot-btn" disabled>Bientot disponible</button>
             </div>
         </div>
     </div>
@@ -341,6 +304,22 @@ export default defineComponent({
         margin-top: auto;
         display: flex;
         gap: 8px;
+    }
+
+    .template-disabled {
+        opacity: 0.5;
+        pointer-events: none;
+        position: relative;
+    }
+
+    .template-disabled .deploy-honeypot-btn {
+        background-color: #444;
+        cursor: not-allowed;
+    }
+
+    .badge-secondary {
+        background-color: rgba(158, 158, 158, 0.2);
+        color: #9e9e9e;
     }
 
     /* Styles pour le guide de déploiement */
