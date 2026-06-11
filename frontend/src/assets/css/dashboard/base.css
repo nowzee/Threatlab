@@ -25,19 +25,18 @@ body {
 }
 
 #deconnexion:hover{
-    background-color: rgba(239, 28, 67, 0.76);
+    background-color: var(--danger-color);
     transition: all 0.2s ease;
-    border-color: rgba(239, 28, 67, 0.76);
+    border-color: var(--danger-color);
 }
 
 .container-main {
     position: relative;
     margin: 16px;
-    background-color: transparent; /* var(--container-background) */
+    background-color: transparent;
     flex-grow: 1;
     height: calc(100vh - 32px);
     border-radius: 12px;
-    border: 0 solid var(--container-border-color); /* 1px solid var(--container-border-color)*/
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
     overflow: auto;
     scrollbar-width: thin;
@@ -75,16 +74,6 @@ body {
     border: 1px solid var(--container-border-color);
 }
 
-.card-title {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 16px;
-    color: var(--white);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
 .content-wrapper {
     padding: 24px;
     animation: fadeIn 0.4s ease;
@@ -95,10 +84,6 @@ body {
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
     gap: 24px;
     margin-bottom: 24px;
-}
-
-.deconnexion:hover{
-    background-color: rgba(255, 58, 94, 0.1);
 }
 
 .flex-container {

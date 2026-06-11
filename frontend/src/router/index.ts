@@ -7,14 +7,16 @@ import A2FView from '@/views/auth/a2f.vue'
 import DashboardView from '@/views/DashboardView.vue'
 import home from '@/views/dashboard/home.vue'
 import deploy from '@/views/dashboard/honeypot/deploy.vue'
-import agentCreation from '@/views/dashboard/honeypot/agent-creation.vue'
+import agentCreationWizard from '@/views/dashboard/honeypot/agent-creation-wizard.vue'
 import threatIntel from '@/views/dashboard/CTI/threat-intel.vue'
 import alerts from '@/views/dashboard/alert/alerts.vue'
 import alertDetails from '@/views/dashboard/alert/alert-details.vue'
 import honeypotManagement from '@/views/dashboard/honeypot/honeypot-management.vue'
+import honeypotDetail from '@/views/dashboard/honeypot/honeypot-detail.vue'
 import settings from '@/views/dashboard/settings/settings.vue'
 import security_settings from "@/views/dashboard/settings/security.vue";
 import api_settings from "@/views/dashboard/settings/api.vue";
+import wordlists from "@/views/dashboard/wordlists/wordlists.vue"
 
 
 const routes = [
@@ -25,22 +27,24 @@ const routes = [
     component: DashboardView,
     meta: { public: false },
     children: [
-      { path: '', redirect: { name: 'home' } },
-      { path: 'home', name: 'home', component: home },
-      { path: 'deploy', name: 'deploy', component: deploy },
-      { path: 'agent-creation', name: 'agent-creation', component: agentCreation },
-      { path: 'honeypot-management', name: 'honeypot-management', component: honeypotManagement },
-      { path: 'threat-intel', name: 'threat-intel', component: threatIntel },
-      { path: 'alerts', name: 'alerts', component: alerts },
-      { path: 'alert-details/:id', name: 'alert-details', component: alertDetails },
-      { path: 'settings', name: 'settings', component: settings,
-      children: [
-          { path: '', redirect: { name: 'security_settings' } },
-          { path: 'security', name: 'security_settings', component: security_settings },
-          { path: 'api', name: 'api_settings', component: api_settings}
-      ]},
-    ],
-  },
+        { path: '', redirect: { name: 'home' } },
+        { path: 'home', name: 'home', component: home },
+        { path: 'deploy', name: 'deploy', component: deploy },
+        { path: 'agent-creation/:type', name: 'agent-creation', component: agentCreationWizard },
+        { path: 'honeypot-management', name: 'honeypot-management', component: honeypotManagement },
+        { path: 'honeypot-detail/:id', name: 'honeypot-detail', component: honeypotDetail },
+        { path: 'threat-intel', name: 'threat-intel', component: threatIntel },
+        { path: 'alerts', name: 'alerts', component: alerts },
+        { path: 'alert-details/:id', name: 'alert-details', component: alertDetails },
+        { path: 'wordlists', name: 'wordlists', component: wordlists },
+        { path: 'settings', name: 'settings', component: settings,
+        children: [
+            { path: '', redirect: { name: 'security_settings' } },
+            { path: 'security', name: 'security_settings', component: security_settings },
+            { path: 'api', name: 'api_settings', component: api_settings}
+        ]},
+        ],
+    },
   { path: '/a2f', name: 'a2f', component: A2FView, meta: { public: true } },
 
   // Route catch-all dynamique basée sur l'authentification
