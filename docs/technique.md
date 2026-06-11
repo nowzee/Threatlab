@@ -233,7 +233,24 @@ Commandes (exemples à adapter):
   - SemVer pour versions
   - Conventional Commits pour messages
 
-## 15. Déploiement
+## 15. Tests du Projet
+
+Le projet dispose d'une suite de tests automatisés utilisant `pytest`.
+
+### Architecture des tests
+- **Tests Unitaires (`backend/tests/unit/`)** : Testent les fonctions et classes individuellement en isolant les dépendances (ex: base de données) via des mocks.
+- **Tests d'Intégration (`backend/tests/integration/`)** : Testent les routes API Flask et les interactions entre les modules.
+
+### Exécution des tests
+Pour exécuter la suite de tests complète avec un rapport de couverture de code :
+```bash
+./run_tests.sh
+```
+
+### Script de santé global
+Le script `docs/test_project.py` peut également être utilisé pour vérifier la santé globale de l'environnement (connexions DB réelles, présence des tables, endpoints API actifs).
+
+## 16. Déploiement
 
 - Conteneurisation (recommandée):
   - Image backend Python slim

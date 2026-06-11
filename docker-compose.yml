@@ -1,0 +1,58 @@
+services:
+  db:
+    build: ./database
+    container_name: threatlabs-db
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: threatlabs
+      MYSQL_USER: threatlabs_user
+      MYSQL_PASSWORD: threatlabs_password
+    ports:
+      - "127.0.0.1:3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - threatlabs-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-proot_password"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 30s
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: threatlabs-backend
+    restart: always
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      - DB_HOST=db
+      - DB_USER=threatlabs_user
+      - DB_PASSWORD=threatlabs_password
+      - DB_NAME=threatlabs
+      - DB_TYPE=mysql
+    ports:
+      - "5000:5000"
+    volumes:
+      - backend_secrets:/app/secrets
+    networks:
+      - threatlabs-network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import ssl, urllib.request; ctx = ssl._create_unverified_context(); urllib.request.urlopen('https://localhost:5000', context=ctx).read()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  threatlabs-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  backend_secrets:

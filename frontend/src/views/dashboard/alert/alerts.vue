@@ -141,7 +141,6 @@ export default defineComponent({
         if (response.ok) {
           const data = await response.json()
           alerts.value = data
-          console.log('Alerts loaded:', data)
         } else {
           console.error('Error fetching alerts:', response.statusText)
         }
@@ -166,7 +165,6 @@ const generateTimelineData = async (timeline: string = '24h') => {
     if (response.ok) {
       const data = await response.json()
       attackWaves.value = data
-      console.log('Timeline data loaded:', data)
     } else {
       console.error('Error fetching timeline data:', response.statusText)
     }

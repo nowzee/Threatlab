@@ -9,7 +9,7 @@ interface MetricData {
   ip_count: number
   Sample_downloaded: number
   tentative_access: number
-  active_honeypot: number
+  number_honeypot: number
 }
 
 interface LogData {
@@ -43,7 +43,7 @@ export default defineComponent({
       ip_count: 0,
       Sample_downloaded: 0,
       tentative_access: 0,
-      active_honeypot: 0
+      number_honeypot: 0
     })
 
     const logs = ref<LogData[]>([])
@@ -331,8 +331,8 @@ export default defineComponent({
                         </svg>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value">{{ isLoading ? '‎' : metrics.active_honeypot }}</div>
-                        <div class="stat-label">Honeypots actifs</div>
+                        <div class="stat-value">{{ isLoading ? '‎' : metrics.number_honeypot }}</div>
+                        <div class="stat-label">Nombre de honeypot</div>
                     </div>
                 </div>
             </div>
