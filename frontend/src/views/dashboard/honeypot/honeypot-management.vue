@@ -4,53 +4,20 @@ import { defineComponent, ref, computed, onMounted } from 'vue'
 interface Honeypot {
   id: number
   name: string
-  type: 'SSH' | 'HTTP' | 'FTP' | 'SMTP' | 'Telnet'
-  status: 'active' | 'inactive' | 'error'
+  type: string
   ip: string
-  group: string
   created_at: string
   last_activity: string
   alerts_count: number
-  integrations: {
-    elk_enabled: boolean
-    elk_url: string
-    opencti_enabled: boolean
-    opencti_url: string
-  }
-}
-
-interface HoneypotGroup {
-  name: string
 }
 
 export default defineComponent({
   name: "HoneypotManagementView",
   setup() {
-
-    // États réactifs
     const honeypots = ref<Honeypot[]>([])
-    const groups = ref<HoneypotGroup[]>([])
     const selectedHoneypots = ref<number[]>([])
-    const showCreateModal = ref(false)
-    const showGroupModal = ref(false)
     const showDeleteConfirm = ref(false)
-    const showIntegrationModal = ref(false)
-    const currentHoneypot = ref<Honeypot | null>(null)
-    const filterGroup = ref<string>('all')
-    const filterStatus = ref<string>('all')
     const searchQuery = ref('')
-
-    const groupForm = ref({
-      name: '',
-      description: '',
-    })
-
-    const integrationForm = ref({
-      elk_enabled: false,
-      elk_url: '',
-      opencti_enabled: false,
-      opencti_url: ''
-    })
 
     const loadHoneypots = async () => {
       try {
@@ -58,188 +25,65 @@ export default defineComponent({
           method: 'GET',
           headers: { 'Content-Type': 'application/json' }
         })
-        if (!response.ok) {
-          throw new Error("Erreur API")
-        }
-        const data = await response.json()
+        if (!response.ok) throw new Error("Erreur API")
 
+        const data = await response.json()
         honeypots.value = data.map((item: any) => ({
           id: item.id,
           name: item.agent_name,
-          type: (item.service_type || 'SSH') as 'SSH' | 'HTTP' | 'FTP' | 'SMTP' | 'Telnet',
-          status: item.is_active ? 'active' : 'inactive',
+          type: (item.service_type || 'ssh').toUpperCase(),
           ip: item.ip_address,
-          group: item.groupe || 'default',
           created_at: item.created_at || '',
           last_activity: item.updated_at || '',
-          alerts_count: item.alert_generated || 0,
-          integrations: {
-            elk_enabled: false,
-            elk_url: '',
-            opencti_enabled: false,
-            opencti_url: ''
-          }
+          alerts_count: item.alert_generated || 0
         }))
-        const names = new Set<string>()
-
-        data.forEach((item: any) => {
-        names.add(item.groupe || "default")
-        })
-
-        groups.value = []
-        names.forEach((name: string) => {
-          groups.value.push({name})
-        })
-
       } catch (error) {
         console.error("Erreur lors du chargement des honeypots:", error)
       }
     }
 
-    // Honeypots filtrés
     const filteredHoneypots = computed(() => {
-      let filtered = honeypots.value
-      if (filterGroup.value !== 'all') {
-        filtered = filtered.filter(h => h.group === filterGroup.value)
-      }
-      if (filterStatus.value !== 'all') {
-        filtered = filtered.filter(h => h.status === filterStatus.value)
-      }
-      if (searchQuery.value.trim()) {
-        const query = searchQuery.value.toLowerCase()
-        filtered = filtered.filter(h =>
-          h.name.toLowerCase().includes(query) ||
-          h.type.toLowerCase().includes(query) ||
-          h.ip.includes(query)
-        )
-      }
-      return filtered
+      if (!searchQuery.value.trim()) return honeypots.value
+      const query = searchQuery.value.toLowerCase()
+      return honeypots.value.filter(h =>
+        h.name.toLowerCase().includes(query) ||
+        h.type.toLowerCase().includes(query) ||
+        h.ip.includes(query)
+      )
     })
-
-    // Fonctions utilitaires
-    const getStatusClass = (status: string) => {
-      switch (status) {
-        case 'active': return 'status-active'
-        case 'inactive': return 'status-inactive'
-        case 'error': return 'status-error'
-        default: return 'status-inactive'
-      }
-    }
-
-    const getStatusText = (status: string) => {
-      switch (status) {
-        case 'active': return 'Actif'
-        case 'inactive': return 'Inactif'
-        case 'error': return 'Erreur'
-        default: return 'Inconnu'
-      }
-    }
-
-    const getTypeIcon = (type: string) => {
-      switch (type) {
-        case 'SSH': return 'M2 3h20v18H2z'
-        case 'HTTP': return 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z'
-        case 'FTP': return 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z'
-        case 'SMTP': return 'M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z'
-        case 'Telnet': return 'M2 3h20v18H2z'
-        default: return 'M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z'
-      }
-    }
-
-    const openIntegrationModal = (honeypot: Honeypot) => {
-      currentHoneypot.value = honeypot
-      integrationForm.value = {
-        elk_enabled: honeypot.integrations.elk_enabled,
-        elk_url: honeypot.integrations.elk_url,
-        opencti_enabled: honeypot.integrations.opencti_enabled,
-        opencti_url: honeypot.integrations.opencti_url
-      }
-      showIntegrationModal.value = true
-    }
-
-    const openGroupModal = () => {
-      groupForm.value = { name: '', description: ''}
-      showGroupModal.value = true
-    }
-
-    const createGroup = async () => {
-      const newGroup: HoneypotGroup = {
-        name: groupForm.value.name,
-      }
-      const response = await fetch('api/agent/manage/create_group', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({group_name: groupForm.value.name})
-      })
-
-      const result = await response.json()
-      if (result.success) {
-
-        groups.value.push(newGroup)
-        showGroupModal.value = false
-      }
-    }
-
-    const uniqueGroupsCount = computed(() => {
-    const groupsSet = new Set(honeypots.value.map(h => h.group))
-        return groupsSet.size
-    })
-
-    const saveIntegrations = () => {
-      if (currentHoneypot.value) {
-        const index = honeypots.value.findIndex(h => h.id === currentHoneypot.value!.id)
-        if (index !== -1 && honeypots.value[index]) {
-          honeypots.value[index].integrations = {
-            elk_enabled: integrationForm.value.elk_enabled,
-            elk_url: integrationForm.value.elk_url,
-            opencti_enabled: integrationForm.value.opencti_enabled,
-            opencti_url: integrationForm.value.opencti_url
-          }
-        }
-      }
-      showIntegrationModal.value = false
-    }
-
-    const toggleHoneypot = (honeypot: Honeypot) => {
-      const index = honeypots.value.findIndex(h => h.id === honeypot.id)
-      if (index !== -1 && honeypots.value[index]) {
-        honeypots.value[index].status = honeypot.status === 'active' ? 'inactive' : 'active'
-      }
-    }
 
     const deleteSelected = async () => {
-    try {
-    for (const id of selectedHoneypots.value) {
-      const response = await fetch('/api/agent/manage/delete', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ agent_id: id })
-      })
-
-      if (!response.ok) {
-        console.error(`Erreur lors de la suppression de l'agent ${id}`)
-      } else {
-        const result = await response.json()
-        if (!result.success) {
-          console.error(`Suppression échouée pour l'agent ${id}`)
+      const deleted: typeof selectedHoneypots.value = []
+      let hadError = false
+      try {
+        for (const id of selectedHoneypots.value) {
+          try {
+            const response = await fetch('/api/agent/manage/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ agent_id: id })
+            })
+            const data = await response.json().catch(() => ({}))
+            // Ne retirer de la liste que si le backend confirme la suppression.
+            if (response.ok && data.success) {
+              deleted.push(id)
+            } else {
+              hadError = true
+              console.error(`Erreur suppression agent ${id}`)
+            }
+          } catch (e) {
+            hadError = true
+            console.error(`Erreur suppression agent ${id}:`, e)
+          }
         }
+      } finally {
+        honeypots.value = honeypots.value.filter(h => !deleted.includes(h.id))
+        selectedHoneypots.value = []
+        showDeleteConfirm.value = false
+        // En cas d'échec partiel, resynchroniser avec l'état réel du serveur.
+        if (hadError) await loadHoneypots()
       }
     }
-
-    // Mise à jour locale de la liste
-    honeypots.value = honeypots.value.filter(h => !selectedHoneypots.value.includes(h.id))
-    selectedHoneypots.value = []
-    showDeleteConfirm.value = false
-
-  } catch (error) {
-    console.error("Erreur lors de la suppression :", error)
-  }
-}
-
 
     const selectAll = () => {
       if (selectedHoneypots.value.length === filteredHoneypots.value.length) {
@@ -249,79 +93,32 @@ export default defineComponent({
       }
     }
 
-    const closeModals = () => {
-      showCreateModal.value = false
-      showGroupModal.value = false
-      showDeleteConfirm.value = false
-      showIntegrationModal.value = false
-    }
-
-    onMounted(() => {
-      loadHoneypots()
-    })
+    onMounted(() => { loadHoneypots() })
 
     return {
-      uniqueGroupsCount,
       honeypots,
-      groups,
       selectedHoneypots,
       filteredHoneypots,
-      showCreateModal,
-      showGroupModal,
       showDeleteConfirm,
-      showIntegrationModal,
-      currentHoneypot,
-      filterGroup,
-      filterStatus,
       searchQuery,
-      groupForm,
-      integrationForm,
-      getStatusClass,
-      getStatusText,
-      getTypeIcon,
-      openIntegrationModal,
-      openGroupModal,
-      createGroup,
-      saveIntegrations,
-      toggleHoneypot,
       deleteSelected,
-      selectAll,
-      closeModals
+      selectAll
     }
   }
 })
 </script>
 
-
 <template>
   <div class="content-wrapper">
-    <!-- En-tête -->
-    <h1 class="page-title">
-        Gestion des Honeypots
-    </h1>
+    <h1 class="page-title">Gestion des Honeypots</h1>
 
-    <!-- Statistiques rapides -->
-      <div class="stats-grid">
-        <div class="card active card-body stat-card">
-          <div class="stat-icon">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <circle cx="12" cy="12" r="10"></circle>
-              <polyline points="8 12 12 16 16 12"></polyline>
-            </svg>
-          </div>
-          <div class="stat-content">
-            <div class="stat-value">{{ honeypots.filter(h => h.status === 'active').length }}</div>
-            <div class="stat-label">Honeypots Actifs</div>
-          </div>
-        </div>
-
-      <div class="card active card-body stat-card total">
-        <div class="stat-icon">
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="card card-body stat-card">
+        <div class="stat-icon icon-total">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M21 11V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h6"></path>
-            <path d="M12 16H7"></path>
-            <path d="M12 12H7"></path>
-            <path d="M12 8H7"></path>
+            <path d="M12 12H7"></path><path d="M12 8H7"></path>
           </svg>
         </div>
         <div class="stat-content">
@@ -330,23 +127,8 @@ export default defineComponent({
         </div>
       </div>
 
-      <div class="card active card-body stat-card groups">
-        <div class="stat-icon">
-          <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-        </div>
-        <div class="stat-content">
-          <div class="stat-value">{{ uniqueGroupsCount }}</div>
-          <div class="stat-label">Groupes</div>
-        </div>
-      </div>
-
-      <div class="card active card-body stat-card alerts">
-        <div class="stat-icon">
+      <div class="card card-body stat-card">
+        <div class="stat-icon icon-alerts">
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
             <line x1="12" y1="9" x2="12" y2="13"></line>
@@ -355,255 +137,79 @@ export default defineComponent({
         </div>
         <div class="stat-content">
           <div class="stat-value">{{ honeypots.reduce((sum, h) => sum + h.alerts_count, 0) }}</div>
-          <div class="stat-label">Alertes Générées</div>
+          <div class="stat-label">Alertes Generees</div>
         </div>
       </div>
     </div>
 
-    <!-- Contrôles et filtres -->
+    <!-- Controls -->
     <div class="controls-section">
       <div class="controls-left">
-
-        <button class="btn btn-secondary" @click="openGroupModal">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-            <circle cx="9" cy="7" r="4"></circle>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-          </svg>
-          Nouveau Groupe
-        </button>
-
-        <button
-          class="btn btn-danger"
-          @click="showDeleteConfirm = true"
-          :disabled="selectedHoneypots.length === 0">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="3 6 5 6 21 6"></polyline>
-            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-          </svg>
-          Supprimer
+        <button class="btn btn-danger" @click="showDeleteConfirm = true" :disabled="selectedHoneypots.length === 0">
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+          Supprimer ({{ selectedHoneypots.length }})
         </button>
       </div>
-
       <div class="controls-right">
         <div class="search-container">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <circle cx="11" cy="11" r="8"></circle>
-            <path d="M21 21l-4.35-4.35"></path>
-          </svg>
-          <input
-            type="text"
-            placeholder="Rechercher un honeypot..."
-            v-model="searchQuery"
-            class="search-input">
-        </div>
-
-        <select v-model="filterGroup" class="filter-select">
-          <option value="all">Tous les groupes</option>
-          <option v-for="group in groups" :value="group.name">
-            {{ group.name }}
-          </option>
-        </select>
-
-        <select v-model="filterStatus" class="filter-select">
-          <option value="all">Tous les statuts</option>
-          <option value="active">Actif</option>
-          <option value="inactive">Inactif</option>
-          <option value="error">Erreur</option>
-        </select>
-      </div>
-    </div>
-
-    <!-- Liste des honeypots -->
-    <div class="content-section">
-      <div class="table-container">
-        <div class="table-header">
-          <h2 class="table-title">Honeypots</h2>
-        </div>
-
-        <div class="modern-table">
-          <table class="honeypots-table">
-            <thead>
-              <tr>
-                <th width="40">
-                  <input
-                    type="checkbox"
-                    @change="selectAll"
-                    :checked="selectedHoneypots.length === filteredHoneypots.length && filteredHoneypots.length > 0">
-                </th>
-                <th>Nom</th>
-                <th>Type</th>
-                <th>Statut</th>
-                <th>Adresse IP</th>
-                <th>Groupe</th>
-                <th>Alertes</th>
-                <th>Dernière Activité</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="honeypot in filteredHoneypots"
-                  :key="honeypot.id"
-                  class="honeypot-row"
-                  :class="'status-' + honeypot.status">
-                <td>
-                  <input
-                    type="checkbox"
-                    :value="honeypot.id"
-                    v-model="selectedHoneypots">
-                </td>
-                <td class="name-cell">
-                  <div class="honeypot-name">
-                    <div class="name-info">
-                      <div class="name-primary">{{ honeypot.name }}</div>
-                      <div class="name-secondary">ID: {{ honeypot.id }}</div>
-                    </div>
-                  </div>
-                </td>
-                <td>
-                  <span class="type-badge" :class="'type-' + honeypot.type.toLowerCase()">
-                    {{ honeypot.type }}
-                  </span>
-                </td>
-                <td>
-                  <div class="status-cell">
-                    <span class="status-indicator" :class="getStatusClass(honeypot.status)">
-                      {{ getStatusText(honeypot.status) }}
-                    </span>
-                  </div>
-                </td>
-                <td>
-                  <code class="ip-address">{{ honeypot.ip }}</code>
-                </td>
-                <td>
-                  <span class="group-badge">{{ honeypot.group }}</span>
-                </td>
-                <td class="alerts-cell">
-                  <div class="alerts-count">{{ honeypot.alerts_count }}</div>
-                </td>
-                <td class="activity-cell">
-                  <time class="last-activity">{{ honeypot.last_activity }}</time>
-                </td>
-                <td class="actions-cell">
-                  <div class="action-buttons">
-                    <button
-                      class="action-btn integration"
-                      @click="openIntegrationModal(honeypot)"
-                      title="Configurer les intégrations">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
-                        <polyline points="7.5 4.21 12 6.81 16.5 4.21"></polyline>
-                        <polyline points="7.5 19.79 7.5 14.6 3 12"></polyline>
-                        <polyline points="21 12 16.5 14.6 16.5 19.79"></polyline>
-                      </svg>
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="M21 21l-4.35-4.35"></path></svg>
+          <input type="text" placeholder="Rechercher..." v-model="searchQuery" class="search-input">
         </div>
       </div>
     </div>
 
-    <!-- Modal Création Groupe -->
-    <div v-if="showGroupModal" class="modal-overlay" @click="closeModals">
+    <!-- Table -->
+    <div class="table-wrap">
+      <table class="honeypots-table">
+        <thead>
+          <tr>
+            <th width="40">
+              <input type="checkbox" @change="selectAll" :checked="selectedHoneypots.length === filteredHoneypots.length && filteredHoneypots.length > 0">
+            </th>
+            <th>Nom</th>
+            <th>Type</th>
+            <th>Adresse IP</th>
+            <th>Alertes</th>
+            <th>Derniere Activite</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="honeypot in filteredHoneypots" :key="honeypot.id">
+            <td><input type="checkbox" :value="honeypot.id" v-model="selectedHoneypots"></td>
+            <td>
+              <div class="name-primary">{{ honeypot.name }}</div>
+              <div class="name-secondary">ID: {{ honeypot.id }}</div>
+            </td>
+            <td><span class="type-badge">{{ honeypot.type }}</span></td>
+            <td><code class="ip-address">{{ honeypot.ip }}</code></td>
+            <td class="alerts-cell">{{ honeypot.alerts_count }}</td>
+            <td class="activity-cell">{{ honeypot.last_activity }}</td>
+            <td>
+              <router-link :to="{ name: 'honeypot-detail', params: { id: honeypot.id } }" class="action-btn" title="Details">
+                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+              </router-link>
+            </td>
+          </tr>
+          <tr v-if="filteredHoneypots.length === 0">
+            <td colspan="7" class="empty-state">Aucun honeypot trouve</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Delete Confirm Modal -->
+    <div v-if="showDeleteConfirm" class="modal-overlay" @click="showDeleteConfirm = false">
       <div class="modal-container" @click.stop>
         <div class="modal-header">
-          <h3>Créer un Nouveau Groupe</h3>
-          <button class="modal-close-btn" @click="closeModals">×</button>
-        </div>
-        <div class="modal-content">
-          <div class="form-group">
-            <label>Nom du groupe</label>
-            <input type="text" v-model="groupForm.name" placeholder="Ex: Production">
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" @click="closeModals">Annuler</button>
-          <button class="btn btn-primary" @click="createGroup">Créer</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal Intégrations -->
-    <div v-if="showIntegrationModal" class="modal-overlay" @click="closeModals">
-      <div class="modal-container large" @click.stop>
-        <div class="modal-header">
-          <h3>Configurer les Intégrations - {{ currentHoneypot?.name }}</h3>
-          <button class="modal-close-btn" @click="closeModals">×</button>
-        </div>
-        <div class="modal-content">
-          <div class="integration-section">
-            <div class="integration-header">
-              <div class="integration-icon elk">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M3 3l7.07 16.97 2.51-7.39 7.39-2.51L3 3z"></path>
-                  <path d="M13 13l6 6"></path>
-                </svg>
-              </div>
-              <div class="integration-info">
-                <h4>Elastic Stack (ELK)</h4>
-                <p>Redirection des logs vers Elasticsearch</p>
-              </div>
-              <label class="switch">
-                <input type="checkbox" v-model="integrationForm.elk_enabled">
-                <span class="slider"></span>
-              </label>
-            </div>
-            <div v-if="integrationForm.elk_enabled" class="integration-config">
-              <div class="form-group">
-                <label>URL Elasticsearch</label>
-                <input type="url" v-model="integrationForm.elk_url" placeholder="https://elastic.company.com:9200">
-              </div>
-            </div>
-          </div>
-
-          <div class="integration-section">
-            <div class="integration-header">
-              <div class="integration-icon opencti">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                </svg>
-              </div>
-              <div class="integration-info">
-                <h4>OpenCTI</h4>
-                <p>Enrichissement avec la Threat Intelligence</p>
-              </div>
-              <label class="switch">
-                <input type="checkbox" v-model="integrationForm.opencti_enabled">
-                <span class="slider"></span>
-              </label>
-            </div>
-            <div v-if="integrationForm.opencti_enabled" class="integration-config">
-              <div class="form-group">
-                <label>URL OpenCTI</label>
-                <input type="url" v-model="integrationForm.opencti_url" placeholder="https://opencti.company.com">
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" @click="closeModals">Annuler</button>
-          <button class="btn btn-primary" @click="saveIntegrations">Enregistrer</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Modal Confirmation Suppression -->
-    <div v-if="showDeleteConfirm" class="modal-overlay" @click="closeModals">
-      <div class="modal-container danger" @click.stop>
-        <div class="modal-header">
           <h3>Confirmer la Suppression</h3>
-          <button class="modal-close-btn" @click="closeModals">×</button>
+          <button class="modal-close-btn" @click="showDeleteConfirm = false">x</button>
         </div>
-        <div class="modal-content">
-          <p>Êtes-vous sûr de vouloir supprimer {{ selectedHoneypots.length }} honeypot(s) ?</p>
-          <p class="warning-text">Cette action est irréversible.</p>
+        <div class="modal-body">
+          <p>Supprimer {{ selectedHoneypots.length }} honeypot(s) ? Cette action est irreversible.</p>
         </div>
-        <div class="modal-actions">
-          <button class="btn btn-secondary" @click="closeModals">Annuler</button>
+        <div class="modal-footer">
+          <button class="btn btn-secondary" @click="showDeleteConfirm = false">Annuler</button>
           <button class="btn btn-danger" @click="deleteSelected">Supprimer</button>
         </div>
       </div>
@@ -612,15 +218,6 @@ export default defineComponent({
 </template>
 
 <style scoped>
-
-.status-indicator {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 20px;
-}
-
-/* Stats grid */
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -628,41 +225,18 @@ export default defineComponent({
   margin-bottom: 32px;
 }
 
-.active .stat-icon {
-  background: rgba(0, 230, 118, 0.2);
-  color: #00e676;
-}
+.icon-total { background: rgba(30, 84, 229, 0.2); color: #1e54e5; }
+.icon-alerts { background: rgba(255, 58, 94, 0.2); color: #ff3a5e; }
 
-.total .stat-icon {
-  background: rgba(30, 84, 229, 0.2);
-  color: #1e54e5;
-}
-
-.groups .stat-icon {
-  background: rgba(255, 183, 77, 0.2);
-  color: #ffb74d;
-}
-
-.alerts .stat-icon {
-  background: rgba(255, 58, 94, 0.2);
-  color: #ff3a5e;
-}
-
-/* Contrôles */
 .controls-section {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 32px;
-  gap: 24px;
+  margin-bottom: 24px;
+  gap: 16px;
 }
 
-.controls-left {
-  display: flex;
-  gap: 12px;
-}
-
-.controls-right {
+.controls-left, .controls-right {
   display: flex;
   gap: 12px;
   align-items: center;
@@ -678,7 +252,6 @@ export default defineComponent({
   position: absolute;
   left: 12px;
   color: var(--text-color-muted);
-  z-index: 1;
 }
 
 .search-input {
@@ -688,315 +261,98 @@ export default defineComponent({
   border-radius: 8px;
   color: var(--white);
   font-size: 14px;
-  width: 300px;
+  width: 280px;
 }
 
-.search-input::placeholder {
-  color: var(--text-color-muted);
-}
+.search-input::placeholder { color: var(--text-color-muted); }
 
-.filter-select {
-  padding: 10px 16px;
+.table-wrap {
   background: var(--container-background-lighter);
   border: 1px solid var(--container-border-color);
-  border-radius: 8px;
-  color: var(--white);
-  font-size: 14px;
-  min-width: 150px;
-}
-
-/* Table */
-.content-section {
-  margin-bottom: 32px;
-}
-
-.table-container {
-  background: var(--container-background-lighter);
-  border: 1px solid var(--container-border-color);
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
-}
-
-.table-header {
-  padding: 24px 32px;
-  border-bottom: 1px solid var(--container-border-color);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.table-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: var(--white);
-  margin: 0;
-}
-
-.modern-table {
-  overflow-x: auto;
 }
 
 .honeypots-table {
   width: 100%;
-  border-collapse: separate;
-  border-spacing: 0;
+  border-collapse: collapse;
 }
 
-.honeypots-table thead th {
+.honeypots-table th {
   background: var(--table-header-bg);
   color: var(--text-color-muted);
-  font-weight: 500;
-  font-size: 14px;
-  letter-spacing: 0.5px;
-  padding: 16px 24px;
+  font-weight: 600;
+  font-size: 13px;
+  padding: 14px 20px;
   text-align: left;
   border-bottom: 1px solid var(--container-border-color);
 }
 
-.honeypot-row {
-  border-bottom: 1px solid var(--table-border);
-  transition: all 0.1s ease;
-}
-
-.honeypot-row:hover {
-  background: var(--table-row-hover);
-}
-
 .honeypots-table td {
-  padding: 20px 24px;
-  vertical-align: middle;
-}
-
-.name-cell {
-  min-width: 200px;
-}
-
-.honeypot-name {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.name-primary {
-  font-weight: 600;
-  color: var(--white);
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--container-border-color);
   font-size: 14px;
+  color: var(--white);
 }
 
-.name-secondary {
-  font-size: 12px;
-  color: var(--text-color-muted);
-  font-family: 'Courier New', monospace;
-}
+.honeypots-table tr:hover { background: var(--table-row-hover); }
+
+.name-primary { font-weight: 600; font-size: 14px; }
+.name-secondary { font-size: 12px; color: var(--text-color-muted); font-family: monospace; }
 
 .type-badge {
-  padding: 4px 8px;
+  padding: 4px 10px;
   border-radius: 12px;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  background: rgba(30, 84, 229, 0.2);
+  color: #42a5f5;
 }
 
 .ip-address {
-  padding: 6px 10px;
-  font-family: 'Courier New', monospace;
-  font-weight: 600;
+  padding: 4px 8px;
+  font-family: monospace;
   font-size: 13px;
+  background: rgba(255,255,255,0.05);
+  border-radius: 4px;
 }
 
-.group-badge {
-  background: rgba(255, 255, 255, 0.1);
-  color: var(--white);
-  padding: 6px 12px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.alerts-count {
-  font-size: 18px;
-  font-weight: 400;
-  color: #ff3a5e;
-  text-align: center;
-}
-
-.last-activity {
-  font-family: 'Courier New', monospace;
-  font-size: 12px;
-  color: var(--text-color-muted);
-}
-
-.action-buttons {
-  display: flex;
-  gap: 8px;
-}
+.alerts-cell { color: #ff3a5e; font-weight: 600; }
+.activity-cell { font-size: 12px; color: var(--text-color-muted); font-family: monospace; }
 
 .action-btn {
   width: 32px;
   height: 32px;
   border-radius: 8px;
-  border: none;
-  display: flex;
+  background: rgba(0, 230, 118, 0.15);
+  color: #00e676;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  text-decoration: none;
+  transition: background 0.2s;
 }
 
-.action-btn.toggle {
-  background: rgba(0, 230, 118, 0.2);
-  color: #00e676;
+.action-btn:hover { background: rgba(0, 230, 118, 0.25); }
+
+.empty-state {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-color-muted);
+  font-style: italic;
 }
 
-.action-btn.toggle:hover {
-  background: rgba(0, 230, 118, 0.3);
-}
-
-.action-btn.integration {
-  background: rgba(30, 84, 229, 0.2);
-  color: #1e54e5;
-}
-
-.action-btn.integration:hover {
-  background: rgba(30, 84, 229, 0.3);
-}
-
-.modal-content {
-  padding: 32px;
-}
-
-.modal-actions {
-  padding: 24px 32px;
+.modal-footer {
+  padding: 16px 24px;
   border-top: 1px solid var(--container-border-color);
   display: flex;
   gap: 12px;
   justify-content: flex-end;
 }
 
-.form-group label {
-  display: block;
-  color: var(--white);
-  font-weight: 600;
-  margin-bottom: 8px;
-  font-size: 14px;
-}
-
-.form-group input,
-.form-group select,
-.form-group textarea {
-  width: 80%;
-  padding: 12px 16px;
-  background: var(--container-background);
-  border: 1px solid var(--container-border-color);
-  border-radius: 8px;
-  color: var(--white);
-  font-size: 14px;
-}
-
-.form-group textarea {
-  resize: vertical;
-  min-height: 80px;
-}
-
-/* Intégrations */
-.integration-section {
-  background: rgba(255, 255, 255, 0.02);
-  border-radius: 12px;
-  padding: 20px;
-  margin-bottom: 20px;
-}
-
-.integration-header {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.integration-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.integration-icon.elk {
-  background: rgba(255, 183, 77, 0.2);
-  color: #ffb74d;
-}
-
-.integration-icon.opencti {
-  background: rgba(30, 84, 229, 0.2);
-  color: #1e54e5;
-}
-
-.integration-info {
-  flex: 1;
-}
-
-.integration-info h4 {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--white);
-  margin: 0 0 4px 0;
-}
-
-.integration-info p {
-  font-size: 14px;
-  color: var(--text-color-muted);
-  margin: 0;
-}
-
-.integration-config {
-  padding-left: 56px;
-}
-
-/* Switch */
-.switch {
-  position: relative;
-  display: inline-block;
-  width: 60px;
-  height: 34px;
-}
-
-.switch input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-.slider {
-  position: absolute;
-  cursor: pointer;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: #333;
-  transition: .4s;
-  border-radius: 34px;
-}
-
-.slider:before {
-  position: absolute;
-  content: "";
-  height: 26px;
-  width: 26px;
-  left: 4px;
-  bottom: 4px;
-  background-color: white;
-  transition: .4s;
-  border-radius: 50%;
-}
-
-input:checked + .slider {
-  background-color: var(--accent-color);
-}
-
-input:checked + .slider:before {
-  transform: translateX(26px);
+@media (max-width: 768px) {
+  .controls-section { flex-direction: column; }
+  .search-input { width: 100%; }
 }
 </style>

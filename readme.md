@@ -16,6 +16,10 @@ Threatlab est une plateforme centralisée pour déployer, superviser et orchestr
 
 ---
 
+## Exemple
+<img width="1885" height="994" alt="image" src="https://github.com/user-attachments/assets/1d367251-0ff1-4ada-bbdb-92b2ca48d810" />
+
+
 ## Fonctionnalités
 
 - **Gestion des honeypots**
@@ -41,29 +45,33 @@ Threatlab est une plateforme centralisée pour déployer, superviser et orchestr
 
 ### Prérequis
 - Python 3.10+
-- Node.js et npm (pour builder le frontend)
+- Node.js et npm
 - Accès internet pour installer les dépendances
+- docker compose
 
-### Étapes
+### Install & setup
 
-**1) Builder le frontend**
 ```bash
-cd frontend
-npm install
-npm run build
+git clone https://github.com/nowzee/Threatlab
 ```
 
-**2) Lancer le backend Flask**
 ```bash
-cd ..
-python app.py
+cd Threatlab
+```
+
+```bash
+docker compose build
+```
+
+```bash
+docker compose up
 ```
 
 Accéder à l'interface via http://localhost:5000
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 Variables d'environnement et paramètres:
 - `SECRET_KEY`: clé secrète pour les sessions côté Flask
@@ -77,7 +85,7 @@ Variables d'environnement et paramètres:
 
 ---
 
-## 🔌 Intégrations (ELK / OpenCTI)
+## Intégrations (ELK / OpenCTI)
 
 Le modèle d'intégration repose sur des connecteurs modulaires:
 - Mapping des événements (timestamp, type d'attaque, honeypot/source, sévérité, IP source, etc.)

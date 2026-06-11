@@ -95,53 +95,6 @@
         background-color: var(--success-color);
     }
 
-    @keyframes fadeIn {
-        from { opacity: 0; }
-        to { opacity: 1; }
-    }
-
-    /* Styles pour les modales */
-    .modal {
-        display: none;
-        position: fixed;
-        z-index: 1000;
-        left: 0;
-        top: 0;
-        width: 100%;
-        height: 100%;
-        background-color: rgba(0, 0, 0, 0.6);
-        animation: fadeIn 0.3s ease;
-    }
-
-    .modal-content {
-        position: relative;
-        background-color: var(--card-background);
-        margin: 10% auto;
-        max-width: 500px;
-        border-radius: 8px;
-        box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-        animation: slideIn 0.3s ease;
-    }
-
-    .modal-header {
-        padding: 16px 20px;
-        border-bottom: 1px solid var(--container-border-color);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-    }
-
-    .modal-header h3 {
-        margin: 0;
-        font-weight: 500;
-        color: var(--text-color);
-    }
-
-    .modal-body {
-        padding: 20px;
-    }
-
-
     .form-actions {
         display: flex;
         justify-content: flex-end;
@@ -184,40 +137,8 @@
         margin: 8px 0;
     }
 
-    /* Status indicators */
-    .status-indicator {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-    }
-
-    .status-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background-color: var(--danger-color);
-    }
-
-    .status-online .status-dot {
-        background-color: var(--success-color);
-    }
-
-    .status-offline .status-dot {
-        background-color: var(--danger-color);
-    }
-
-    @keyframes slideIn {
-        from { transform: translateY(-20px); opacity: 0; }
-        to { transform: translateY(0); opacity: 1; }
-    }
-
     @media (max-width: 768px) {
         .settings-tabs {
             padding-bottom: 8px;
-        }
-
-        .modal-content {
-            width: 90%;
-            margin: 20% auto;
         }
     }
