@@ -219,7 +219,7 @@ def download_wordlist(wordlist_type: str) -> Tuple[Response, int]:
             filename = f"threatlab_usernames_{timestamp}.txt"
 
         elif wordlist_type == 'combinations':
-            data = get_credential_combinations()
+            data = get_credential_combinations(None)
             lines = [f"{entry['username']}:{entry['password']}" for entry in data
                      if entry.get('username') and entry.get('password')]
             filename = f"threatlab_credentials_{timestamp}.txt"

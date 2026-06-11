@@ -12,10 +12,14 @@ DB_USER = os.getenv('DB_USER', 'threatlabs_user')
 DB_PASSWORD = os.getenv('DB_PASSWORD', 'threatlabs_password')
 DB_NAME = os.getenv('DB_NAME', 'threatlabs')
 
-# Créer le pool de connexions une seule fois
+# Taille du pool configurable (attention : multipliée par le nombre de workers
+# gunicorn ; garder workers * DB_POOL_SIZE sous max_connections de MySQL ~151)
+DB_POOL_SIZE = int(os.getenv('DB_POOL_SIZE', '10'))
+
+# Créer le pool de connexions une seule fois (par processus)
 connection_pool = pooling.MySQLConnectionPool(
     pool_name="threatlabs_pool",
-    pool_size=10,
+    pool_size=DB_POOL_SIZE,
     pool_reset_session=True,
     host=DB_HOST,
     user=DB_USER,
@@ -87,6 +91,11 @@ class DatabaseManagerHoneypot:
             self.cursor.execute(query, params)
         else:
             self.cursor.execute(query)
+
+    def executemany(self, query, seq_params):
+        """Exécute une requête sur une séquence de paramètres (insertion par lot)."""
+        query = query.replace('?', '%s')
+        self.cursor.executemany(query, seq_params)
 
     def fetchall(self):
         return self.cursor.fetchall()

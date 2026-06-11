@@ -53,22 +53,35 @@ export default defineComponent({
     })
 
     const deleteSelected = async () => {
+      const deleted: typeof selectedHoneypots.value = []
+      let hadError = false
       try {
         for (const id of selectedHoneypots.value) {
-          const response = await fetch('/api/agent/manage/delete', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ agent_id: id })
-          })
-          if (!response.ok) {
-            console.error(`Erreur suppression agent ${id}`)
+          try {
+            const response = await fetch('/api/agent/manage/delete', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ agent_id: id })
+            })
+            const data = await response.json().catch(() => ({}))
+            // Ne retirer de la liste que si le backend confirme la suppression.
+            if (response.ok && data.success) {
+              deleted.push(id)
+            } else {
+              hadError = true
+              console.error(`Erreur suppression agent ${id}`)
+            }
+          } catch (e) {
+            hadError = true
+            console.error(`Erreur suppression agent ${id}:`, e)
           }
         }
-        honeypots.value = honeypots.value.filter(h => !selectedHoneypots.value.includes(h.id))
+      } finally {
+        honeypots.value = honeypots.value.filter(h => !deleted.includes(h.id))
         selectedHoneypots.value = []
         showDeleteConfirm.value = false
-      } catch (error) {
-        console.error("Erreur lors de la suppression:", error)
+        // En cas d'échec partiel, resynchroniser avec l'état réel du serveur.
+        if (hadError) await loadHoneypots()
       }
     }
 

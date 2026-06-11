@@ -11,6 +11,7 @@ import jwt
 import os
 from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction, get_agent_about
 from module.database.db_manager import DatabaseManagerHoneypot
+from module.ingestion.ingest import enqueue_report
 from string import Template
 from module.auth.decorator import agent_jwt_required
 
@@ -106,8 +107,7 @@ def agent_report() -> tuple[Response, int] | Response:
         HTTP status codes: 200 (success), 400 (missing fields), 500 (database error).
     """
     try:
-        data = request.json
-        agent_id = data.get('agent_id')
+        data = request.json or {}
 
         # Validate that essential fields are present
         required_fields = ['source_ip', 'service_type']
@@ -115,14 +115,11 @@ def agent_report() -> tuple[Response, int] | Response:
             if not data.get(field):
                 return jsonify({'success': False, 'error': f'Missing required field: {field}'}), 400
 
-        source_ip = data.get('source_ip')
-        service_type = data.get('service_type')
-        country_name = data.get('country_name')
-        attack_type = data.get('attack_type', 'auth_attempt')
-
-        # Build attack data dictionary with all available fields
-        attack_data = {
-            'agent_id': data.get('agent_id'),  # Use agent_id from JWT payload
+        # Build a normalized report and hand it to the async ingestion worker.
+        # The heavy DB work (IP upsert, attack log, credentials) is done off the
+        # request thread, with attack_logs written in batches.
+        report = {
+            'agent_id': data.get('agent_id'),
             'source_ip': data.get('source_ip'),
             'service_type': data.get('service_type'),
             'source_port': data.get('source_port'),
@@ -132,46 +129,22 @@ def agent_report() -> tuple[Response, int] | Response:
             'payload': data.get('payload'),
             'malware_hash': data.get('malware_hash'),
             'classification': data.get('classification'),
+            'attack_type': data.get('attack_type', 'auth_attempt'),
             'country_code': data.get('country_code'),
-            'country_name': data.get('country_name')
+            'country_name': data.get('country_name'),
+            # SMTP-specific fields (ignored for other service types)
+            'sender_email': data.get('sender_email'),
+            'recipient_email': data.get('recipient_email'),
+            'subject': data.get('subject'),
+            'message_content': data.get('message_content'),
+            'attachments': data.get('attachments'),
         }
 
-        # Register or update IP in malicious_ips table with relationships
-        if not add_malicious_ip_address(agent_id, source_ip, service_type, country_name,
-                                        data.get('country_code'), data.get('classification')):
-            return jsonify({'success': False, 'error': 'Failed to add malicious IP'}), 500
+        # File pleine = surcharge : on renvoie 503, l'agent ré-enfile et réessaie.
+        if not enqueue_report(report):
+            return jsonify({'success': False, 'error': 'ingestion overloaded, retry later'}), 503
 
-        # Insert detailed attack log for forensics and analysis
-        if not add_attack_log(attack_data):
-            return jsonify({'success': False, 'error': 'Failed to add attack log'}), 500
-
-        # Process service-specific data
-        if service_type in ['ssh', 'ftp']:
-            username_attempt = data.get('username_attempt')
-            password_attempt = data.get('password_attempt')
-
-            # Track compromised credentials for brute-force analysis
-            if username_attempt and password_attempt:
-                if not add_compromised_credential(source_ip, username_attempt, password_attempt, service_type):
-                    return jsonify({'success': False, 'error': 'Failed to add compromised credential'}), 500
-
-        elif service_type == 'smtp':
-            sender_email = data.get('sender_email')
-            recipient_email = data.get('recipient_email')
-            subject = data.get('subject')
-            message_content = data.get('message_content')
-            attachments = data.get('attachments')
-
-            # Store SMTP-specific data for phishing/spam analysis
-            if not add_smtp_interaction(source_ip, sender_email, recipient_email,
-                                        subject, message_content, attachments):
-                return jsonify({'success': False, 'error': 'Failed to add SMTP interaction'}), 500
-
-        elif service_type == 'port_scan':
-            # Port scan specific logging already handled in attack_log
-            pass
-
-        return jsonify({'success': True, 'message': f'{service_type.upper()} attack data processed successfully'})
+        return jsonify({'success': True, 'message': 'attack report queued'}), 200
 
     except Exception as e:
         print(f"Error in agent_report: {e}")

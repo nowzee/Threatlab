@@ -17,6 +17,7 @@ from route.log_analyse.alerte_dashboard import log_analyse_bp
 from route.log_analyse.alerte_details import alert_details_bp
 from route.CTI.threat_intelligence import threat_intel_bp
 from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser
+from module.ingestion.ingest import start_worker
 import secrets
 
 # Initialize Flask app with Vue.js frontend static files
@@ -122,6 +123,8 @@ def serve_vue_app() -> Response:
 @app.route('/<path>', methods=['GET', 'POST'])
 def serve_static_or_index(path) -> Response:
     return send_from_directory(app.static_folder, 'index.html')
+
+start_worker()
 
 if __name__ == '__main__':
     # Initialize user database (accounts, API keys, login attempts)

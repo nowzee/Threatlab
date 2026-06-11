@@ -43,7 +43,7 @@ services:
     networks:
       - threatlabs-network
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000').read()"]
+      test: ["CMD", "python", "-c", "import ssl, urllib.request; ctx = ssl._create_unverified_context(); urllib.request.urlopen('https://localhost:5000', context=ctx).read()"]
       interval: 30s
       timeout: 10s
       retries: 3

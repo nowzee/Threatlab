@@ -12,6 +12,29 @@ import os
 import hashlib
 from flask import current_app
 
+
+def _clip(value: Any, max_len: int) -> Optional[str]:
+    """
+    Tronque une valeur à la longueur maximale d'une colonne VARCHAR.
+
+    Les honeypots reçoivent des entrées arbitraires et potentiellement
+    surdimensionnées (overflow, payloads malveillants). Tronquer en amont
+    évite les erreurs MySQL 1406 « Data too long » qui faisaient échouer
+    l'enregistrement de l'attaque (HTTP 500).
+
+    Args:
+        value: Valeur à insérer (str ou None).
+        max_len: Longueur maximale de la colonne cible.
+
+    Returns:
+        La chaîne tronquée, ou None si la valeur est None.
+    """
+    if value is None:
+        return None
+    s = value if isinstance(value, str) else str(value)
+    return s[:max_len]
+
+
 def generate_jwt(agent_id: int) -> str:
     """
     Génère un JWT unique pour un agent spécifique.
@@ -235,6 +258,13 @@ def add_compromised_credential(malicious_ip: str,
         bool: True si l'opération a réussi, False sinon.
     """
     try:
+        # Tronque aux limites des colonnes (VARCHAR(255)/VARCHAR(50)) afin que la
+        # recherche et l'insertion soient cohérentes et n'échouent pas sur des
+        # entrées malveillantes surdimensionnées.
+        username = _clip(username, 255)
+        password = _clip(password, 255)
+        service_type = _clip(service_type, 50)
+
         with DatabaseManagerHoneypot() as db:
             # Lookup the IP ID from the malicious_ips table
             db.execute("SELECT id FROM malicious_ips WHERE ip_address = %s", (malicious_ip,))
@@ -332,20 +362,66 @@ def add_attack_log(attack_data: Dict[str, Any]) -> bool:
                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                       (now,
                        attack_data.get('agent_id'),
-                       attack_data.get('source_ip'),
+                       _clip(attack_data.get('source_ip'), 45),
                        attack_data.get('source_port'),
                        attack_data.get('target_port'),
-                       attack_data.get('service_type'),
-                       attack_data.get('username_attempt'),
-                       attack_data.get('password_attempt'),
+                       _clip(attack_data.get('service_type'), 50),
+                       _clip(attack_data.get('username_attempt'), 255),
+                       _clip(attack_data.get('password_attempt'), 255),
                        attack_data.get('payload'),
-                       attack_data.get('malware_hash'),
-                       attack_data.get('classification'),
-                       attack_data.get('country_code'),
-                       attack_data.get('country_name')))
+                       _clip(attack_data.get('malware_hash'), 255),
+                       _clip(attack_data.get('classification'), 50),
+                       _clip(attack_data.get('country_code'), 10),
+                       _clip(attack_data.get('country_name'), 100)))
             return True
     except Exception as e:
         print(f"Error adding attack log: {e}")
+        return False
+
+def add_attack_logs_batch(rows: List[Dict[str, Any]]) -> bool:
+    """
+    Insère plusieurs logs d'attaque en une seule requête (insertion par lot).
+
+    Utilisé par le worker d'ingestion asynchrone pour absorber de gros volumes :
+    une requête multi-lignes au lieu d'un INSERT par attaque réduit fortement le
+    nombre d'allers-retours SQL.
+
+    Args:
+        rows (List[Dict[str, Any]]): Liste de dictionnaires d'attaque (mêmes clés
+            que add_attack_log).
+
+    Returns:
+        bool: True si l'insertion a réussi, False sinon.
+    """
+    if not rows:
+        return True
+    try:
+        with DatabaseManagerHoneypot() as db:
+            now = datetime.now()
+            params = [
+                (now,
+                 r.get('agent_id'),
+                 _clip(r.get('source_ip'), 45),
+                 r.get('source_port'),
+                 r.get('target_port'),
+                 _clip(r.get('service_type'), 50),
+                 _clip(r.get('username_attempt'), 255),
+                 _clip(r.get('password_attempt'), 255),
+                 r.get('payload'),
+                 _clip(r.get('malware_hash'), 255),
+                 _clip(r.get('classification'), 50),
+                 _clip(r.get('country_code'), 10),
+                 _clip(r.get('country_name'), 100))
+                for r in rows
+            ]
+            db.executemany("""INSERT INTO attack_logs
+                         (created_at, agent_id, source_ip, source_port, target_port, service_type,
+                          username_attempt, password_attempt, payload, malware_hash,
+                          attack_type, country_code, country_name)
+                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", params)
+            return True
+    except Exception as e:
+        print(f"Error adding attack log batch ({len(rows)} rows): {e}")
         return False
 
 def add_smtp_interaction(malicious_ip: str,
@@ -518,10 +594,13 @@ class ManagerAgent:
 
             db.execute('''SELECT id FROM honey_agents WHERE id = %s''', (int(agent_id),))
             agent = db.fetchone()
-            if agent:
-                db.execute("DELETE FROM honey_agents WHERE id = %s", (int(agent_id),))
-                return True
-            return False
+            if not agent:
+                return False
+
+            db.execute("UPDATE attack_logs SET agent_id = NULL WHERE agent_id = %s", (int(agent_id),))
+            db.execute("DELETE FROM ip_agent_relations WHERE agent_id = %s", (int(agent_id),))
+            db.execute("DELETE FROM honey_agents WHERE id = %s", (int(agent_id),))
+            return True
 
     @staticmethod
     def list() -> List[Dict[str, Any]]:
@@ -775,23 +854,30 @@ def get_port_distribution() -> List[Dict[str, Any]]:
         return db.fetchall()
 
 
-def get_credential_combinations() -> List[Dict[str, Any]]:
+def get_credential_combinations(limit: Optional[int] = 15) -> List[Dict[str, Any]]:
     """
-    Récupère les 15 combinaisons username/password les plus observées.
+    Récupère les combinaisons username/password observées, triées par fréquence.
+
+    Args:
+        limit: Nombre maximum de combinaisons. None = toutes les combinaisons uniques.
 
     Returns:
         List[Dict[str, Any]]: Liste des combinaisons de credentials avec leur compteur.
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''
-                   SELECT username,
-                          password,
-                          SUM(attempt_count) AS count
-                   FROM compromised_credentials
-                   GROUP BY username, password
-                   ORDER BY count DESC
-                   LIMIT 15
-                   ''')
+        query = '''
+                SELECT username,
+                       password,
+                       SUM(attempt_count) AS count
+                FROM compromised_credentials
+                GROUP BY username, password
+                ORDER BY count DESC
+                '''
+        if limit is not None:
+            query += ' LIMIT %s'
+            db.execute(query, (limit,))
+        else:
+            db.execute(query)
 
         return db.fetchall()
 
