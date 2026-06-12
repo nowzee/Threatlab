@@ -3,10 +3,10 @@ Authentication and Two-Factor Authentication (2FA) module.
 
 Handles user authentication, 2FA status management and OTP secret handling.
 """
-import hashlib
 from typing import Optional
 from module.database.db_manager import DatabaseManagerUser
 from module.crypto_utils.key_manager import Key_manager_db
+from module.crypto_utils.password_hash import verify_password
 
 
 def auth_user(username: str, password: str) -> bool:
@@ -20,17 +20,12 @@ def auth_user(username: str, password: str) -> bool:
     Returns:
         bool: True if authentication successful, False otherwise.
     """
-    # Hash the password using SHA-256 to compare with stored hash
-    password = hashlib.sha256(password.encode()).hexdigest()
-
     with DatabaseManagerUser() as db:
-        # Query for matching username and password hash
-        db.execute("SELECT username FROM users WHERE username = ? AND password = ?", (username, password))
+        db.execute("SELECT password FROM users WHERE username = ?", (username,))
         result = db.fetchone()
-        if result:
-            return True
-        else:
+        if not result:
             return False
+        return verify_password(result[0], password)
 
 
 def a2f_active(username: str) -> bool:
