@@ -634,9 +634,24 @@ def log_command(command, handler, success=True):
                           payload=' '.join(urls) if urls else command))
 
 
+def _finalize_pasted_script(lines, handler):
+    """Store a pasted shell script (detected by shebang) as an uploaded payload."""
+    content = ('\n'.join(lines) + '\n').encode('utf-8', 'ignore')
+    logger.info("Captured pasted script (%d bytes) from %s"
+                % (len(content), handler.client_address[0]))
+    try:
+        process_uploaded_binary(
+            content, 'pasted_script.sh', handler.username, handler.password,
+            handler.client_address[0], handler.client_address[1],
+            config.get('ssh', {}).get('port', 22), 'ssh', 'pasted shell script (shebang)')
+    except Exception as e:
+        logger.error("Script capture processing error: " + str(e))
+
+
 def run_shell_session(channel, handler):
     """Interactive shell loop: reads keystrokes, emulates, returns output."""
     emu = ShellEmulator(handler.username, config.get('ssh', {}).get('hostname', DEFAULT_HOSTNAME))
+    upload_allowed = config.get('ssh', {}).get('allow_upload', True)
 
     motd = config.get('ssh', {}).get('motd', DEFAULT_MOTD)
     if motd:
@@ -644,9 +659,18 @@ def run_shell_session(channel, handler):
     channel.send(emu.prompt())
 
     line = ''
+    script_lines = None  # None = normal mode; list = capturing a pasted script
     while True:
         try:
             data = channel.recv(1024)
+        except socket.timeout:
+            # Idle while capturing a pasted script -> store it as a payload.
+            if script_lines is not None:
+                _finalize_pasted_script(script_lines, handler)
+                script_lines = None
+                channel.settimeout(None)
+                channel.send(emu.prompt())
+            continue
         except Exception:
             break
         if not data:
@@ -655,8 +679,18 @@ def run_shell_session(channel, handler):
         for byte in data:
             if byte in (13, 10):  # CR / LF
                 channel.send('\r\n')
-                cmd = line.strip()
+                raw = line
                 line = ''
+                cmd = raw.strip()
+                # A line starting with a shebang means a script is being pasted:
+                # capture it (and the following lines) as a file, not a command.
+                if script_lines is None and upload_allowed and cmd.startswith('#!'):
+                    script_lines = [raw]
+                    channel.settimeout(1.5)
+                    continue
+                if script_lines is not None:
+                    script_lines.append(raw)
+                    continue
                 if cmd:
                     output, should_exit = emu.execute(cmd)
                     log_command(cmd, handler, command_succeeded(output))
