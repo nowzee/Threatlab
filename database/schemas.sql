@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS honey_agents (
     service_type VARCHAR(50) NOT NULL,
     groupe VARCHAR(100),
     banner TEXT,
+    interactive INT DEFAULT 1,
     alert_generated INT DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -113,6 +114,23 @@ CREATE TABLE IF NOT EXISTS compromised_credentials (
     last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
     attempt_count INT DEFAULT 1,
     FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
+);
+
+CREATE TABLE IF NOT EXISTS uploaded_files (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    file_hash VARCHAR(64) UNIQUE NOT NULL,
+    file_name VARCHAR(255),
+    file_size BIGINT,
+    stored_path VARCHAR(512),
+    source_ip VARCHAR(45),
+    username VARCHAR(255),
+    password VARCHAR(255),
+    request_headers TEXT,
+    agent_id BIGINT,
+    service_type VARCHAR(50),
+    first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+    upload_count INT DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS password_attempted (

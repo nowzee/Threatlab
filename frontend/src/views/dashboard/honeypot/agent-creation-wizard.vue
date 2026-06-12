@@ -9,6 +9,7 @@ interface AgentTypeConfig {
   bannerLabel: string
   bannerHelp: string
   placeholderName: string
+  interactiveHelp: string
 }
 
 interface AgentConfig {
@@ -17,6 +18,7 @@ interface AgentConfig {
   ipAddress: string
   country: string
   banner: string
+  interactive: boolean
   networkConfig: {
     host: string
     port: number
@@ -32,6 +34,7 @@ const AGENT_TYPE_CONFIGS: Record<string, AgentTypeConfig> = {
     bannerLabel: 'Banniere SSH',
     bannerHelp: 'Banniere SSH affichee aux attaquants pour simuler un serveur specifique',
     placeholderName: 'Ex: SSH-Prod-01',
+    interactiveHelp: 'Emule un shell et un faux systeme de fichiers pour capturer les commandes des attaquants. Desactive : capture des identifiants uniquement.',
   },
   ftp: {
     label: 'FTP',
@@ -40,6 +43,7 @@ const AGENT_TYPE_CONFIGS: Record<string, AgentTypeConfig> = {
     bannerLabel: 'Banniere FTP',
     bannerHelp: 'Banniere FTP affichee aux attaquants pour simuler un serveur specifique',
     placeholderName: 'Ex: FTP-Prod-01',
+    interactiveHelp: 'Autorise un bot a la fois a se connecter et uploader des fichiers (captures et hashes). Desactive : capture des identifiants uniquement.',
   }
 }
 
@@ -68,6 +72,7 @@ export default defineComponent({
       ipAddress: '',
       country: '',
       banner: typeConfig.value.defaultBanner,
+      interactive: true,
       networkConfig: {
         host: '0.0.0.0',
         port: typeConfig.value.defaultPort,
@@ -148,7 +153,8 @@ export default defineComponent({
             agent_type: agentType.value,
             ip_address: agentConfig.ipAddress || '0.0.0.0',
             country_name: agentConfig.country,
-            banner: agentConfig.banner
+            banner: agentConfig.banner,
+            interactive: agentConfig.interactive
           })
         })
         const data = await response.json()
@@ -281,6 +287,13 @@ export default defineComponent({
               <label for="network-interface">Interface reseau</label>
               <input id="network-interface" v-model="agentConfig.networkConfig.interface" type="text" class="form-input" placeholder="eth0" />
             </div>
+            <div class="form-group full-width">
+              <label class="toggle-row">
+                <input type="checkbox" v-model="agentConfig.interactive" class="toggle-input" />
+                <span>Mode interactif</span>
+              </label>
+              <small class="form-help">{{ typeConfig.interactiveHelp }}</small>
+            </div>
           </div>
         </div>
       </div>
@@ -307,6 +320,7 @@ export default defineComponent({
                 <div class="review-item"><span class="review-label">Port</span><code class="review-value">{{ agentConfig.networkConfig.port }}</code></div>
                 <div class="review-item"><span class="review-label">Host</span><code class="review-value">{{ agentConfig.networkConfig.host }}</code></div>
                 <div class="review-item"><span class="review-label">Interface</span><code class="review-value">{{ agentConfig.networkConfig.interface }}</code></div>
+                <div class="review-item"><span class="review-label">Mode interactif</span><span class="review-value">{{ agentConfig.interactive ? 'Active' : 'Desactive' }}</span></div>
                 <div class="review-item full-width"><span class="review-label">Banniere</span><code class="review-value review-banner">{{ agentConfig.banner }}</code></div>
               </div>
             </div>
@@ -410,6 +424,8 @@ export default defineComponent({
 }
 .form-input:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(156, 77, 255, 0.1); }
 .form-help { color: var(--text-color-muted); font-size: 12px; }
+.toggle-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.toggle-input { width: 18px; height: 18px; accent-color: var(--accent-color); cursor: pointer; }
 
 /* Review */
 .review-section { margin-bottom: 28px; }

@@ -36,10 +36,12 @@ services:
       - DB_PASSWORD=threatlabs_password
       - DB_NAME=threatlabs
       - DB_TYPE=mysql
+      - UPLOAD_DIR=/app/uploads
     ports:
       - "5000:5000"
     volumes:
       - backend_secrets:/app/secrets
+      - backend_uploads:/app/uploads
     networks:
       - threatlabs-network
     healthcheck:
@@ -56,3 +58,4 @@ networks:
 volumes:
   mysql_data:
   backend_secrets:
+  backend_uploads:

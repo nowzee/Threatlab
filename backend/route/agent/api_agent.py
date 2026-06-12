@@ -9,7 +9,8 @@ from typing import Tuple
 from flask import Blueprint, jsonify, request, current_app, send_file, Response
 import jwt
 import os
-from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction, get_agent_about
+import hashlib
+from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction, get_agent_about, record_uploaded_file, ensure_interactive_column
 from module.database.db_manager import DatabaseManagerHoneypot
 from module.ingestion.ingest import enqueue_report
 from string import Template
@@ -59,13 +60,15 @@ def agent_create() -> Tuple[Response, int]:
         ip_address = request.json.get('ip_address', '0.0.0.0')
         country_name = request.json.get('country_name')
         banner = request.json.get('banner', 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
+        interactive = bool(request.json.get('interactive', True))
 
         agent_id, secret_token = create_agent_token(
             agent_name,
             ip_address=ip_address,
             country_name=country_name,
             service_type=agent_type,
-            banner=banner
+            banner=banner,
+            interactive=interactive
         )
 
         if agent_id:
@@ -82,6 +85,69 @@ def agent_create() -> Tuple[Response, int]:
         print(f"Error in agent_create: {e}")
         print(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': f'Internal error: {str(e)}'}), 500
+
+
+@agent_create_bp.route("/upload", methods=['POST'])
+@agent_jwt_required
+def agent_upload() -> Tuple[Response, int]:
+    """
+    Receive a file uploaded to an interactive honeypot (e.g. FTP STOR).
+
+    The agent sends the raw file plus metadata (hash, ip, username, password,
+    request headers). The server recomputes the SHA-256 (no trust in the agent
+    hash), stores the file once (dedup by hash) in a created folder, and records
+    the metadata in the uploaded_files table.
+
+    Returns JSON: {success, new, hash}. `new` is False if this hash was already
+    known (file not re-stored).
+    """
+    try:
+        f = request.files.get('file')
+        if f is None:
+            return jsonify({'success': False, 'error': 'no file provided'}), 400
+
+        file_bytes = f.read()
+        if not file_bytes:
+            return jsonify({'success': False, 'error': 'empty file'}), 400
+
+        # Hash recomputed server-side (we don't trust the agent-provided hash).
+        file_hash = hashlib.sha256(file_bytes).hexdigest()
+
+        form = request.form
+        upload_dir = os.getenv('UPLOAD_DIR', '/app/uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+        stored_path = os.path.join(upload_dir, file_hash)
+
+        # Storage dedup: only write the file if the hash is unknown.
+        is_new = not os.path.exists(stored_path)
+        if is_new:
+            with open(stored_path, 'wb') as out:
+                out.write(file_bytes)
+
+        agent_id = form.get('agent_id')
+        try:
+            agent_id = int(agent_id) if agent_id else None
+        except (TypeError, ValueError):
+            agent_id = None
+
+        record_uploaded_file(
+            file_hash=file_hash,
+            file_name=form.get('file_name') or f.filename,
+            file_size=len(file_bytes),
+            stored_path=stored_path,
+            source_ip=form.get('source_ip'),
+            username=form.get('username'),
+            password=form.get('password'),
+            request_headers=form.get('request_headers'),
+            agent_id=agent_id,
+            service_type=form.get('service_type', 'ftp'),
+        )
+
+        return jsonify({'success': True, 'new': is_new, 'hash': file_hash}), 200
+
+    except Exception as e:
+        print(f"Error in agent_upload: {e}")
+        return jsonify({'success': False, 'error': 'internal server error'}), 500
 
 
 @agent_create_bp.route("/report", methods=['POST'])
@@ -140,7 +206,7 @@ def agent_report() -> tuple[Response, int] | Response:
             'attachments': data.get('attachments'),
         }
 
-        # File pleine = surcharge : on renvoie 503, l'agent ré-enfile et réessaie.
+        # Queue full = overload: return 503, the agent re-queues and retries.
         if not enqueue_report(report):
             return jsonify({'success': False, 'error': 'ingestion overloaded, retry later'}), 503
 
@@ -169,9 +235,10 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
     """
     try:
         # Get agent details from database including service_type
+        ensure_interactive_column()
         with DatabaseManagerHoneypot() as db:
             db.execute("""
-                       SELECT agent_name, banner, ip_address, service_type
+                       SELECT agent_name, banner, ip_address, service_type, interactive
                        FROM honey_agents
                        WHERE id = %s
                        """, (agent_id,))
@@ -185,6 +252,7 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
             banner = result['banner']
             ip_address = result['ip_address']
             service_type = result['service_type']
+            interactive = bool(result.get('interactive', 1))
 
         # Read the template file
         template_path = os.path.join(
@@ -225,12 +293,19 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
                 "host": ip_address if ip_address else "0.0.0.0",
                 "port": 22,
                 "banner": "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5",
-                "host_key_file": "ssh_host_key.pem"
+                "host_key_file": "ssh_host_key.pem",
+                "interactive": interactive,
+                "hostname": "srv01"
             },
             "ftp": {
                 "host": ip_address if ip_address else "0.0.0.0",
                 "port": 21,
-                "banner": "220 FTP server ready"
+                "banner": "220 FTP server ready",
+                "interactive": interactive,
+                "session_min_seconds": 600,
+                "session_max_seconds": 900,
+                "max_upload_bytes": 52428800,
+                "public_ip": ""
             },
             "reporting": {
                 "interval": 30,

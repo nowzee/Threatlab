@@ -28,7 +28,7 @@ def _load_or_create_secret_key() -> str:
     os.makedirs(SECRETS_DIR, exist_ok=True)
     app_KEY_FILE = os.path.join(SECRETS_DIR, '.app_secret_key')
 
-    # Charger ou générer la clé
+    # Load or generate the key
     if os.path.exists(app_KEY_FILE):
         with open(app_KEY_FILE, 'r') as f:
             return f.read().strip()
@@ -47,10 +47,10 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
 
 os.makedirs(SECRETS_DIR, exist_ok=True)
 
-# Fichier de la clé agent
+# Agent key file
 AGENT_KEY_FILE = os.path.join(SECRETS_DIR, '.agent_secret_key')
 
-# Charger ou générer la clé
+# Load or generate the key
 if os.path.exists(AGENT_KEY_FILE):
     with open(AGENT_KEY_FILE, 'r') as f:
         app.config['AGENT_SECRET_KEY'] = f.read().strip()
@@ -95,7 +95,7 @@ def before_request() -> tuple[Response, int] | None:
     """
     # Define endpoints that don't require authentication
     # Includes: static files, login, session check, Vue app, and agent reporting
-    public_endpoints = ["static", "auth.login", "serve_static_or_index", "auth.session_state", "serve_vue_app", "agent_create.agent_report"]
+    public_endpoints = ["static", "auth.login", "serve_static_or_index", "auth.session_state", "serve_vue_app", "agent_create.agent_report", "agent_create.agent_upload"]
 
     # Define endpoints accessible during 2FA validation process
     a2f_endpoints = ['auth.a2f', 'static', 'serve_static_or_index', 'serve_vue_app']

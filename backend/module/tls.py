@@ -1,10 +1,10 @@
 """
-Génération d'un certificat TLS auto-signé persistant.
+Persistent self-signed TLS certificate generation.
 
-Remplace l'ancien `ssl_context='adhoc'` du serveur de dev Flask (qui régénérait
-un certificat à chaque démarrage) par un certificat stable stocké dans le volume
-des secrets, que gunicorn sert via certfile/keyfile. Les agents se connectent
-avec `verify=False`, le certificat n'a donc pas besoin d'être signé par une CA.
+Replaces the old `ssl_context='adhoc'` of the Flask dev server (which
+regenerated a certificate on every start) with a stable certificate stored in
+the secrets volume, served by gunicorn via certfile/keyfile. Agents connect with
+`verify=False`, so the certificate does not need to be signed by a CA.
 """
 import os
 import datetime
@@ -16,7 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 
 
 def ensure_self_signed_cert(cert_path: str, key_path: str) -> None:
-    """Génère un certificat auto-signé s'il n'existe pas déjà."""
+    """Generate a self-signed certificate if it does not already exist."""
     if os.path.exists(cert_path) and os.path.exists(key_path):
         return
 
@@ -50,4 +50,4 @@ def ensure_self_signed_cert(cert_path: str, key_path: str) -> None:
     with open(cert_path, "wb") as f:
         f.write(cert.public_bytes(serialization.Encoding.PEM))
 
-    print(f"[tls] certificat auto-signé généré: {cert_path}")
+    print(f"[tls] self-signed certificate generated: {cert_path}")
