@@ -28,9 +28,16 @@ interface Command {
 export default defineComponent({
   name: 'PayloadsView',
   setup() {
+    const itemsPerPage = 10
     const activeTab = ref<'payloads' | 'commands'>('payloads')
     const payloads = ref<Payload[]>([])
     const commands = ref<Command[]>([])
+    const payloadTotal = ref(0)
+    const cmdTotal = ref(0)
+    const payloadPage = ref(1)
+    const cmdPage = ref(1)
+    const payloadQuery = ref('')
+    const cmdQuery = ref('')
     const cmdFilter = ref<'all' | 'success' | 'failed'>('all')
     const loading = ref(false)
     const selectedCmd = ref<Command | null>(null)
@@ -39,18 +46,24 @@ export default defineComponent({
     const loadPayloads = async () => {
       loading.value = true
       try {
-        const r = await fetch('/api/agent/user/payloads', { credentials: 'include' })
-        payloads.value = r.ok ? await r.json() : []
-      } catch { payloads.value = [] }
+        const u = `/api/agent/user/payloads?page=${payloadPage.value}&limit=${itemsPerPage}&q=${encodeURIComponent(payloadQuery.value)}`
+        const r = await fetch(u, { credentials: 'include' })
+        const d = r.ok ? await r.json() : { items: [], total: 0 }
+        payloads.value = d.items || []
+        payloadTotal.value = d.total || 0
+      } catch { payloads.value = []; payloadTotal.value = 0 }
       finally { loading.value = false }
     }
 
     const loadCommands = async () => {
       loading.value = true
       try {
-        const r = await fetch(`/api/agent/user/commands?status=${cmdFilter.value}`, { credentials: 'include' })
-        commands.value = r.ok ? await r.json() : []
-      } catch { commands.value = [] }
+        const u = `/api/agent/user/commands?status=${cmdFilter.value}&page=${cmdPage.value}&limit=${itemsPerPage}&q=${encodeURIComponent(cmdQuery.value)}`
+        const r = await fetch(u, { credentials: 'include' })
+        const d = r.ok ? await r.json() : { items: [], total: 0 }
+        commands.value = d.items || []
+        cmdTotal.value = d.total || 0
+      } catch { commands.value = []; cmdTotal.value = 0 }
       finally { loading.value = false }
     }
 
@@ -62,8 +75,40 @@ export default defineComponent({
 
     const setFilter = (f: 'all' | 'success' | 'failed') => {
       cmdFilter.value = f
+      cmdPage.value = 1
       loadCommands()
     }
+
+    // Debounced search
+    let pTimer = 0, cTimer = 0
+    const onPayloadSearch = () => {
+      clearTimeout(pTimer)
+      pTimer = window.setTimeout(() => { payloadPage.value = 1; loadPayloads() }, 350)
+    }
+    const onCmdSearch = () => {
+      clearTimeout(cTimer)
+      cTimer = window.setTimeout(() => { cmdPage.value = 1; loadCommands() }, 350)
+    }
+
+    // --- Pagination (10 par page, façon vue alertes) ---
+    const buildPages = (current: number, total: number): (number | string)[] => {
+      const pages: (number | string)[] = []
+      if (total <= 7) { for (let i = 1; i <= total; i++) pages.push(i); return pages }
+      pages.push(1)
+      if (current > 3) pages.push('...')
+      for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.push(i)
+      if (current < total - 2) pages.push('...')
+      pages.push(total)
+      return pages
+    }
+
+    const payloadTotalPages = computed(() => Math.max(1, Math.ceil(payloadTotal.value / itemsPerPage)))
+    const payloadPages = computed(() => buildPages(payloadPage.value, payloadTotalPages.value))
+    const goPayloadPage = (p: number) => { if (p >= 1 && p <= payloadTotalPages.value) { payloadPage.value = p; loadPayloads() } }
+
+    const cmdTotalPages = computed(() => Math.max(1, Math.ceil(cmdTotal.value / itemsPerPage)))
+    const cmdPages = computed(() => buildPages(cmdPage.value, cmdTotalPages.value))
+    const goCmdPage = (p: number) => { if (p >= 1 && p <= cmdTotalPages.value) { cmdPage.value = p; loadCommands() } }
 
     const downloadPayload = (hash: string) => {
       window.location.href = `/api/agent/user/payloads/download/${hash}`
@@ -78,9 +123,6 @@ export default defineComponent({
     const formatDate = (s: string) => s ? new Date(s).toLocaleString('fr-FR') : '-'
     const shortHash = (h: string) => h ? h.slice(0, 12) + '…' : ''
 
-    const failedCount = computed(() =>
-      commands.value.filter(c => c.attack_type === 'shell_command_failed').length)
-
     const copyCmd = async () => {
       if (!selectedCmd.value) return
       try { await navigator.clipboard.writeText(selectedCmd.value.payload) } catch { /* ignore */ }
@@ -91,8 +133,11 @@ export default defineComponent({
     onMounted(loadPayloads)
 
     return {
-      activeTab, payloads, commands, cmdFilter, loading, failedCount,
-      selectedCmd, copied, copyCmd,
+      activeTab, payloads, commands, cmdFilter, loading,
+      selectedCmd, copied, copyCmd, itemsPerPage,
+      payloadTotal, cmdTotal, payloadQuery, cmdQuery, onPayloadSearch, onCmdSearch,
+      payloadPage, payloadTotalPages, payloadPages, goPayloadPage,
+      cmdPage, cmdTotalPages, cmdPages, goCmdPage,
       setTab, setFilter, downloadPayload, formatBytes, formatDate, shortHash
     }
   }
@@ -113,9 +158,16 @@ export default defineComponent({
     </div>
 
     <!-- PAYLOADS -->
-    <div v-if="activeTab === 'payloads'" class="card">
+    <div v-if="activeTab === 'payloads'">
+      <div class="search-bar">
+        <input v-model="payloadQuery" @input="onPayloadSearch" class="search-input"
+               placeholder="Rechercher dans le contenu, le nom, l'IP, le hash… (ex: une IP, un domaine, un mot)" />
+      </div>
+      <div class="card">
       <div v-if="loading" class="empty-state">Chargement…</div>
-      <div v-else-if="payloads.length === 0" class="empty-state">Aucun fichier capturé pour le moment.</div>
+      <div v-else-if="payloads.length === 0" class="empty-state">
+        {{ payloadQuery ? 'Aucun fichier ne contient « ' + payloadQuery + ' ».' : 'Aucun fichier capturé pour le moment.' }}
+      </div>
       <table v-else class="data-table">
         <thead>
           <tr>
@@ -137,6 +189,21 @@ export default defineComponent({
           </tr>
         </tbody>
       </table>
+
+      <div class="pagination-wrapper" v-if="payloadTotalPages > 1">
+        <div class="pagination-info">
+          {{ (payloadPage - 1) * itemsPerPage + 1 }}-{{ Math.min(payloadPage * itemsPerPage, payloadTotal) }} sur {{ payloadTotal }}
+        </div>
+        <div class="pagination">
+          <button class="page-btn" @click="goPayloadPage(payloadPage - 1)" :disabled="payloadPage === 1">‹</button>
+          <template v-for="(pg, i) in payloadPages" :key="i">
+            <button v-if="typeof pg === 'number'" class="page-number" :class="{ active: pg === payloadPage }" @click="goPayloadPage(pg)">{{ pg }}</button>
+            <span v-else class="page-ellipsis">…</span>
+          </template>
+          <button class="page-btn" @click="goPayloadPage(payloadPage + 1)" :disabled="payloadPage === payloadTotalPages">›</button>
+        </div>
+      </div>
+      </div>
     </div>
 
     <!-- COMMANDS -->
@@ -145,10 +212,14 @@ export default defineComponent({
         <button class="filter-btn" :class="{ active: cmdFilter === 'all' }" @click="setFilter('all')">Toutes</button>
         <button class="filter-btn" :class="{ active: cmdFilter === 'success' }" @click="setFilter('success')">Réussies</button>
         <button class="filter-btn fail" :class="{ active: cmdFilter === 'failed' }" @click="setFilter('failed')">Échouées</button>
+        <input v-model="cmdQuery" @input="onCmdSearch" class="search-input cmd-search"
+               placeholder="Rechercher une commande (ip, mot, URL…)" />
       </div>
       <div class="card">
         <div v-if="loading" class="empty-state">Chargement…</div>
-        <div v-else-if="commands.length === 0" class="empty-state">Aucune commande pour ce filtre.</div>
+        <div v-else-if="commands.length === 0" class="empty-state">
+          {{ cmdQuery ? 'Aucune commande ne contient « ' + cmdQuery + ' ».' : 'Aucune commande pour ce filtre.' }}
+        </div>
         <table v-else class="data-table">
           <thead>
             <tr><th>Heure</th><th>IP source</th><th>Pays</th><th>Utilisateur</th><th>Commande</th><th>Statut</th></tr>
@@ -168,6 +239,20 @@ export default defineComponent({
             </tr>
           </tbody>
         </table>
+
+        <div class="pagination-wrapper" v-if="cmdTotalPages > 1">
+          <div class="pagination-info">
+            {{ (cmdPage - 1) * itemsPerPage + 1 }}-{{ Math.min(cmdPage * itemsPerPage, cmdTotal) }} sur {{ cmdTotal }}
+          </div>
+          <div class="pagination">
+            <button class="page-btn" @click="goCmdPage(cmdPage - 1)" :disabled="cmdPage === 1">‹</button>
+            <template v-for="(pg, i) in cmdPages" :key="i">
+              <button v-if="typeof pg === 'number'" class="page-number" :class="{ active: pg === cmdPage }" @click="goCmdPage(pg)">{{ pg }}</button>
+              <span v-else class="page-ellipsis">…</span>
+            </template>
+            <button class="page-btn" @click="goCmdPage(cmdPage + 1)" :disabled="cmdPage === cmdTotalPages">›</button>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -258,7 +343,18 @@ export default defineComponent({
 }
 .btn-dl:hover { background: rgba(156,77,255,.22); }
 
-.filter-bar { display: flex; gap: 8px; margin-bottom: 16px; }
+.search-bar { margin-bottom: 16px; }
+.search-input {
+  width: 100%; box-sizing: border-box;
+  padding: 11px 14px; background: var(--container-background);
+  border: 1px solid var(--container-border-color); border-radius: 8px;
+  color: var(--white); font-size: 14px;
+}
+.search-input:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 2px rgba(156,77,255,.15); }
+.search-input::placeholder { color: var(--text-color-muted); }
+.cmd-search { flex: 1; min-width: 180px; padding: 7px 12px; font-size: 13px; }
+
+.filter-bar { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
 .filter-btn {
   background: var(--container-background); border: 1px solid var(--container-border-color);
   color: var(--text-color-muted); padding: 7px 16px; border-radius: 6px;
@@ -266,4 +362,21 @@ export default defineComponent({
 }
 .filter-btn.active { background: var(--accent-color); color: #fff; border-color: var(--accent-color); }
 .filter-btn.fail.active { background: var(--danger-color); border-color: var(--danger-color); }
+
+/* Pagination (style vue alertes) */
+.pagination-wrapper {
+  padding: 16px 20px; border-top: 1px solid var(--container-border-color);
+  display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;
+}
+.pagination-info { font-size: 13px; color: var(--text-color-muted); }
+.pagination { display: flex; gap: 6px; align-items: center; }
+.page-btn, .page-number {
+  min-width: 34px; height: 34px; display: flex; align-items: center; justify-content: center;
+  background: transparent; border: 1px solid var(--container-border-color); border-radius: 6px;
+  color: var(--text-color); font-size: 14px; cursor: pointer; transition: all .2s ease; padding: 0 6px;
+}
+.page-btn:hover:not(:disabled), .page-number:hover { background: rgba(255,255,255,.05); border-color: var(--accent-color); }
+.page-number.active { background: var(--accent-color); border-color: var(--accent-color); color: #fff; }
+.page-btn:disabled { opacity: .4; cursor: not-allowed; }
+.page-ellipsis { min-width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; color: var(--text-color-muted); }
 </style>

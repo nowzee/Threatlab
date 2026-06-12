@@ -519,23 +519,61 @@ def record_uploaded_file(file_hash: str, file_name: str, file_size: int, stored_
         return False
 
 
-def get_uploaded_files(limit: Optional[int] = 200) -> List[Dict[str, Any]]:
-    """List captured uploaded files (binaries), most recent first."""
+_UPLOAD_COLS = ("file_hash, file_name, file_size, stored_path, source_ip, username, "
+                "password, service_type, agent_id, upload_count, first_seen, last_seen")
+
+
+def get_uploaded_files_page(page: int = 1, limit: int = 10, q: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Paginated list of captured files.
+
+    If `q` is given, returns files whose metadata (name, ip, user, hash) OR
+    file content contains the string. Returns {items, total, page, limit}.
+    """
+    page = max(1, int(page))
+    limit = max(1, min(100, int(limit)))
     try:
         with DatabaseManagerHoneypot() as db:
             _ensure_uploaded_files_table(db)
-            query = """SELECT file_hash, file_name, file_size, source_ip, username, password,
-                              service_type, agent_id, upload_count, first_seen, last_seen
-                       FROM uploaded_files ORDER BY last_seen DESC"""
-            if limit is not None:
-                query += " LIMIT %s"
-                db.execute(query, (limit,))
-            else:
-                db.execute(query)
-            return db.fetchall()
+
+            if not q:
+                db.execute("SELECT COUNT(*) AS c FROM uploaded_files")
+                total = db.fetchone()['c']
+                db.execute("SELECT " + _UPLOAD_COLS + " FROM uploaded_files "
+                           "ORDER BY last_seen DESC LIMIT %s OFFSET %s",
+                           (limit, (page - 1) * limit))
+                rows = db.fetchall()
+                return {'items': rows, 'total': total, 'page': page, 'limit': limit}
+
+            # Search: scan recent files, match metadata then file content.
+            db.execute("SELECT " + _UPLOAD_COLS + " FROM uploaded_files "
+                       "ORDER BY last_seen DESC LIMIT 3000")
+            candidates = db.fetchall()
+
+        ql = q.lower()
+        qb = q.encode('utf-8', 'ignore')
+        matches = []
+        for r in candidates:
+            meta = ' '.join(str(r.get(k) or '') for k in
+                            ('file_name', 'source_ip', 'username', 'password', 'file_hash')).lower()
+            hit = ql in meta
+            if not hit:
+                path = r.get('stored_path')
+                if path and (r.get('file_size') or 0) <= 10 * 1024 * 1024 and os.path.exists(path):
+                    try:
+                        with open(path, 'rb') as f:
+                            hit = qb in f.read()
+                    except Exception:
+                        hit = False
+            if hit:
+                matches.append(r)
+
+        total = len(matches)
+        start = (page - 1) * limit
+        return {'items': matches[start:start + limit], 'total': total, 'page': page, 'limit': limit}
     except Exception as e:
         print(f"Error listing uploaded files: {e}")
-        return []
+        return {'items': [], 'total': 0, 'page': page, 'limit': limit}
 
 
 def get_uploaded_file(file_hash: str) -> Optional[Dict[str, Any]]:
@@ -551,36 +589,47 @@ def get_uploaded_file(file_hash: str) -> Optional[Dict[str, Any]]:
         return None
 
 
-def get_shell_commands(status: str = 'all', limit: Optional[int] = 300) -> List[Dict[str, Any]]:
+def get_shell_commands_page(status: str = 'all', page: int = 1, limit: int = 10,
+                            q: Optional[str] = None) -> Dict[str, Any]:
     """
-    List shell commands observed by interactive honeypots.
+    Paginated list of observed shell commands.
 
     Args:
         status: 'all', 'success' (recognized) or 'failed' (command not found).
-        limit: Max rows.
+        page, limit: Pagination.
+        q: Optional substring to match against the command text.
+
+    Returns:
+        {items, total, page, limit}.
     """
+    page = max(1, int(page))
+    limit = max(1, min(100, int(limit)))
     try:
         with DatabaseManagerHoneypot() as db:
-            query = ("SELECT id, created_at, source_ip, country_code, agent_id, "
-                     "username_attempt, payload, attack_type, service_type "
-                     "FROM attack_logs "
-                     "WHERE attack_type IN ('shell_command', 'shell_command_failed')")
+            where = "attack_type IN ('shell_command', 'shell_command_failed')"
             params: List[Any] = []
             if status == 'success':
-                query += " AND attack_type = %s"
+                where += " AND attack_type = %s"
                 params.append('shell_command')
             elif status == 'failed':
-                query += " AND attack_type = %s"
+                where += " AND attack_type = %s"
                 params.append('shell_command_failed')
-            query += " ORDER BY id DESC"
-            if limit is not None:
-                query += " LIMIT %s"
-                params.append(limit)
-            db.execute(query, tuple(params))
-            return db.fetchall()
+            if q:
+                where += " AND payload LIKE %s"
+                params.append('%' + q + '%')
+
+            db.execute("SELECT COUNT(*) AS c FROM attack_logs WHERE " + where, tuple(params))
+            total = db.fetchone()['c']
+
+            db.execute("SELECT id, created_at, source_ip, country_code, agent_id, "
+                       "username_attempt, payload, attack_type, service_type "
+                       "FROM attack_logs WHERE " + where +
+                       " ORDER BY id DESC LIMIT %s OFFSET %s",
+                       tuple(params) + (limit, (page - 1) * limit))
+            return {'items': db.fetchall(), 'total': total, 'page': page, 'limit': limit}
     except Exception as e:
         print(f"Error listing shell commands: {e}")
-        return []
+        return {'items': [], 'total': 0, 'page': page, 'limit': limit}
 
 
 def add_smtp_interaction(malicious_ip: str,
