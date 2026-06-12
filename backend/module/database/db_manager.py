@@ -140,9 +140,8 @@ class DatabaseManagerUser:
                 admin_password = generate_random_string(16)
                 admin_id = generate_custom_snowflake('admin')
 
-                # Hacher le mot de passe
-                import hashlib
-                password_hash = hashlib.sha256(admin_password.encode()).hexdigest()
+                from module.crypto_utils.password_hash import hash_password
+                password_hash = hash_password(admin_password)
 
                 # Insérer l'utilisateur admin
                 self.cursor.execute(
