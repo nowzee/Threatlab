@@ -442,13 +442,31 @@ class ShellEmulator:
                 out.append(node.rstrip('\n'))
         return '\n'.join(out) + '\n'
 
-    # Commands accepted silently (no realistic output needed).
+    # Commands accepted silently (recognized, no realistic output needed).
     _NOOP = frozenset((
         'mkdir', 'touch', 'rm', 'chmod', 'chown', 'export', 'unset', 'set',
         'kill', 'killall', 'cp', 'mv', 'dd', 'ln', 'sync', 'sleep', 'sysctl',
         'iptables', 'service', 'systemctl', 'insmod', 'rmmod', 'modprobe',
         'umask', 'alias', 'unalias', 'true', 'false', ':', 'wait',
-        'tftp', 'ftpget', 'nc', 'ncat', 'setsid', 'nohup', 'pkill'))
+        'tftp', 'ftpget', 'nc', 'ncat', 'setsid', 'nohup', 'pkill',
+        # text / shell utilities frequently used by bots
+        'grep', 'egrep', 'fgrep', 'sed', 'awk', 'cut', 'sort', 'uniq', 'wc',
+        'tr', 'xargs', 'tee', 'read', 'test', 'expr', 'eval', 'source', '.',
+        'sleep', 'usleep', 'timeout', 'flock', 'mktemp', 'basename', 'dirname',
+        # interpreters / build / archive (payload execution)
+        'perl', 'python', 'python3', 'python2', 'php', 'ruby', 'lua', 'node',
+        'gcc', 'cc', 'g++', 'make', 'ld', 'strip', 'tar', 'gzip', 'gunzip',
+        'bzip2', 'unzip', 'zip', 'xz', 'base64', 'openssl', 'gpg',
+        # hashing / inspection
+        'md5sum', 'sha1sum', 'sha256sum', 'cksum', 'strings', 'file', 'stat',
+        'readlink', 'realpath', 'lsattr', 'chattr', 'getconf', 'ldconfig', 'ldd',
+        # process / network / system probes
+        'top', 'htop', 'netstat', 'ss', 'ifconfig', 'ip', 'route', 'arp',
+        'iptables-save', 'last', 'lastlog', 'w', 'who', 'users', 'groups',
+        'lscpu', 'lsblk', 'lsof', 'lsmod', 'dmesg', 'mount', 'umount',
+        'useradd', 'userdel', 'usermod', 'passwd', 'su', 'sudo', 'login',
+        'screen', 'tmux', 'at', 'batch', 'logger', 'reboot', 'shutdown',
+        'halt', 'poweroff', 'wall', 'write', 'mesg', 'reset', 'tput'))
 
     # Busybox applets we "know" (anything else -> "applet not found").
     _BUSYBOX = frozenset((
@@ -479,10 +497,16 @@ class ShellEmulator:
         if not toks:
             return "", False
         cmd, args = toks[0], toks[1:]
+        # A path-based invocation (./x, /tmp/x, ../x) is a dropped binary.
+        was_path = cmd.startswith('/') or cmd.startswith('./') or cmd.startswith('../')
         # Normalize absolute/relative paths: /bin/busybox -> busybox, ./x -> x
         if '/' in cmd:
             cmd = cmd.rsplit('/', 1)[1]
-        return self._dispatch(cmd, args)
+        out, should_exit = self._dispatch(cmd, args)
+        # Fake execution: a dropped binary "runs" silently instead of erroring.
+        if was_path and out.endswith('command not found\n'):
+            return "", False
+        return out, should_exit
 
     def _dispatch(self, cmd, args):
         if cmd in ('exit', 'logout', 'quit'):
@@ -539,6 +563,12 @@ class ShellEmulator:
             return "no crontab for " + self.user + "\n", False
         if cmd == 'history':
             return "", False
+        if cmd in ('env', 'printenv'):
+            return self._env(), False
+        if cmd == 'printf':
+            return self._printf(args), False
+        if cmd == 'date':
+            return "Mon Jan  1 00:00:00 UTC 2024\n", False
         if cmd == 'clear':
             return "\x1b[H\x1b[2J", False
         if cmd == 'help':
@@ -596,6 +626,23 @@ class ShellEmulator:
                 pass
         return text + ("\n" if newline else ""), False
 
+    def _env(self):
+        return ("SHELL=/bin/bash\nHOME=" + self.home() + "\nUSER=" + self.user +
+                "\nLOGNAME=" + self.user +
+                "\nPATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin\n"
+                "PWD=" + self.cwd_path() + "\nHOSTNAME=" + self.host +
+                "\nLANG=en_US.UTF-8\nTERM=xterm\nSHLVL=1\n_=/usr/bin/env\n")
+
+    def _printf(self, args):
+        if not args:
+            return ""
+        fmt = ' '.join(args).strip('"').strip("'")
+        try:
+            fmt = fmt.encode('latin-1', 'ignore').decode('unicode_escape', 'ignore')
+        except Exception:
+            pass
+        return fmt
+
     def _busybox(self, args):
         if not args:
             return ("BusyBox v1.30.1 (Ubuntu 1:1.30.1-4ubuntu) multi-call binary.\n"
@@ -633,10 +680,16 @@ def log_command(command, handler, success=True):
                           classification='malware_download',
                           payload=' '.join(urls) if urls else command))
 
+    # Fake execution: actually fetch any download URL and ship the payload.
+    if '://' in command:
+        fetch_downloads_from_text(command, handler.username, handler.password,
+                                  handler.client_address[0], handler.client_address[1])
+
 
 def _finalize_pasted_script(lines, handler):
     """Store a pasted shell script (detected by shebang) as an uploaded payload."""
-    content = ('\n'.join(lines) + '\n').encode('utf-8', 'ignore')
+    text = '\n'.join(lines) + '\n'
+    content = text.encode('utf-8', 'ignore')
     logger.info("Captured pasted script (%d bytes) from %s"
                 % (len(content), handler.client_address[0]))
     try:
@@ -646,6 +699,9 @@ def _finalize_pasted_script(lines, handler):
             config.get('ssh', {}).get('port', 22), 'ssh', 'pasted shell script (shebang)')
     except Exception as e:
         logger.error("Script capture processing error: " + str(e))
+    # Fetch any payloads the script downloads (fake execution).
+    fetch_downloads_from_text(text, handler.username, handler.password,
+                              handler.client_address[0], handler.client_address[1])
 
 
 def run_shell_session(channel, handler):
@@ -1002,6 +1058,65 @@ def _process_ftp_upload(file_bytes, filename, username, password, addr, ftp_port
     """FTP STOR upload: delegate to the shared upload pipeline."""
     process_uploaded_binary(file_bytes, filename, username, password,
                             addr[0], addr[1], ftp_port, 'ftp', "\n".join(cmd_log))
+
+
+# --- Malware collection: fake execution that fetches the real payload ---
+_fetched_urls = set()
+_fetched_lock = threading.Lock()
+_URL_RE = re.compile(r'(?:https?|ftp)://[^\s\'"`|;()<>]+')
+_DOLLAR = '\\' + chr(36)  # regex for a literal dollar, built without one (template-safe)
+
+
+def fetch_downloads_from_text(text, username, password, source_ip, source_port):
+    """
+    Find download URLs in a command/script and fetch+upload the payload.
+
+    The bot's wget/curl/tftp "succeeds" (fake execution), but behind the scenes
+    the agent downloads the targeted file and ships it to the server for
+    analysis (hashed, deduplicated) like any other captured payload.
+    """
+    ssh_cfg = config.get('ssh', {})
+    if not ssh_cfg.get('allow_upload', True) or not ssh_cfg.get('fetch_downloads', True):
+        return
+    urls = set()
+    for raw in _URL_RE.findall(text or ''):
+        # Substitute common arch placeholders so arch-based payload URLs resolve.
+        u = re.sub(_DOLLAR + r'\((?:uname[^)]*|arch)\)', 'x86_64', raw)
+        u = re.sub(_DOLLAR + r'\{?\w*arch\w*\}?', 'x86_64', u, flags=re.IGNORECASE)
+        urls.add(u.rstrip('.,;'))
+    for url in urls:
+        threading.Thread(target=_fetch_one_download,
+                         args=(url, username, password, source_ip, source_port),
+                         daemon=True).start()
+
+
+def _fetch_one_download(url, username, password, source_ip, source_port):
+    with _fetched_lock:
+        if url in _fetched_urls:
+            return
+        _fetched_urls.add(url)
+        if len(_fetched_urls) > 5000:
+            _fetched_urls.clear()
+    max_size = int(config.get('ssh', {}).get('max_upload_bytes', 50 * 1024 * 1024))
+    try:
+        r = requests.get(url, timeout=20, verify=False, stream=True,
+                         headers={'User-Agent': 'Wget/1.20.3 (linux-gnu)'})
+        data = b''
+        for chunk in r.iter_content(65536):
+            if not chunk:
+                break
+            data += chunk
+            if len(data) > max_size:
+                break
+        if not data:
+            logger.info("Download empty: " + url)
+            return
+        name = url.rsplit('/', 1)[-1].split('?')[0] or 'download.bin'
+        logger.info("Fetched payload from %s (%d bytes)" % (url, len(data)))
+        process_uploaded_binary(data, name, username, password, source_ip, source_port,
+                                config.get('ssh', {}).get('port', 22), 'ssh', 'fetched: ' + url)
+    except Exception as e:
+        logger.error("Payload fetch failed for %s: %s" % (url, e))
 
 
 def handle_client_ftp(conn, addr):

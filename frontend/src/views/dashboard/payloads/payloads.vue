@@ -33,6 +33,8 @@ export default defineComponent({
     const commands = ref<Command[]>([])
     const cmdFilter = ref<'all' | 'success' | 'failed'>('all')
     const loading = ref(false)
+    const selectedCmd = ref<Command | null>(null)
+    const copied = ref(false)
 
     const loadPayloads = async () => {
       loading.value = true
@@ -79,10 +81,18 @@ export default defineComponent({
     const failedCount = computed(() =>
       commands.value.filter(c => c.attack_type === 'shell_command_failed').length)
 
+    const copyCmd = async () => {
+      if (!selectedCmd.value) return
+      try { await navigator.clipboard.writeText(selectedCmd.value.payload) } catch { /* ignore */ }
+      copied.value = true
+      setTimeout(() => { copied.value = false }, 1500)
+    }
+
     onMounted(loadPayloads)
 
     return {
       activeTab, payloads, commands, cmdFilter, loading, failedCount,
+      selectedCmd, copied, copyCmd,
       setTab, setFilter, downloadPayload, formatBytes, formatDate, shortHash
     }
   }
@@ -149,7 +159,7 @@ export default defineComponent({
               <td class="mono">{{ c.source_ip }}</td>
               <td>{{ c.country_code || '-' }}</td>
               <td class="mono dim">{{ c.username_attempt || '-' }}</td>
-              <td class="mono cmd">{{ c.payload }}</td>
+              <td class="mono cmd" :title="'Cliquer pour voir en entier'" @click="selectedCmd = c">{{ c.payload }}</td>
               <td>
                 <span class="badge" :class="c.attack_type === 'shell_command_failed' ? 'bad' : 'ok'">
                   {{ c.attack_type === 'shell_command_failed' ? 'échouée' : 'réussie' }}
@@ -158,6 +168,28 @@ export default defineComponent({
             </tr>
           </tbody>
         </table>
+      </div>
+    </div>
+
+    <!-- Command detail modal -->
+    <div v-if="selectedCmd" class="modal-overlay" @click.self="selectedCmd = null">
+      <div class="modal">
+        <div class="modal-head">
+          <span>Commande complète</span>
+          <button class="modal-close" @click="selectedCmd = null">✕</button>
+        </div>
+        <div class="modal-meta">
+          <span>{{ formatDate(selectedCmd.created_at) }}</span>
+          <span class="mono">{{ selectedCmd.source_ip }}</span>
+          <span class="mono dim">{{ selectedCmd.username_attempt }}</span>
+          <span class="badge" :class="selectedCmd.attack_type === 'shell_command_failed' ? 'bad' : 'ok'">
+            {{ selectedCmd.attack_type === 'shell_command_failed' ? 'échouée' : 'réussie' }}
+          </span>
+        </div>
+        <pre class="modal-cmd">{{ selectedCmd.payload }}</pre>
+        <div class="modal-actions">
+          <button class="btn-dl" @click="copyCmd">{{ copied ? 'Copié !' : 'Copier' }}</button>
+        </div>
       </div>
     </div>
   </div>
@@ -186,7 +218,33 @@ export default defineComponent({
 .data-table tbody tr:hover { background: #1a1a1a; }
 .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 .dim { color: var(--text-color-muted); }
-.cmd { max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cfd3dc; }
+.cmd { max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cfd3dc; cursor: pointer; }
+.cmd:hover { color: var(--accent-color); }
+
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.6);
+  display: flex; align-items: center; justify-content: center; z-index: 100; padding: 24px;
+}
+.modal {
+  background: var(--container-background); border: 1px solid var(--container-border-color);
+  border-radius: 10px; width: 100%; max-width: 760px; max-height: 80vh; display: flex; flex-direction: column;
+}
+.modal-head {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 14px 18px; border-bottom: 1px solid var(--container-border-color);
+  color: var(--white); font-weight: 600;
+}
+.modal-close { background: none; border: none; color: var(--text-color-muted); font-size: 16px; cursor: pointer; }
+.modal-close:hover { color: var(--white); }
+.modal-meta { display: flex; gap: 14px; align-items: center; padding: 12px 18px; font-size: 12px; color: var(--text-color-muted); flex-wrap: wrap; }
+.modal-cmd {
+  margin: 0; padding: 16px 18px; overflow: auto; flex: 1;
+  font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px;
+  color: #cfd3dc; white-space: pre-wrap; word-break: break-all; line-height: 1.6;
+  background: #0d0d0d; border-top: 1px solid var(--container-border-color);
+  border-bottom: 1px solid var(--container-border-color);
+}
+.modal-actions { padding: 12px 18px; display: flex; justify-content: flex-end; }
 
 .pill { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(156,77,255,.15); color: var(--accent-color); text-transform: uppercase; }
 .badge { font-size: 11px; padding: 2px 9px; border-radius: 4px; font-weight: 600; }

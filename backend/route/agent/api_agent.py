@@ -299,6 +299,7 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
                 "host_key_file": "ssh_host_key.pem",
                 "interactive": interactive,
                 "allow_upload": allow_upload,
+                "fetch_downloads": allow_upload,
                 "hostname": "srv01"
             },
             "ftp": {
