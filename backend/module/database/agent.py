@@ -55,18 +55,19 @@ def generate_jwt(agent_id: int) -> str:
 
 
 def ensure_interactive_column() -> None:
-    """Add the honey_agents.interactive column if missing (existing deployments)."""
+    """Add the honey_agents.interactive / allow_upload columns if missing (existing deployments)."""
     try:
         with DatabaseManagerHoneypot() as db:
-            db.execute("""
-                SELECT COUNT(*) AS c FROM information_schema.columns
-                WHERE table_schema = DATABASE()
-                  AND table_name = 'honey_agents' AND column_name = 'interactive'
-            """)
-            if db.fetchone()['c'] == 0:
-                db.execute("ALTER TABLE honey_agents ADD COLUMN interactive INT DEFAULT 1")
+            for column in ('interactive', 'allow_upload'):
+                db.execute("""
+                    SELECT COUNT(*) AS c FROM information_schema.columns
+                    WHERE table_schema = DATABASE()
+                      AND table_name = 'honey_agents' AND column_name = %s
+                """, (column,))
+                if db.fetchone()['c'] == 0:
+                    db.execute("ALTER TABLE honey_agents ADD COLUMN " + column + " INT DEFAULT 1")
     except Exception as e:
-        print(f"Error ensuring interactive column: {e}")
+        print(f"Error ensuring agent columns: {e}")
 
 
 def create_agent_token(agent_name: str,
@@ -74,7 +75,8 @@ def create_agent_token(agent_name: str,
                        country_name: Optional[str] = None,
                        service_type: str = "ssh",
                        banner: Optional[str] = None,
-                       interactive: bool = True) -> Tuple[Optional[int], Optional[str]]:
+                       interactive: bool = True,
+                       allow_upload: bool = True) -> Tuple[Optional[int], Optional[str]]:
     """
     Creates a record for a new honeypot agent and generates a unique token.
 
@@ -84,7 +86,8 @@ def create_agent_token(agent_name: str,
         country_name (Optional[str], optional): Name of the country where the agent is deployed. Defaults to None.
         service_type (str, optional): Type of simulated service (ssh, smtp, ftp, etc.). Defaults to "ssh".
         banner (Optional[str], optional): Banner of the simulated service. Defaults to None.
-        interactive (bool, optional): Enable interactive mode (SSH shell / FTP upload). Defaults to True.
+        interactive (bool, optional): Enable interactive mode (SSH shell / FTP session). Defaults to True.
+        allow_upload (bool, optional): Allow file uploads (SFTP/SCP for SSH, STOR for FTP). Defaults to True.
 
     Returns:
         Tuple[Optional[int], Optional[str]]: (agent_id, secret_token) if successful, otherwise (None, None).
@@ -94,9 +97,10 @@ def create_agent_token(agent_name: str,
         ensure_interactive_column()
         with DatabaseManagerHoneypot() as db:
             db.execute("""
-                INSERT INTO honey_agents (agent_name, ip_address, country_name, service_type, banner, interactive)
-                VALUES (%s, %s, %s, %s, %s, %s)
-            """, (agent_name, ip_address, country_name, service_type, banner, 1 if interactive else 0))
+                INSERT INTO honey_agents (agent_name, ip_address, country_name, service_type, banner, interactive, allow_upload)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+            """, (agent_name, ip_address, country_name, service_type, banner,
+                  1 if interactive else 0, 1 if allow_upload else 0))
 
             # Step 2: Get the auto-generated ID of the newly inserted agent
             agent_id = db.cursor.lastrowid
@@ -513,6 +517,70 @@ def record_uploaded_file(file_hash: str, file_name: str, file_size: int, stored_
     except Exception as e:
         print(f"Error recording uploaded file: {e}")
         return False
+
+
+def get_uploaded_files(limit: Optional[int] = 200) -> List[Dict[str, Any]]:
+    """List captured uploaded files (binaries), most recent first."""
+    try:
+        with DatabaseManagerHoneypot() as db:
+            _ensure_uploaded_files_table(db)
+            query = """SELECT file_hash, file_name, file_size, source_ip, username, password,
+                              service_type, agent_id, upload_count, first_seen, last_seen
+                       FROM uploaded_files ORDER BY last_seen DESC"""
+            if limit is not None:
+                query += " LIMIT %s"
+                db.execute(query, (limit,))
+            else:
+                db.execute(query)
+            return db.fetchall()
+    except Exception as e:
+        print(f"Error listing uploaded files: {e}")
+        return []
+
+
+def get_uploaded_file(file_hash: str) -> Optional[Dict[str, Any]]:
+    """Return the stored path and name of a captured file by hash."""
+    try:
+        with DatabaseManagerHoneypot() as db:
+            _ensure_uploaded_files_table(db)
+            db.execute("SELECT stored_path, file_name FROM uploaded_files WHERE file_hash = %s",
+                       (file_hash,))
+            return db.fetchone()
+    except Exception as e:
+        print(f"Error fetching uploaded file: {e}")
+        return None
+
+
+def get_shell_commands(status: str = 'all', limit: Optional[int] = 300) -> List[Dict[str, Any]]:
+    """
+    List shell commands observed by interactive honeypots.
+
+    Args:
+        status: 'all', 'success' (recognized) or 'failed' (command not found).
+        limit: Max rows.
+    """
+    try:
+        with DatabaseManagerHoneypot() as db:
+            query = ("SELECT id, created_at, source_ip, country_code, agent_id, "
+                     "username_attempt, payload, attack_type, service_type "
+                     "FROM attack_logs "
+                     "WHERE attack_type IN ('shell_command', 'shell_command_failed')")
+            params: List[Any] = []
+            if status == 'success':
+                query += " AND attack_type = %s"
+                params.append('shell_command')
+            elif status == 'failed':
+                query += " AND attack_type = %s"
+                params.append('shell_command_failed')
+            query += " ORDER BY id DESC"
+            if limit is not None:
+                query += " LIMIT %s"
+                params.append(limit)
+            db.execute(query, tuple(params))
+            return db.fetchall()
+    except Exception as e:
+        print(f"Error listing shell commands: {e}")
+        return []
 
 
 def add_smtp_interaction(malicious_ip: str,

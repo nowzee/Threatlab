@@ -6,8 +6,8 @@ rankings, and generating reports for the user dashboard.
 """
 
 from typing import Tuple
-from flask import Blueprint, jsonify, Response
-from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking, get_top_passwords, get_top_usernames, get_credential_combinations, get_wordlist_stats
+from flask import Blueprint, jsonify, Response, request, send_file
+from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking, get_top_passwords, get_top_usernames, get_credential_combinations, get_wordlist_stats, get_uploaded_files, get_uploaded_file, get_shell_commands
 from datetime import datetime
 import os
 import traceback
@@ -249,3 +249,40 @@ def download_wordlist(wordlist_type: str) -> Tuple[Response, int]:
         print(f"Error downloading wordlist: {e}")
         traceback.print_exc()
         return jsonify({'error': 'Failed to generate wordlist'}), 500
+
+
+@agent_user_api_bp.route("/payloads", methods=['GET'])
+def list_payloads() -> Tuple[Response, int]:
+    """List captured uploaded files (binaries dropped via FTP/SFTP/SCP)."""
+    try:
+        return jsonify(get_uploaded_files(200)), 200
+    except Exception as e:
+        print(f"Error listing payloads: {e}")
+        return jsonify({'error': 'Failed to list payloads'}), 500
+
+
+@agent_user_api_bp.route("/payloads/download/<file_hash>", methods=['GET'])
+def download_payload(file_hash: str) -> Tuple[Response, int]:
+    """Download a captured binary by its hash."""
+    try:
+        row = get_uploaded_file(file_hash)
+        if not row or not row.get('stored_path') or not os.path.exists(row['stored_path']):
+            return jsonify({'error': 'Payload not found'}), 404
+        return send_file(row['stored_path'], as_attachment=True,
+                         download_name=row.get('file_name') or file_hash)
+    except Exception as e:
+        print(f"Error downloading payload: {e}")
+        return jsonify({'error': 'Failed to download payload'}), 500
+
+
+@agent_user_api_bp.route("/commands", methods=['GET'])
+def list_commands() -> Tuple[Response, int]:
+    """List observed shell commands. ?status=all|success|failed"""
+    try:
+        status = request.args.get('status', 'all')
+        if status not in ('all', 'success', 'failed'):
+            status = 'all'
+        return jsonify(get_shell_commands(status, 300)), 200
+    except Exception as e:
+        print(f"Error listing commands: {e}")
+        return jsonify({'error': 'Failed to list commands'}), 500

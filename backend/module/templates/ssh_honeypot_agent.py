@@ -11,6 +11,7 @@ import time
 import requests
 import os
 import sys
+import re
 import hashlib
 import random
 from datetime import datetime
@@ -281,9 +282,13 @@ DEFAULT_MOTD = (
 
 def build_filesystem():
     """Build a fake in-memory filesystem (dirs=dict, files=str)."""
+    bin_files = {name: "" for name in (
+        'busybox', 'sh', 'bash', 'cat', 'ls', 'echo', 'wget', 'curl', 'chmod',
+        'cp', 'rm', 'mv', 'ps', 'kill', 'mount', 'dd', 'tftp', 'nc', 'ssh', 'scp')}
     return {
-        'bin': {}, 'sbin': {}, 'lib': {}, 'usr': {'bin': {}, 'local': {'bin': {}}},
-        'tmp': {}, 'opt': {},
+        'bin': dict(bin_files), 'sbin': {}, 'lib': {}, 'usr': {'bin': dict(bin_files), 'local': {'bin': {}}},
+        'tmp': {}, 'opt': {}, 'mnt': {}, 'run': {},
+        'dev': {'null': "", 'zero': "", 'urandom': "", 'shm': {}},
         'etc': {
             'hostname': DEFAULT_HOSTNAME + "\n",
             'passwd': (
@@ -293,16 +298,44 @@ def build_filesystem():
                 "sshd:x:110:65534::/run/sshd:/usr/sbin/nologin\n"
                 "admin:x:1000:1000:admin:/home/admin:/bin/bash\n"
             ),
+            'hosts': "127.0.0.1\tlocalhost\n127.0.1.1\t" + DEFAULT_HOSTNAME + "\n",
+            'issue': "Ubuntu 20.04.3 LTS \\n \\l\n",
             'os-release': (
                 'NAME="Ubuntu"\nVERSION="20.04.3 LTS (Focal Fossa)"\n'
-                'ID=ubuntu\nVERSION_ID="20.04"\n'
+                'ID=ubuntu\nID_LIKE=debian\nVERSION_ID="20.04"\n'
             ),
+        },
+        'proc': {
+            'cpuinfo': (
+                "processor\t: 0\nvendor_id\t: GenuineIntel\ncpu family\t: 6\n"
+                "model name\t: Intel(R) Xeon(R) CPU E5-2670 0 @ 2.60GHz\ncpu MHz\t\t: 2599.998\n"
+                "cache size\t: 20480 KB\nflags\t\t: fpu vme de pse tsc msr\n\n"
+                "processor\t: 1\nvendor_id\t: GenuineIntel\ncpu family\t: 6\n"
+                "model name\t: Intel(R) Xeon(R) CPU E5-2670 0 @ 2.60GHz\ncpu MHz\t\t: 2599.998\n"
+            ),
+            'meminfo': (
+                "MemTotal:        2041000 kB\nMemFree:         1502344 kB\n"
+                "MemAvailable:    1723016 kB\nBuffers:           58112 kB\nCached:           312456 kB\n"
+                "SwapTotal:        998396 kB\nSwapFree:         998396 kB\n"
+            ),
+            'mounts': (
+                "sysfs /sys sysfs rw,nosuid,nodev,noexec,relatime 0 0\n"
+                "proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0\n"
+                "/dev/sda1 / ext4 rw,relatime 0 0\n"
+                "tmpfs /run tmpfs rw,nosuid,nodev 0 0\n"
+            ),
+            'version': (
+                "Linux version 5.4.0-91-generic (buildd@lcy01) "
+                "(gcc 9.3.0) #102-Ubuntu SMP Fri Nov 5 16:31:28 UTC 2021\n"
+            ),
+            'filesystems': "nodev\tsysfs\nnodev\tproc\n\text4\n\tvfat\n",
         },
         'root': {'.bashrc': "# ~/.bashrc\n", '.ssh': {}},
         'home': {'admin': {'.bashrc': "# ~/.bashrc\n"}},
         'var': {
             'log': {'auth.log': "", 'syslog': ""},
             'www': {'html': {'index.html': "<html><body>It works!</body></html>\n"}},
+            'run': {},
         },
     }
 
@@ -409,15 +442,55 @@ class ShellEmulator:
                 out.append(node.rstrip('\n'))
         return '\n'.join(out) + '\n'
 
-    def execute(self, line):
-        """Execute a command line. Returns (output, should_exit)."""
-        parts = line.strip().split()
-        if not parts:
-            return "", False
-        cmd, args = parts[0], parts[1:]
+    # Commands accepted silently (no realistic output needed).
+    _NOOP = frozenset((
+        'mkdir', 'touch', 'rm', 'chmod', 'chown', 'export', 'unset', 'set',
+        'kill', 'killall', 'cp', 'mv', 'dd', 'ln', 'sync', 'sleep', 'sysctl',
+        'iptables', 'service', 'systemctl', 'insmod', 'rmmod', 'modprobe',
+        'umask', 'alias', 'unalias', 'true', 'false', ':', 'wait',
+        'tftp', 'ftpget', 'nc', 'ncat', 'setsid', 'nohup', 'pkill'))
 
-        if cmd in ('exit', 'logout'):
+    # Busybox applets we "know" (anything else -> "applet not found").
+    _BUSYBOX = frozenset((
+        'cat', 'ls', 'echo', 'pwd', 'whoami', 'id', 'uname', 'ps', 'wget',
+        'cp', 'rm', 'mv', 'chmod', 'kill', 'sh', 'mount', 'dd', 'cd', 'free',
+        'df', 'head', 'tail', 'grep', 'which', 'hostname', 'sleep', 'tftp'))
+
+    def execute(self, line):
+        """Execute a possibly-chained command line. Returns (output, should_exit)."""
+        out = []
+        for stmt in re.split(r'\s*(?:&&|\|\||;|\n)\s*', line.strip()):
+            if not stmt.strip():
+                continue
+            # Emulate pipes by running only the left-most command.
+            stmt = stmt.split('|', 1)[0]
+            text, should_exit = self._run_one(stmt)
+            if text:
+                out.append(text)
+            if should_exit:
+                return ''.join(out), True
+        return ''.join(out), False
+
+    def _run_one(self, stmt):
+        # Drop simple output redirections (> f, >> f, 2> f, 2>&1).
+        stmt = stmt.replace('2>&1', '')
+        stmt = re.sub(r'\s*\d?>>?\s*\S+', '', stmt).strip()
+        toks = stmt.split()
+        if not toks:
+            return "", False
+        cmd, args = toks[0], toks[1:]
+        # Normalize absolute/relative paths: /bin/busybox -> busybox, ./x -> x
+        if '/' in cmd:
+            cmd = cmd.rsplit('/', 1)[1]
+        return self._dispatch(cmd, args)
+
+    def _dispatch(self, cmd, args):
+        if cmd in ('exit', 'logout', 'quit'):
             return "", True
+        if cmd == 'busybox':
+            return self._busybox(args)
+        if cmd == 'echo':
+            return self._echo(args)
         if cmd == 'whoami':
             return self.user + "\n", False
         if cmd == 'id':
@@ -428,10 +501,7 @@ class ShellEmulator:
         if cmd == 'pwd':
             return self.cwd_path() + "\n", False
         if cmd == 'uname':
-            if '-a' in args:
-                return ("Linux " + self.host + " 5.4.0-91-generic #102-Ubuntu SMP "
-                        "Fri Nov 5 16:31:28 UTC 2021 x86_64 x86_64 x86_64 GNU/Linux\n"), False
-            return "Linux\n", False
+            return self._uname(args)
         if cmd == 'hostname':
             return self.host + "\n", False
         if cmd == 'ls':
@@ -440,8 +510,8 @@ class ShellEmulator:
             return self._cd(args), False
         if cmd == 'cat':
             return self._cat(args), False
-        if cmd == 'echo':
-            return ' '.join(args) + "\n", False
+        if cmd == 'head' or cmd == 'tail':
+            return self._cat([a for a in args if not a.startswith('-')][:1] or args), False
         if cmd == 'ps':
             return ("  PID TTY          TIME CMD\n"
                     "    1 ?        00:00:01 systemd\n"
@@ -451,21 +521,101 @@ class ShellEmulator:
         if cmd == 'uptime':
             return (" 00:00:00 up 10 days,  3:14,  1 user,  "
                     "load average: 0.00, 0.01, 0.05\n"), False
+        if cmd == 'nproc':
+            return "2\n", False
+        if cmd == 'free':
+            return ("              total        used        free      shared  buff/cache   available\n"
+                    "Mem:        2041000      210000     1502344        1024      328656     1723016\n"
+                    "Swap:        998396           0      998396\n"), False
+        if cmd == 'df':
+            return ("Filesystem     1K-blocks    Used Available Use% Mounted on\n"
+                    "/dev/sda1       41152812 6230112  32800316  16% /\n"
+                    "tmpfs            1020500       0   1020500   0% /run\n"), False
+        if cmd == 'which':
+            if args and args[0] in self._BUSYBOX or (args and args[0] in self._NOOP):
+                return "/bin/" + args[0] + "\n", False
+            return "", False
+        if cmd == 'crontab':
+            return "no crontab for " + self.user + "\n", False
+        if cmd == 'history':
+            return "", False
         if cmd == 'clear':
             return "\x1b[H\x1b[2J", False
         if cmd == 'help':
             return "GNU bash, version 5.0.17(1)-release\n", False
         if cmd in ('wget', 'curl'):
-            # "Silent" download: logged separately by log_command.
+            return "", False  # "silent" download: logged by log_command
+        if cmd in ('sh', 'bash', 'enable', 'system', 'shell'):
+            return "", False  # subshell / router prompts: no-op
+        if cmd in self._NOOP:
             return "", False
-        if cmd in ('mkdir', 'touch', 'rm', 'chmod', 'chown', 'export', 'kill', 'killall'):
-            return "", False  # silently accepted
         return cmd + ": command not found\n", False
 
+    def _uname(self, args):
+        flags = ''.join(a[1:] for a in args if a.startswith('-'))
+        if 'a' in flags:
+            return ("Linux " + self.host + " 5.4.0-91-generic #102-Ubuntu SMP "
+                    "Fri Nov 5 16:31:28 UTC 2021 x86_64 x86_64 x86_64 GNU/Linux\n"), False
+        if not flags:
+            return "Linux\n", False
+        # uname prints fields in a fixed order regardless of flag order.
+        out = []
+        if 's' in flags:
+            out.append("Linux")
+        if 'n' in flags:
+            out.append(self.host)
+        if 'r' in flags:
+            out.append("5.4.0-91-generic")
+        if 'v' in flags:
+            out.append("#102-Ubuntu SMP Fri Nov 5 16:31:28 UTC 2021")
+        if 'm' in flags:
+            out.append("x86_64")
+        if 'p' in flags:
+            out.append("x86_64")
+        if 'i' in flags:
+            out.append("x86_64")
+        if 'o' in flags:
+            out.append("GNU/Linux")
+        return (' '.join(out) if out else "Linux") + "\n", False
 
-def log_command(command, handler):
-    """Log and queue an observed shell command."""
+    def _echo(self, args):
+        newline = True
+        interpret = False
+        i = 0
+        while i < len(args) and args[i].startswith('-') and set(args[i][1:]) <= set('neE'):
+            if 'n' in args[i]:
+                newline = False
+            if 'e' in args[i]:
+                interpret = True
+            i += 1
+        text = ' '.join(args[i:]).strip('"').strip("'")
+        if interpret:
+            try:
+                text = text.encode('latin-1', 'ignore').decode('unicode_escape', 'ignore')
+            except Exception:
+                pass
+        return text + ("\n" if newline else ""), False
+
+    def _busybox(self, args):
+        if not args:
+            return ("BusyBox v1.30.1 (Ubuntu 1:1.30.1-4ubuntu) multi-call binary.\n"
+                    "Usage: busybox [function [arguments]...]\n"), False
+        applet = args[0]
+        if applet in self._BUSYBOX or applet in self._NOOP:
+            return self._dispatch(applet, args[1:])
+        # Honeypot-detection trick: bots send a random applet and expect this.
+        return applet + ": applet not found\n", False
+
+
+def command_succeeded(output):
+    """A command is "failed" if the emulator did not recognize it."""
+    return 'command not found' not in output and 'applet not found' not in output
+
+
+def log_command(command, handler, success=True):
+    """Log and queue an observed shell command (success marks a recognized command)."""
     logger.info("SSH command from " + handler.client_address[0] + ": " + command)
+    kind = 'shell_command' if success else 'shell_command_failed'
     base = {
         'source_ip': handler.client_address[0],
         'source_port': handler.client_address[1],
@@ -473,8 +623,7 @@ def log_command(command, handler):
         'username_attempt': handler.username,
         'service_type': 'ssh',
     }
-    queue_attack(dict(base, attack_type='shell_command',
-                      classification='shell_command', payload=command))
+    queue_attack(dict(base, attack_type=kind, classification=kind, payload=command))
 
     low = command.strip().lower()
     if low.startswith('wget ') or low.startswith('curl '):
@@ -509,8 +658,8 @@ def run_shell_session(channel, handler):
                 cmd = line.strip()
                 line = ''
                 if cmd:
-                    log_command(cmd, handler)
                     output, should_exit = emu.execute(cmd)
+                    log_command(cmd, handler, command_succeeded(output))
                     if should_exit:
                         channel.send('logout\r\n')
                         return
@@ -606,6 +755,62 @@ class HoneypotSFTPServer(paramiko.SFTPServerInterface):
         return paramiko.SFTP_OK
 
 
+def run_scp_sink(channel, handler):
+    """Receive a file uploaded via `scp -t` (SCP sink protocol) and capture it."""
+    ssh_port = config.get('ssh', {}).get('port', 22)
+    max_upload = int(config.get('ssh', {}).get('max_upload_bytes', 50 * 1024 * 1024))
+    try:
+        channel.sendall(b'\x00')  # signal "ready"
+        while True:
+            line = b''
+            while not line.endswith(b'\n'):
+                ch = channel.recv(1)
+                if not ch:
+                    return
+                line += ch
+            line = line.rstrip(b'\r\n')
+            if not line:
+                continue
+            kind = chr(line[0])
+            if kind == 'C':
+                # File header: C<mode> <size> <name>
+                try:
+                    _mode, size_s, name = line[1:].decode('utf-8', 'ignore').split(' ', 2)
+                    size = int(size_s)
+                except Exception:
+                    channel.sendall(b'\x02scp: protocol error\n')
+                    return
+                channel.sendall(b'\x00')  # ack header
+                data = bytearray()
+                while len(data) < size:
+                    chunk = channel.recv(min(65536, size - len(data)))
+                    if not chunk:
+                        break
+                    data.extend(chunk)
+                    if len(data) > max_upload:
+                        break
+                try:
+                    channel.recv(1)  # trailing status byte from client
+                except Exception:
+                    pass
+                channel.sendall(b'\x00')  # ack file received
+                try:
+                    process_uploaded_binary(
+                        bytes(data[:max_upload]), name, handler.username, handler.password,
+                        handler.client_address[0], handler.client_address[1],
+                        ssh_port, 'ssh', 'SCP ' + name)
+                except Exception as e:
+                    logger.error("SCP upload processing error: " + str(e))
+            elif kind in ('D', 'T'):
+                channel.sendall(b'\x00')  # directory / mtime header: ack and ignore
+            elif kind == 'E':
+                channel.sendall(b'\x00')  # end of directory
+            else:
+                channel.sendall(b'\x00')
+    except Exception as e:
+        logger.error("SCP sink error: " + str(e))
+
+
 def handle_client_ssh(client_socket, client_address):
     """Handle individual SSH client connections"""
     try:
@@ -623,9 +828,11 @@ def handle_client_ssh(client_socket, client_address):
         ssh_banner = config.get('ssh', {}).get('banner', 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
         transport.local_version = ssh_banner
 
-        # In interactive mode, expose the SFTP subsystem so bots can upload
-        # binaries (captured and forwarded to the server like FTP STOR).
-        if config.get('ssh', {}).get('interactive', False):
+        # In interactive mode with uploads allowed, expose the SFTP subsystem so
+        # bots can upload binaries (captured and forwarded like FTP STOR).
+        ssh_interactive = config.get('ssh', {}).get('interactive', False)
+        upload_allowed = config.get('ssh', {}).get('allow_upload', True)
+        if ssh_interactive and upload_allowed:
             transport.set_subsystem_handler('sftp', paramiko.SFTPServer, HoneypotSFTPServer)
 
         # Start server with custom handler
@@ -648,14 +855,19 @@ def handle_client_ssh(client_socket, client_address):
                 while transport.is_active() and time.time() < deadline:
                     time.sleep(1)
             elif server_handler.exec_command is not None:
-                # Non-interactive bot: a single command then close
                 cmd = server_handler.exec_command
-                log_command(cmd, server_handler)
-                emu = ShellEmulator(server_handler.username,
-                                    config.get('ssh', {}).get('hostname', DEFAULT_HOSTNAME))
-                output, _ = emu.execute(cmd)
-                if output:
-                    channel.send(output.replace('\n', '\r\n'))
+                if upload_allowed and re.match(r'\s*scp\b', cmd) and re.search(r'-[a-zA-Z]*t', cmd):
+                    # File drop via `scp -t <path>`: capture the binary.
+                    log_command(cmd, server_handler, True)
+                    run_scp_sink(channel, server_handler)
+                else:
+                    # Non-interactive bot: a single command then close.
+                    emu = ShellEmulator(server_handler.username,
+                                        config.get('ssh', {}).get('hostname', DEFAULT_HOSTNAME))
+                    output, _ = emu.execute(cmd)
+                    log_command(cmd, server_handler, command_succeeded(output))
+                    if output:
+                        channel.send(output.replace('\n', '\r\n'))
                 try:
                     channel.send_exit_status(0)
                 except Exception:
@@ -771,6 +983,7 @@ def handle_client_ftp(conn, addr):
     ftp_cfg = config.get('ftp', {})
     ftp_port = ftp_cfg.get('port', 21)
     interactive_enabled = ftp_cfg.get('interactive', False)
+    upload_allowed = ftp_cfg.get('allow_upload', True)
     smin = int(ftp_cfg.get('session_min_seconds', 600))
     smax = int(ftp_cfg.get('session_max_seconds', 900))
     max_size = int(ftp_cfg.get('max_upload_bytes', 50 * 1024 * 1024))
@@ -910,6 +1123,8 @@ def handle_client_ftp(conn, addr):
                 elif cmd in ("STOR", "STOU", "APPE"):
                     if not authenticated:
                         need_login()
+                    elif not upload_allowed:
+                        send("550 Permission denied.\r\n")
                     else:
                         filename = arg or "upload.bin"
                         send("150 Ok to send data.\r\n")

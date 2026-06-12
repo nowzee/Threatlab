@@ -19,6 +19,7 @@ interface AgentConfig {
   country: string
   banner: string
   interactive: boolean
+  allowUpload: boolean
   networkConfig: {
     host: string
     port: number
@@ -73,6 +74,7 @@ export default defineComponent({
       country: '',
       banner: typeConfig.value.defaultBanner,
       interactive: true,
+      allowUpload: true,
       networkConfig: {
         host: '0.0.0.0',
         port: typeConfig.value.defaultPort,
@@ -154,7 +156,8 @@ export default defineComponent({
             ip_address: agentConfig.ipAddress || '0.0.0.0',
             country_name: agentConfig.country,
             banner: agentConfig.banner,
-            interactive: agentConfig.interactive
+            interactive: agentConfig.interactive,
+            allow_upload: agentConfig.interactive && agentConfig.allowUpload
           })
         })
         const data = await response.json()
@@ -294,6 +297,13 @@ export default defineComponent({
               </label>
               <small class="form-help">{{ typeConfig.interactiveHelp }}</small>
             </div>
+            <div class="form-group full-width" v-if="agentConfig.interactive">
+              <label class="toggle-row">
+                <input type="checkbox" v-model="agentConfig.allowUpload" class="toggle-input" />
+                <span>Autoriser l'upload de fichiers ({{ agentType === 'ftp' ? 'STOR' : 'SFTP / SCP' }})</span>
+              </label>
+              <small class="form-help">Les binaires deposes par les bots sont captures, hashes et envoyes au serveur. Decoche pour ne capturer que les commandes / identifiants.</small>
+            </div>
           </div>
         </div>
       </div>
@@ -321,6 +331,7 @@ export default defineComponent({
                 <div class="review-item"><span class="review-label">Host</span><code class="review-value">{{ agentConfig.networkConfig.host }}</code></div>
                 <div class="review-item"><span class="review-label">Interface</span><code class="review-value">{{ agentConfig.networkConfig.interface }}</code></div>
                 <div class="review-item"><span class="review-label">Mode interactif</span><span class="review-value">{{ agentConfig.interactive ? 'Active' : 'Desactive' }}</span></div>
+                <div class="review-item" v-if="agentConfig.interactive"><span class="review-label">Upload fichiers</span><span class="review-value">{{ agentConfig.allowUpload ? 'Active' : 'Desactive' }}</span></div>
                 <div class="review-item full-width"><span class="review-label">Banniere</span><code class="review-value review-banner">{{ agentConfig.banner }}</code></div>
               </div>
             </div>

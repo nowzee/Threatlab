@@ -61,6 +61,7 @@ def agent_create() -> Tuple[Response, int]:
         country_name = request.json.get('country_name')
         banner = request.json.get('banner', 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
         interactive = bool(request.json.get('interactive', True))
+        allow_upload = bool(request.json.get('allow_upload', True))
 
         agent_id, secret_token = create_agent_token(
             agent_name,
@@ -68,7 +69,8 @@ def agent_create() -> Tuple[Response, int]:
             country_name=country_name,
             service_type=agent_type,
             banner=banner,
-            interactive=interactive
+            interactive=interactive,
+            allow_upload=allow_upload
         )
 
         if agent_id:
@@ -238,7 +240,7 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
         ensure_interactive_column()
         with DatabaseManagerHoneypot() as db:
             db.execute("""
-                       SELECT agent_name, banner, ip_address, service_type, interactive
+                       SELECT agent_name, banner, ip_address, service_type, interactive, allow_upload
                        FROM honey_agents
                        WHERE id = %s
                        """, (agent_id,))
@@ -253,6 +255,7 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
             ip_address = result['ip_address']
             service_type = result['service_type']
             interactive = bool(result.get('interactive', 1))
+            allow_upload = bool(result.get('allow_upload', 1))
 
         # Read the template file
         template_path = os.path.join(
@@ -295,6 +298,7 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
                 "banner": "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5",
                 "host_key_file": "ssh_host_key.pem",
                 "interactive": interactive,
+                "allow_upload": allow_upload,
                 "hostname": "srv01"
             },
             "ftp": {
@@ -302,6 +306,7 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
                 "port": 21,
                 "banner": "220 FTP server ready",
                 "interactive": interactive,
+                "allow_upload": allow_upload,
                 "session_min_seconds": 600,
                 "session_max_seconds": 900,
                 "max_upload_bytes": 52428800,

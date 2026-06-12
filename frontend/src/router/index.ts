@@ -17,6 +17,7 @@ import settings from '@/views/dashboard/settings/settings.vue'
 import security_settings from "@/views/dashboard/settings/security.vue";
 import api_settings from "@/views/dashboard/settings/api.vue";
 import wordlists from "@/views/dashboard/wordlists/wordlists.vue"
+import payloads from "@/views/dashboard/payloads/payloads.vue"
 
 
 const routes = [
@@ -37,6 +38,7 @@ const routes = [
         { path: 'alerts', name: 'alerts', component: alerts },
         { path: 'alert-details/:id', name: 'alert-details', component: alertDetails },
         { path: 'wordlists', name: 'wordlists', component: wordlists },
+        { path: 'payloads', name: 'payloads', component: payloads },
         { path: 'settings', name: 'settings', component: settings,
         children: [
             { path: '', redirect: { name: 'security_settings' } },
