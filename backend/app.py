@@ -94,8 +94,10 @@ def before_request() -> tuple[Response, int] | None:
                                     is required, None otherwise.
     """
     # Define endpoints that don't require authentication
-    # Includes: static files, login, session check, Vue app, and agent reporting
-    public_endpoints = ["static", "auth.login", "serve_static_or_index", "auth.session_state", "serve_vue_app", "agent_create.agent_report", "agent_create.agent_upload"]
+    # Includes: static files, login, session check, Vue app, agent reporting,
+    # and agent install/download (fetched from the target host via curl|bash,
+    # which has no session).
+    public_endpoints = ["static", "auth.login", "serve_static_or_index", "auth.session_state", "serve_vue_app", "agent_create.agent_report", "agent_create.agent_upload", "agent_create.install_agent", "agent_create.download_agent"]
 
     # Define endpoints accessible during 2FA validation process
     a2f_endpoints = ['auth.a2f', 'static', 'serve_static_or_index', 'serve_vue_app']

@@ -172,7 +172,7 @@ export default defineComponent({
 
     const getInstallCommand = (method: string) => {
       if (!createdAgentId.value) return ''
-      const base = `curl -sSL ${serverUrl}/api/agent/install/${createdAgentId.value} | sudo bash`
+      const base = `curl -k -sSL ${serverUrl}/api/agent/install/${createdAgentId.value} | sudo bash`
       if (method === 'interactive') return base
       return `${base} -s -- --method ${method}`
     }

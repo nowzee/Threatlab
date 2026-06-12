@@ -87,8 +87,10 @@ class SSHServerHandler(paramiko.ServerInterface):
         self.client_address = client_address
         self.event = threading.Event()
         self.username = None
+        self.password = None
         self.shell_requested = False
         self.exec_command = None
+        self.sftp_requested = False
 
     def check_auth_password(self, username, password):
         """Capture the user/pass attempt."""
@@ -106,9 +108,10 @@ class SSHServerHandler(paramiko.ServerInterface):
             })
 
         # Interactive mode: accept the login to observe post-authentication
-        # behavior (commands). Otherwise: always reject.
+        # behavior (commands, SFTP uploads). Otherwise: always reject.
         if config.get('ssh', {}).get('interactive', False):
             self.username = username
+            self.password = password
             return paramiko.AUTH_SUCCESSFUL
         return paramiko.AUTH_FAILED
 
@@ -143,6 +146,13 @@ class SSHServerHandler(paramiko.ServerInterface):
             self.exec_command = str(command)
         self.event.set()
         return True
+
+    def check_channel_subsystem_request(self, channel, name):
+        # SFTP file upload (sftp subsystem over SSH).
+        if name == 'sftp':
+            self.sftp_requested = True
+            self.event.set()
+        return super().check_channel_subsystem_request(channel, name)
 
 
 def get_ip_geolocation(ip_address):
@@ -524,6 +534,78 @@ def run_shell_session(channel, handler):
                 channel.send(chr(byte))
 
 
+class _SFTPUploadHandle(paramiko.SFTPHandle):
+    """Captures the bytes written to a file uploaded over SFTP."""
+
+    def __init__(self, flags, filename, sftp_iface):
+        super().__init__(flags)
+        self.filename = filename
+        self.sftp = sftp_iface
+        self.buffer = bytearray()
+        self.truncated = False
+
+    def write(self, offset, data):
+        if not self.truncated:
+            self.buffer.extend(data)
+            if len(self.buffer) > self.sftp.max_upload:
+                self.truncated = True
+                logger.warning("SFTP upload truncated (>%d bytes)" % self.sftp.max_upload)
+        return paramiko.SFTP_OK
+
+    def close(self):
+        try:
+            if self.buffer:
+                h = self.sftp.handler
+                process_uploaded_binary(
+                    bytes(self.buffer[:self.sftp.max_upload]), self.filename,
+                    h.username, h.password,
+                    h.client_address[0], h.client_address[1],
+                    config.get('ssh', {}).get('port', 22),
+                    'ssh', 'SFTP put ' + str(self.filename),
+                )
+        except Exception as e:
+            logger.error("SFTP upload processing error: " + str(e))
+        return paramiko.SFTP_OK
+
+
+class HoneypotSFTPServer(paramiko.SFTPServerInterface):
+    """Minimal SFTP server: captures uploads, fakes everything else."""
+
+    def __init__(self, server, *largs, **kwargs):
+        super().__init__(server, *largs, **kwargs)
+        self.handler = server  # SSHServerHandler instance
+        self.max_upload = int(config.get('ssh', {}).get('max_upload_bytes', 50 * 1024 * 1024))
+
+    def open(self, path, flags, attr):
+        writing = bool(flags & (os.O_WRONLY | os.O_RDWR | os.O_CREAT | os.O_APPEND))
+        if writing:
+            logger.info("SFTP upload start from %s: %s" % (self.handler.client_address[0], path))
+            return _SFTPUploadHandle(flags, path, self)
+        # Reads: nothing real to serve.
+        return paramiko.SFTP_PERMISSION_DENIED
+
+    def list_folder(self, path):
+        return []
+
+    def stat(self, path):
+        return paramiko.SFTP_NO_SUCH_FILE
+
+    def lstat(self, path):
+        return paramiko.SFTP_NO_SUCH_FILE
+
+    def remove(self, path):
+        return paramiko.SFTP_OK
+
+    def rename(self, oldpath, newpath):
+        return paramiko.SFTP_OK
+
+    def mkdir(self, path, attr):
+        return paramiko.SFTP_OK
+
+    def rmdir(self, path):
+        return paramiko.SFTP_OK
+
+
 def handle_client_ssh(client_socket, client_address):
     """Handle individual SSH client connections"""
     try:
@@ -541,6 +623,11 @@ def handle_client_ssh(client_socket, client_address):
         ssh_banner = config.get('ssh', {}).get('banner', 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
         transport.local_version = ssh_banner
 
+        # In interactive mode, expose the SFTP subsystem so bots can upload
+        # binaries (captured and forwarded to the server like FTP STOR).
+        if config.get('ssh', {}).get('interactive', False):
+            transport.set_subsystem_handler('sftp', paramiko.SFTPServer, HoneypotSFTPServer)
+
         # Start server with custom handler
         server_handler = SSHServerHandler(client_address)
         transport.start_server(server=server_handler)
@@ -551,10 +638,16 @@ def handle_client_ssh(client_socket, client_address):
             return
 
         try:
-            # Let the client request a shell or run a command
+            # Let the client request a shell, run a command, or open SFTP
             server_handler.event.wait(10)
 
-            if server_handler.exec_command is not None:
+            if server_handler.sftp_requested:
+                # SFTP runs in paramiko's own subsystem thread; keep the
+                # connection alive until the client disconnects (bounded).
+                deadline = time.time() + 900
+                while transport.is_active() and time.time() < deadline:
+                    time.sleep(1)
+            elif server_handler.exec_command is not None:
                 # Non-interactive bot: a single command then close
                 cmd = server_handler.exec_command
                 log_command(cmd, server_handler)
@@ -632,15 +725,17 @@ def send_file_to_server(file_bytes, filename, meta):
     return False
 
 
-def _process_ftp_upload(file_bytes, filename, username, password, addr, ftp_port, cmd_log):
-    """Compute the hash, log the upload and forward the file to the server."""
+def process_uploaded_binary(file_bytes, filename, username, password,
+                            source_ip, source_port, target_port, service_type, headers):
+    """Hash an uploaded binary, log it, and forward it to the server (FTP STOR / SFTP put)."""
     file_hash = hashlib.sha256(file_bytes).hexdigest()
-    logger.info(f"FTP upload from {addr[0]}: {filename} ({len(file_bytes)} bytes) sha256={file_hash}")
+    logger.info(f"{service_type.upper()} upload from {source_ip}: {filename} "
+                f"({len(file_bytes)} bytes) sha256={file_hash}")
 
     queue_attack({
-        'source_ip': addr[0], 'source_port': addr[1], 'target_port': ftp_port,
+        'source_ip': source_ip, 'source_port': source_port, 'target_port': target_port,
         'username_attempt': username or "", 'password_attempt': password or "",
-        'service_type': 'ftp', 'attack_type': 'file_upload', 'classification': 'file_upload',
+        'service_type': service_type, 'attack_type': 'file_upload', 'classification': 'file_upload',
         'malware_hash': file_hash, 'payload': filename,
     })
 
@@ -648,13 +743,19 @@ def _process_ftp_upload(file_bytes, filename, username, password, addr, ftp_port
         'file_hash': file_hash,
         'file_name': filename or 'upload.bin',
         'file_size': str(len(file_bytes)),
-        'source_ip': addr[0],
+        'source_ip': source_ip,
         'username': username or "",
         'password': password or "",
-        'request_headers': "\n".join(cmd_log)[:8000],
+        'request_headers': (headers or "")[:8000],
         'agent_id': str(config.get('agent_id', 1)),
-        'service_type': 'ftp',
+        'service_type': service_type,
     })
+
+
+def _process_ftp_upload(file_bytes, filename, username, password, addr, ftp_port, cmd_log):
+    """FTP STOR upload: delegate to the shared upload pipeline."""
+    process_uploaded_binary(file_bytes, filename, username, password,
+                            addr[0], addr[1], ftp_port, 'ftp', "\n".join(cmd_log))
 
 
 def handle_client_ftp(conn, addr):
@@ -825,7 +926,7 @@ def handle_client_ftp(conn, addr):
                                         break
                                     file_bytes += chunk
                                     if len(file_bytes) > max_size:
-                                        logger.warning(f"FTP upload tronqué (>{max_size} o) de {addr[0]}")
+                                        logger.warning(f"FTP upload truncated (>{max_size} bytes) from {addr[0]}")
                                         break
                             except Exception:
                                 pass
@@ -838,7 +939,7 @@ def handle_client_ftp(conn, addr):
                             try:
                                 _process_ftp_upload(file_bytes, filename, username, password, addr, ftp_port, cmd_log)
                             except Exception as e:
-                                logger.error(f"Erreur traitement upload: {e}")
+                                logger.error(f"Upload processing error: {e}")
                 elif cmd in ("LIST", "NLST"):
                     if not authenticated:
                         need_login()

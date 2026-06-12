@@ -145,11 +145,12 @@ download_agent() {
 
     mkdir -p "${INSTALL_DIR}"
 
+    # -k / --no-check-certificate: the server uses a self-signed certificate.
     if check_command curl; then
-        curl -sSL -o "${INSTALL_DIR}/agent.py" \
+        curl -ksSL -o "${INSTALL_DIR}/agent.py" \
             "${SERVER_URL}/api/agent/download/${AGENT_ID}"
     elif check_command wget; then
-        wget -q -O "${INSTALL_DIR}/agent.py" \
+        wget -q --no-check-certificate -O "${INSTALL_DIR}/agent.py" \
             "${SERVER_URL}/api/agent/download/${AGENT_ID}"
     else
         log_error "Neither curl nor wget found. Please install one."
