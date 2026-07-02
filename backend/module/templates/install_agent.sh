@@ -32,6 +32,7 @@ SERVICE_NAME="threatlabs-agent"
 LOG_FILE="/var/log/threatlabs-agent.log"
 IMAGE_NAME="threatlabs-agent-${AGENT_ID}"
 CONTAINER_NAME="threatlabs-agent-${AGENT_ID}"
+ASSUME_YES="0"   # set by --yes/-y to skip the "install dependencies?" prompt
 
 # Colors
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
@@ -103,6 +104,25 @@ detect_os() {
 
 choose_auto_method() {
     if check_command docker; then echo "docker"; else echo "direct"; fi
+}
+
+# Ask the user before installing missing dependencies. Works when piped
+# (curl | bash) by talking to /dev/tty. Returns 0 = proceed, 1 = declined.
+# Bypassed with --yes, and auto-proceeds if there is no terminal at all.
+confirm_install() {
+    if [ "${ASSUME_YES}" = "1" ]; then return 0; fi
+    if ! { true >/dev/tty; } 2>/dev/null; then return 0; fi
+    {
+        echo ""
+        echo -e "${YELLOW}$1${NC}"
+        printf "Install these now? [Y/n] "
+    } >/dev/tty
+    local ans=""
+    read -r ans </dev/tty || ans=""
+    case "${ans}" in
+        n|N|no|NO|non|Non) return 1 ;;
+        *) return 0 ;;
+    esac
 }
 
 # Ask the user to choose Docker vs System. Works even when piped (curl | bash)
@@ -278,6 +298,23 @@ install_docker() {
 install_direct() {
     STEP_CURRENT=0; STEP_TOTAL=5
     echo -e "${BOLD}Installing natively (systemd)...${NC}"
+
+    # Detect missing SYSTEM packages (installed via the package manager). The
+    # Python libs (paramiko, requests) are installed into an isolated venv and
+    # don't touch the system, so they are NOT listed in this prompt.
+    local need=""
+    if ! check_command python3; then
+        need="python3 python3-venv python3-pip"
+    else
+        python3 -m venv --help  >/dev/null 2>&1 || need="${need} python3-venv"
+        python3 -m pip --version >/dev/null 2>&1 || need="${need} python3-pip"
+    fi
+    if [ -n "${need}" ]; then
+        if ! confirm_install "The following system packages will be installed:${need}"; then
+            echo; log_error "Cancelled. These packages are required to run the agent (or re-run with --yes)."; exit 1
+        fi
+    fi
+
     run_step "Preparing Python" ensure_python_env
     run_step "Downloading agent" download_agent
     run_step "Installing dependencies" install_python_deps
@@ -328,9 +365,10 @@ main() {
         case "$1" in
             --method|-m) INSTALL_METHOD="$2"; shift 2 ;;
             --dir|-d)    INSTALL_DIR="$2"; shift 2 ;;
+            --yes|-y)    ASSUME_YES="1"; shift ;;
             --uninstall) INSTALL_METHOD="uninstall"; shift ;;
             --help|-h)
-                echo "Usage: $0 [--method docker|direct|manual|auto] [--dir DIR] [--uninstall]"
+                echo "Usage: $0 [--method docker|direct|manual|auto] [--dir DIR] [--yes] [--uninstall]"
                 exit 0 ;;
             *) log_error "Unknown option: $1"; exit 1 ;;
         esac
