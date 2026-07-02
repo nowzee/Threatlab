@@ -55,7 +55,6 @@ const routes = [
     },
   { path: '/a2f', name: 'a2f', component: A2FView, meta: { public: true } },
 
-  // Route catch-all dynamique basée sur l'authentification
   {
     path: '/:pathMatch(.*)*',
     name: 'NotFound',
