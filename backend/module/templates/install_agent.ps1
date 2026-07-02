@@ -25,6 +25,7 @@ $ServerUrl   = '{{SERVER_URL}}'
 $ServiceType = '{{SERVICE_TYPE}}'
 $AgentName   = '{{AGENT_NAME}}'
 $Banner      = '{{BANNER}}'
+$AgentPorts  = '{{PORTS}}'   # space-separated, e.g. "22 2222"
 # ================================================================================
 
 $ImageName     = "threatlabs-agent-$AgentId"
@@ -135,9 +136,10 @@ function Download-Agent {
 }
 
 function Port-Args {
-    if ($ServiceType -eq 'ssh') { @('-p', '22:22') }
-    elseif ($ServiceType -eq 'ftp') { @('-p', '21:21') }
-    else { @('-p', '22:22', '-p', '21:21') }
+    # Map every user-chosen port (host -> container, same number).
+    $a = @()
+    foreach ($p in ($AgentPorts -split '\s+' | Where-Object { $_ })) { $a += @('-p', "${p}:${p}") }
+    $a
 }
 
 # ====================== INSTALL METHODS ======================
@@ -154,18 +156,18 @@ function Install-Docker {
     Download-Agent
 
     Step "Building image"
-    @'
+    @"
 FROM python:3.11-alpine
 RUN apk add --no-cache libffi openssl \
     && pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir paramiko requests
 WORKDIR /app
 COPY agent.py /app/agent.py
-EXPOSE 22 21
+EXPOSE $AgentPorts
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD pgrep -f "agent.py" >/dev/null 2>&1 || exit 1
 CMD ["python3", "-u", "/app/agent.py"]
-'@ | Set-Content -Path "$InstallDir\Dockerfile" -Encoding ASCII
+"@ | Set-Content -Path "$InstallDir\Dockerfile" -Encoding ASCII
     Invoke-Native 'docker' @('build', '-t', $ImageName, $InstallDir) 'Docker build failed.'
 
     Step "Starting container"

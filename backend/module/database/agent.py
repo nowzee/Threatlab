@@ -63,7 +63,8 @@ def create_agent_token(agent_name: str,
                        allow_upload: bool = True,
                        owner_id: Optional[int] = None,
                        auth_mode: str = 'any',
-                       auth_whitelist: Optional[str] = None) -> Tuple[Optional[int], Optional[str]]:
+                       auth_whitelist: Optional[str] = None,
+                       port: Optional[str] = None) -> Tuple[Optional[int], Optional[str]]:
     """
     Creates a record for a new honeypot agent and generates a unique token.
 
@@ -84,11 +85,11 @@ def create_agent_token(agent_name: str,
         print(f"[DEBUG] Starting create_agent_token for: {agent_name}")
         with DatabaseManagerHoneypot() as db:
             db.execute("""
-                INSERT INTO honey_agents (agent_name, ip_address, country_name, service_type, banner, interactive, allow_upload, owner_id, auth_mode, auth_whitelist)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO honey_agents (agent_name, ip_address, country_name, service_type, banner, interactive, allow_upload, owner_id, auth_mode, auth_whitelist, port)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (agent_name, ip_address, country_name, service_type, banner,
                   1 if interactive else 0, 1 if allow_upload else 0, owner_id,
-                  auth_mode if auth_mode in ('any', 'whitelist') else 'any', auth_whitelist))
+                  auth_mode if auth_mode in ('any', 'whitelist') else 'any', auth_whitelist, port))
 
             # Step 2: Get the auto-generated ID of the newly inserted agent
             agent_id = db.cursor.lastrowid

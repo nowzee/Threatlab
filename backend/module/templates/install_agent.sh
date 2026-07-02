@@ -23,6 +23,7 @@ SERVER_URL="{{SERVER_URL}}"
 SERVICE_TYPE="{{SERVICE_TYPE}}"
 AGENT_NAME="{{AGENT_NAME}}"
 BANNER="{{BANNER}}"
+AGENT_PORTS="{{PORTS}}"   # space-separated, e.g. "22 2222"
 # ================================================================================
 
 # Defaults
@@ -215,24 +216,29 @@ download_agent() {
 }
 
 port_args() {
-    if [ "${SERVICE_TYPE}" = "ssh" ]; then echo "-p 22:22"
-    elif [ "${SERVICE_TYPE}" = "ftp" ]; then echo "-p 21:21"
-    else echo "-p 22:22 -p 21:21"; fi
+    # Map every user-chosen port (host -> container, same number).
+    local args="" p
+    for p in ${AGENT_PORTS}; do args="${args} -p ${p}:${p}"; done
+    echo "${args}"
 }
 
 docker_build_image() {
-    cat > "${INSTALL_DIR}/Dockerfile" <<'DOCKEREOF'
+    {
+        cat <<'DOCKEREOF'
 FROM python:3.11-alpine
 RUN apk add --no-cache libffi openssl \
     && pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir paramiko requests
 WORKDIR /app
 COPY agent.py /app/agent.py
-EXPOSE 22 21
+DOCKEREOF
+        echo "EXPOSE ${AGENT_PORTS}"
+        cat <<'DOCKEREOF'
 HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
     CMD pgrep -f "agent.py" >/dev/null 2>&1 || exit 1
 CMD ["python3", "-u", "/app/agent.py"]
 DOCKEREOF
+    } > "${INSTALL_DIR}/Dockerfile"
     docker build -t "${IMAGE_NAME}" "${INSTALL_DIR}" >"${INSTALL_DIR}/build.log" 2>&1 || {
         echo; log_error "Docker build failed. Last lines:"; tail -n 20 "${INSTALL_DIR}/build.log"; exit 1;
     }

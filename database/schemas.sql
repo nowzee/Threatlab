@@ -16,7 +16,8 @@ CREATE TABLE IF NOT EXISTS honey_agents (
     secret_token_sha256 VARCHAR(255) UNIQUE,
     owner_id BIGINT,
     auth_mode VARCHAR(20) NOT NULL DEFAULT 'any',
-    auth_whitelist TEXT
+    auth_whitelist TEXT,
+    port VARCHAR(255)
 );
 
 CREATE TABLE IF NOT EXISTS groups_agent (

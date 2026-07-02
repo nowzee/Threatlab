@@ -24,7 +24,7 @@ interface AgentConfig {
   authWhitelist: { username: string; password: string }[]
   networkConfig: {
     host: string
-    port: number
+    ports: string
     interface: string
   }
 }
@@ -81,7 +81,7 @@ export default defineComponent({
       authWhitelist: [{ username: '', password: '' }],
       networkConfig: {
         host: '0.0.0.0',
-        port: typeConfig.value.defaultPort,
+        ports: String(typeConfig.value.defaultPort),
         interface: 'eth0'
       }
     })
@@ -90,7 +90,7 @@ export default defineComponent({
       const cfg = AGENT_TYPE_CONFIGS[agentType.value]
       if (cfg) {
         agentConfig.banner = cfg.defaultBanner
-        agentConfig.networkConfig.port = cfg.defaultPort
+        agentConfig.networkConfig.ports = String(cfg.defaultPort)
       }
     })
 
@@ -113,8 +113,9 @@ export default defineComponent({
         if (!agentConfig.description.trim()) stepErrors.value.push('La description est obligatoire')
       }
       if (step === 2) {
-        if (agentConfig.networkConfig.port < 1 || agentConfig.networkConfig.port > 65535) {
-          stepErrors.value.push('Le port doit etre entre 1 et 65535')
+        const nums = agentConfig.networkConfig.ports.split(/[,\s]+/).filter(Boolean).map(Number)
+        if (!nums.length || nums.some(n => !Number.isInteger(n) || n < 1 || n > 65535)) {
+          stepErrors.value.push('Port(s) invalide(s) : entre 1 et 65535, séparés par une virgule ou un espace')
         }
       }
       return stepErrors.value.length === 0
@@ -169,6 +170,7 @@ export default defineComponent({
             ip_address: agentConfig.ipAddress || '0.0.0.0',
             country_name: agentConfig.country,
             banner: agentConfig.banner,
+            port: agentConfig.networkConfig.ports,
             interactive: agentConfig.interactive,
             allow_upload: agentConfig.interactive && agentConfig.allowUpload,
             auth_mode: agentConfig.interactive ? agentConfig.authMode : 'any',
@@ -312,8 +314,9 @@ export default defineComponent({
               <input id="network-host" v-model="agentConfig.networkConfig.host" type="text" class="form-input" placeholder="0.0.0.0" />
             </div>
             <div class="form-group">
-              <label for="network-port">Port</label>
-              <input id="network-port" v-model.number="agentConfig.networkConfig.port" type="number" class="form-input" min="1" max="65535" />
+              <label for="network-port">Port(s)</label>
+              <input id="network-port" v-model="agentConfig.networkConfig.ports" type="text" class="form-input" placeholder="Ex: 22 ou 22,2222" />
+              <small class="form-help">Un ou plusieurs ports (séparés par une virgule ou un espace).</small>
             </div>
             <div class="form-group">
               <label for="network-interface">Interface reseau</label>
@@ -377,7 +380,7 @@ export default defineComponent({
             <div class="review-section">
               <h4 class="review-section-title">Reseau</h4>
               <div class="review-grid">
-                <div class="review-item"><span class="review-label">Port</span><code class="review-value">{{ agentConfig.networkConfig.port }}</code></div>
+                <div class="review-item"><span class="review-label">Port(s)</span><code class="review-value">{{ agentConfig.networkConfig.ports }}</code></div>
                 <div class="review-item"><span class="review-label">Host</span><code class="review-value">{{ agentConfig.networkConfig.host }}</code></div>
                 <div class="review-item"><span class="review-label">Interface</span><code class="review-value">{{ agentConfig.networkConfig.interface }}</code></div>
                 <div class="review-item"><span class="review-label">Mode interactif</span><span class="review-value">{{ agentConfig.interactive ? 'Active' : 'Desactive' }}</span></div>

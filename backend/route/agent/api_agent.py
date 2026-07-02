@@ -65,6 +65,30 @@ def agent_create() -> Tuple[Response, int]:
         interactive = bool(request.json.get('interactive', True))
         allow_upload = bool(request.json.get('allow_upload', True))
 
+        # Listening port(s) chosen by the user. Accepts a single value, a list,
+        # or a "22,2222"/"22 2222" string. Stored as a comma-separated list.
+        default_port = 22 if agent_type == 'ssh' else (21 if agent_type == 'ftp' else 22)
+        raw_ports = request.json.get('port')
+        if raw_ports is None:
+            raw_ports = request.json.get('ports')
+        if isinstance(raw_ports, list):
+            candidates = raw_ports
+        elif raw_ports is None:
+            candidates = []
+        else:
+            candidates = str(raw_ports).replace(',', ' ').split()
+        ports = []
+        for c in candidates:
+            try:
+                pi = int(c)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= pi <= 65535 and pi not in ports:
+                ports.append(pi)
+        if not ports:
+            ports = [default_port]
+        port = ','.join(str(p) for p in ports)
+
         # Interactive-shell auth policy. Credential capture is ALWAYS on; this
         # only controls which credentials may enter the fake shell.
         import json as _json
@@ -108,7 +132,8 @@ def agent_create() -> Tuple[Response, int]:
             allow_upload=allow_upload,
             owner_id=owner_id,
             auth_mode=auth_mode,
-            auth_whitelist=auth_whitelist_json
+            auth_whitelist=auth_whitelist_json,
+            port=port
         )
 
         if agent_id:
@@ -281,7 +306,7 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
         with DatabaseManagerHoneypot() as db:
             db.execute("""
                        SELECT agent_name, banner, ip_address, service_type, interactive, allow_upload,
-                              auth_mode, auth_whitelist
+                              auth_mode, auth_whitelist, port
                        FROM honey_agents
                        WHERE id = %s
                        """, (agent_id,))
@@ -299,6 +324,7 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
             allow_upload = bool(result.get('allow_upload', 1))
             auth_mode = result.get('auth_mode') or 'any'
             auth_whitelist_raw = result.get('auth_whitelist')
+            port_val = result.get('port')
 
         # Read the template file
         template_path = os.path.join(
@@ -404,6 +430,23 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
             'allow': auth_allow,
         }
 
+        # Apply the user-chosen listening port(s) to the active service. The DB
+        # stores a comma-separated list; the agent listens on all of them.
+        default_p = 21 if service_type == 'ftp' else 22
+        eff_ports = []
+        for c in str(port_val or '').replace(',', ' ').split():
+            try:
+                pi = int(c)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= pi <= 65535 and pi not in eff_ports:
+                eff_ports.append(pi)
+        if not eff_ports:
+            eff_ports = [default_p]
+        svc_key = 'ftp' if service_type == 'ftp' else 'ssh'
+        default_config[svc_key]['ports'] = eff_ports
+        default_config[svc_key]['port'] = eff_ports[0]
+
         # Serialize config as JSON. The template parses it with json.loads(r\"\"\"...\"\"\"),
         # so plain JSON (lowercase true/false/null) is correct and user-supplied
         # strings (passwords) are embedded safely.
@@ -484,7 +527,7 @@ def install_agent(agent_id: int) -> Tuple[Response, int]:
     try:
         with DatabaseManagerHoneypot() as db:
             db.execute("""
-                SELECT agent_name, banner, ip_address, service_type
+                SELECT agent_name, banner, ip_address, service_type, port
                 FROM honey_agents
                 WHERE id = %s
             """, (agent_id,))
@@ -526,6 +569,20 @@ def install_agent(agent_id: int) -> Tuple[Response, int]:
         script_content = script_content.replace('{{SERVICE_TYPE}}', result['service_type'] or 'ssh')
         script_content = script_content.replace('{{AGENT_NAME}}', result['agent_name'] or f'agent-{agent_id}')
         script_content = script_content.replace('{{BANNER}}', result['banner'] or 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
+        _svc = result['service_type'] or 'ssh'
+        _default_p = 21 if _svc == 'ftp' else 22
+        _ports = []
+        for c in str(result.get('port') or '').replace(',', ' ').split():
+            try:
+                pi = int(c)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= pi <= 65535 and pi not in _ports:
+                _ports.append(pi)
+        if not _ports:
+            _ports = [_default_p]
+        # Space-separated list, e.g. "22 2222" — used by the installer for -p / EXPOSE.
+        script_content = script_content.replace('{{PORTS}}', ' '.join(str(p) for p in _ports))
 
         import tempfile
         temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.' + ext, delete=False)

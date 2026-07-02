@@ -101,11 +101,34 @@ def _auth_allowed(username, password):
     return False
 
 
+def _service_ports(service, default_port):
+    """Ports the given service should listen on: config['<svc>']['ports'] (list),
+    falling back to config['<svc>']['port'], then default. De-duped int list."""
+    cfg = config.get(service, {}) if isinstance(config, dict) else {}
+    out = []
+    raw = cfg.get('ports')
+    if isinstance(raw, list):
+        for p in raw:
+            try:
+                pi = int(p)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= pi <= 65535 and pi not in out:
+                out.append(pi)
+    if out:
+        return out
+    try:
+        return [int(cfg.get('port', default_port))]
+    except (TypeError, ValueError):
+        return [default_port]
+
+
 class SSHServerHandler(paramiko.ServerInterface):
     """Handles SSH authentication and, in interactive mode, the emulated shell."""
 
-    def __init__(self, client_address):
+    def __init__(self, client_address, local_port=None):
         self.client_address = client_address
+        self.local_port = local_port if local_port else config.get('ssh', {}).get('port', 22)
         self.event = threading.Event()
         self.username = None
         self.password = None
@@ -120,7 +143,7 @@ class SSHServerHandler(paramiko.ServerInterface):
         queue_attack({
             'source_ip': self.client_address[0],
             'source_port': self.client_address[1],
-            'target_port': config.get('ssh', {}).get('port', 22),
+            'target_port': self.local_port,
             'username_attempt': username,
             'password_attempt': password,
             'service_type': 'ssh',
@@ -945,8 +968,12 @@ def handle_client_ssh(client_socket, client_address):
         if ssh_interactive and upload_allowed:
             transport.set_subsystem_handler('sftp', paramiko.SFTPServer, HoneypotSFTPServer)
 
-        # Start server with custom handler
-        server_handler = SSHServerHandler(client_address)
+        # Start server with custom handler (remember which local port was hit)
+        try:
+            local_port = client_socket.getsockname()[1]
+        except Exception:
+            local_port = config.get('ssh', {}).get('port', 22)
+        server_handler = SSHServerHandler(client_address, local_port)
         transport.start_server(server=server_handler)
 
         # Wait for a channel (only opens if auth succeeded, i.e. interactive mode)
@@ -1150,7 +1177,10 @@ def handle_client_ftp(conn, addr):
     """
     peer = f"{addr[0]}:{addr[1]}"
     ftp_cfg = config.get('ftp', {})
-    ftp_port = ftp_cfg.get('port', 21)
+    try:
+        ftp_port = conn.getsockname()[1]
+    except Exception:
+        ftp_port = ftp_cfg.get('port', 21)
     interactive_enabled = ftp_cfg.get('interactive', False)
     upload_allowed = ftp_cfg.get('allow_upload', True)
     smin = int(ftp_cfg.get('session_min_seconds', 600))
@@ -1375,88 +1405,88 @@ def handle_client_ftp(conn, addr):
         except Exception:
             pass
 
+def _ssh_accept_loop(ssh_host, ssh_port):
+    """Bind one SSH port and accept connections forever."""
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    try:
+        server_socket.bind((ssh_host, ssh_port))
+    except OSError as e:
+        logger.error(f"Failed to bind SSH port {ssh_port}: {e} (need sudo for ports < 1024)")
+        return
+    server_socket.listen(100)
+    logger.info(f"SSH Honeypot listening on port {ssh_port}")
+    try:
+        while True:
+            client_socket, client_address = server_socket.accept()
+            logger.info(f"SSH connection from {client_address[0]}:{client_address[1]} on port {ssh_port}")
+            threading.Thread(target=handle_client_ssh, args=(client_socket, client_address), daemon=True).start()
+    except Exception as e:
+        logger.error(f"SSH accept loop error on port {ssh_port}: {e}")
+    finally:
+        server_socket.close()
+
+
 def start_ssh_honeypot():
-    """Start the SSH honeypot server"""
+    """Start the SSH honeypot on every configured port."""
     if not config.get('features', {}).get('ssh_enabled', True):
         logger.info("SSH honeypot is disabled in configuration")
         return
 
     ssh_host = config.get('ssh', {}).get('host', '0.0.0.0')
-    ssh_port = config.get('ssh', {}).get('port', 22)
-
-    logger.info(f"Starting SSH Honeypot on {ssh_host}:{ssh_port}")
+    ports = _service_ports('ssh', 22)
+    logger.info(f"Starting SSH Honeypot on {ssh_host} ports {ports}")
     logger.info(f"Agent ID: {config.get('agent_id', 1)}")
 
-    # Ensure host key exists
     load_or_generate_host_key()
 
-    # Create server socket
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    threads = []
+    for p in ports:
+        t = threading.Thread(target=_ssh_accept_loop, args=(ssh_host, p), daemon=True)
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join()
 
+def _ftp_accept_loop(ftp_host, ftp_port):
+    """Bind one FTP port and accept connections forever."""
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
-        server_socket.bind((ssh_host, ssh_port))
+        s.bind((ftp_host, ftp_port))
     except OSError as e:
-        logger.error(f"Failed to bind to port {ssh_port}: {e}")
-        logger.error("Make sure you have permission to bind to this port (use sudo for ports < 1024)")
-        sys.exit(1)
-
-    server_socket.listen(100)
-    logger.info(f"SSH Honeypot listening on port {ssh_port}")
-
-    # Accept connections
+        logger.error(f"Failed to bind FTP port {ftp_port}: {e} (need sudo for ports < 1024)")
+        return
+    s.listen(100)
+    logger.info(f"FTP Honeypot listening on port {ftp_port}")
     try:
         while True:
-            client_socket, client_address = server_socket.accept()
-            logger.info(f"SSH connection from {client_address[0]}:{client_address[1]}")
-
-            # Handle client in separate thread
-            client_thread = threading.Thread(
-                target=handle_client_ssh,
-                args=(client_socket, client_address),
-                daemon=True
-            )
-            client_thread.start()
-
-    except KeyboardInterrupt:
-        logger.info("Shutting down SSH honeypot...")
+            conn, addr = s.accept()
+            logger.info(f"FTP connection from {addr[0]}:{addr[1]} on port {ftp_port}")
+            threading.Thread(target=handle_client_ftp, args=(conn, addr), daemon=True).start()
+    except Exception as e:
+        logger.error(f"FTP accept loop error on port {ftp_port}: {e}")
     finally:
-        server_socket.close()
+        s.close()
+
 
 def start_ftp_honeypot():
-    """Start the FTP honeypot server"""
+    """Start the FTP honeypot on every configured port."""
     if not config.get('features', {}).get('ftp_enabled', True):
         logger.info("FTP honeypot is disabled in configuration")
         return
 
     ftp_host = config.get('ftp', {}).get('host', '0.0.0.0')
-    ftp_port = config.get('ftp', {}).get('port', 21)
+    ports = _service_ports('ftp', 21)
+    logger.info(f"Starting FTP Honeypot on {ftp_host} ports {ports}")
 
-    logger.info(f"Starting FTP Honeypot on {ftp_host}:{ftp_port}")
-
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
-    try:
-        s.bind((ftp_host, ftp_port))
-    except OSError as e:
-        logger.error(f"Failed to bind to port {ftp_port}: {e}")
-        logger.error("Make sure you have permission to bind to this port (use sudo for ports < 1024)")
-        sys.exit(1)
-
-    s.listen(100)
-    logger.info(f"FTP Honeypot listening on port {ftp_port}")
-
-    try:
-        while True:
-            conn, addr = s.accept()
-            logger.info(f"FTP connection from {addr[0]}:{addr[1]}")
-            t = threading.Thread(target=handle_client_ftp, args=(conn, addr), daemon=True)
-            t.start()
-    except KeyboardInterrupt:
-        logger.info("Shutting down FTP honeypot...")
-    finally:
-        s.close()
+    threads = []
+    for p in ports:
+        t = threading.Thread(target=_ftp_accept_loop, args=(ftp_host, p), daemon=True)
+        t.start()
+        threads.append(t)
+    for t in threads:
+        t.join()
 
 
 
