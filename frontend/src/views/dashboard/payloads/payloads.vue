@@ -177,12 +177,12 @@ export default defineComponent({
               <td class="mono">{{ p.file_name }}</td>
               <td class="mono small" :title="p.file_hash">{{ shortHash(p.file_hash) }}</td>
               <td>{{ formatBytes(p.file_size) }}</td>
-              <td><span class="pill"><span class="d"></span>{{ p.service_type }}</span></td>
+              <td><span class="pill svc"><span class="d"></span>{{ p.service_type }}</span></td>
               <td class="mono">{{ p.source_ip }}</td>
               <td class="mono small">{{ p.username }}<span v-if="p.password">:{{ p.password }}</span></td>
               <td>{{ p.upload_count }}</td>
               <td class="small">{{ formatDate(p.last_seen) }}</td>
-              <td><button class="btn btn-ghost btn-sm" @click="downloadPayload(p.file_hash)">Télécharger</button></td>
+              <td><button class="btn btn-sm dl" @click="downloadPayload(p.file_hash)">Télécharger</button></td>
             </tr>
           </tbody>
         </table>
@@ -294,6 +294,13 @@ export default defineComponent({
 .seg-btn:hover { color: var(--ap-ink); }
 .seg-btn.active { background: var(--ap-ink); color: var(--ap-paper); }
 
+/* Service tag: outlined so it stays visible on the light paper surface */
+.svc { border: 1px solid var(--ap-line-strong); }
+
+/* Download button: outlined, fills on hover (clear affordance vs a text-only hover) */
+.dl { border: 1px solid var(--ap-line-strong); background: transparent; color: var(--ap-ink); opacity: 1; }
+.dl:hover { background: var(--ap-ink); color: var(--ap-paper); border-color: var(--ap-ink); }
+
 /* Command cell */
 .cmd { max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
 .cmd:hover { text-decoration: underline; }
@@ -303,7 +310,7 @@ export default defineComponent({
 .pp-pager-info { font-size: 12px; color: var(--ap-gray); }
 .pp-pages { display: flex; gap: 6px; align-items: center; }
 .pp-page { min-width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; padding: 0 6px; border: 1px solid var(--ap-line-strong); background: transparent; color: var(--ap-ink); font-size: 13px; cursor: pointer; }
-.pp-page:hover:not(:disabled) { background: var(--ap-sand); }
+.pp-page:hover:not(:disabled):not(.active) { background: var(--ap-sand); }
 .pp-page.active { background: var(--ap-ink); color: var(--ap-paper); border-color: var(--ap-ink); }
 .pp-page:disabled { opacity: .4; cursor: not-allowed; }
 .pp-ellipsis { min-width: 20px; text-align: center; color: var(--ap-gray); }
