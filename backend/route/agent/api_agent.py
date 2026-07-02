@@ -380,7 +380,7 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
                 "session_min_seconds": 600,
                 "session_max_seconds": 900,
                 "max_upload_bytes": 52428800,
-                "public_ip": ""
+                "public_ip": ip_address or ""
             },
             "reporting": {
                 "interval": 30,

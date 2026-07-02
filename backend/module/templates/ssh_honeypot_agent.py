@@ -101,6 +101,19 @@ def _auth_allowed(username, password):
     return False
 
 
+def _in_container():
+    """True if running inside a Docker/OCI container. Inside a container the
+    host's configured IP isn't bindable, so we listen on 0.0.0.0 instead."""
+    if os.path.exists('/.dockerenv'):
+        return True
+    try:
+        with open('/proc/1/cgroup', 'rt') as f:
+            data = f.read()
+        return ('docker' in data) or ('containerd' in data) or ('kubepods' in data)
+    except Exception:
+        return False
+
+
 def _service_ports(service, default_port):
     """Ports the given service should listen on: config['<svc>']['ports'] (list),
     falling back to config['<svc>']['port'], then default. De-duped int list."""
@@ -1434,6 +1447,8 @@ def start_ssh_honeypot():
         return
 
     ssh_host = config.get('ssh', {}).get('host', '0.0.0.0')
+    if _in_container():
+        ssh_host = '0.0.0.0'  # the configured host IP isn't bindable inside a container
     ports = _service_ports('ssh', 22)
     logger.info(f"Starting SSH Honeypot on {ssh_host} ports {ports}")
     logger.info(f"Agent ID: {config.get('agent_id', 1)}")
@@ -1477,6 +1492,8 @@ def start_ftp_honeypot():
         return
 
     ftp_host = config.get('ftp', {}).get('host', '0.0.0.0')
+    if _in_container():
+        ftp_host = '0.0.0.0'  # the configured host IP isn't bindable inside a container
     ports = _service_ports('ftp', 21)
     logger.info(f"Starting FTP Honeypot on {ftp_host} ports {ports}")
 

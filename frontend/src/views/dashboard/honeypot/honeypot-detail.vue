@@ -181,7 +181,7 @@ export default defineComponent({
       <!-- Tabs -->
       <div class="tabs-container">
         <button class="tab-btn" :class="{ active: activeTab === 'overview' }" @click="activeTab = 'overview'">Vue d'ensemble</button>
-        <button class="tab-btn" :class="{ active: activeTab === 'attacks' }" @click="activeTab = 'attacks'">Attaques Recentes ({{ honeypot.recent_attacks.length }})</button>
+        <button class="tab-btn" :class="{ active: activeTab === 'attacks' }" @click="activeTab = 'attacks'">Attaques Recentes</button>
         <button class="tab-btn" :class="{ active: activeTab === 'settings' }" @click="activeTab = 'settings'">Parametres</button>
       </div>
 
