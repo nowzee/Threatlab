@@ -22,6 +22,7 @@ const showDeleteConfirm = ref(false)
 const searchQuery = ref('')
 const deleting = ref(false)
 const toast = ref('')
+const loading = ref(true)
 
 const distinctTypes = computed(() => new Set(honeypots.value.map(h => h.type)).size)
 
@@ -42,6 +43,7 @@ const allSelected = computed(() =>
 )
 
 async function loadHoneypots() {
+  loading.value = true
   try {
     const response = await fetch('/api/agent/manage/list', {
       method: 'GET',
@@ -62,6 +64,8 @@ async function loadHoneypots() {
     }))
   } catch (error) {
     console.error('Erreur lors du chargement des honeypots:', error)
+  } finally {
+    loading.value = false
   }
 }
 
@@ -155,11 +159,11 @@ onMounted(loadHoneypots)
     <!-- Stats -->
     <div class="hp-stats">
       <div class="hp-stat">
-        <div class="n">{{ honeypots.length }}</div>
+        <div class="n"><span v-if="loading" class="sk-bar sk-num"></span><template v-else>{{ honeypots.length }}</template></div>
         <div class="l">Honeypots</div>
       </div>
       <div class="hp-stat">
-        <div class="n">{{ distinctTypes }}</div>
+        <div class="n"><span v-if="loading" class="sk-bar sk-num"></span><template v-else>{{ distinctTypes }}</template></div>
         <div class="l">Types de services</div>
       </div>
     </div>
@@ -173,8 +177,31 @@ onMounted(loadHoneypots)
       <span class="hp-selcount" v-if="selectedHoneypots.length">{{ selectedHoneypots.length }} sélectionné(s)</span>
     </div>
 
+    <!-- Skeleton de chargement (pas de spinner : cartes fantômes avec reflet qui glisse) -->
+    <div class="hp-grid" v-if="loading">
+      <article class="hp-card sk-card" v-for="n in 6" :key="'sk' + n" aria-hidden="true">
+        <div class="hp-card-top">
+          <div class="sk-head">
+            <span class="sk-bar" style="width:62%;height:15px"></span>
+            <span class="sk-bar" style="width:34%;height:11px;margin-top:8px"></span>
+          </div>
+          <span class="sk-bar sk-box"></span>
+        </div>
+        <span class="sk-bar" style="width:64px;height:20px"></span>
+        <div class="hp-meta">
+          <span class="sk-bar" style="width:100%;height:12px"></span>
+          <span class="sk-bar" style="width:100%;height:12px"></span>
+          <span class="sk-bar" style="width:100%;height:12px"></span>
+        </div>
+        <div class="hp-foot">
+          <span class="sk-bar" style="width:52px;height:22px"></span>
+          <span class="sk-bar" style="width:62px;height:26px"></span>
+        </div>
+      </article>
+    </div>
+
     <!-- Grid -->
-    <div class="hp-grid" v-if="filteredHoneypots.length">
+    <div class="hp-grid" v-else-if="filteredHoneypots.length">
       <article
         v-for="h in filteredHoneypots"
         :key="h.id"
@@ -315,6 +342,30 @@ onMounted(loadHoneypots)
 
 /* En dark, le survol ghost par défaut (--ap-sand) est trop proche du fond des cartes : on le renforce. */
 [data-theme="dark"] .hp-page .btn-ghost:hover { background: var(--ap-line-strong); opacity: 1; }
+
+/* Skeleton de chargement — barres fantômes avec reflet qui glisse (aucun spinner). */
+.hp-page { --sk-base: #e9e6df; --sk-shine: rgba(255, 255, 255, 0.6); }
+[data-theme="dark"] .hp-page { --sk-base: #262626; --sk-shine: rgba(255, 255, 255, 0.06); }
+.sk-bar {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: var(--sk-base);
+  border-radius: 3px;
+}
+.sk-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, var(--sk-shine), transparent);
+  animation: sk-slide 1.4s ease-in-out infinite;
+}
+@keyframes sk-slide { to { transform: translateX(100%); } }
+.sk-head { flex: 1; min-width: 0; }
+.sk-box { width: 16px; height: 16px; flex-shrink: 0; }
+.sk-num { display: inline-block; width: 44px; height: 26px; }
+@media (prefers-reduced-motion: reduce) { .sk-bar::after { animation: none; } }
 
 @media (max-width: 640px) {
   .hp-page .head { flex-direction: column; align-items: stretch; }
