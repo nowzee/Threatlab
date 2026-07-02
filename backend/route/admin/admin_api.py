@@ -1,10 +1,3 @@
-"""
-Admin API Route Module.
-
-Admin-only endpoints (role == 'admin') for managing user accounts and reading
-the audit log. Login-gating is provided globally by ``app.before_request``; the
-``@require_admin`` decorator adds the role check.
-"""
 from typing import Tuple
 
 from flask import Blueprint, jsonify, request, Response
@@ -79,7 +72,6 @@ def admin_delete_user(user_id: int) -> Tuple[Response, int]:
 @admin_bp.route('/audit', methods=['GET'])
 @require_admin
 def admin_audit() -> Tuple[Response, int]:
-    """Paginated audit log. Query: ?page=&limit=."""
     try:
         page = int(request.args.get('page', 1))
         limit = int(request.args.get('limit', 25))

@@ -145,7 +145,6 @@ export default defineComponent({
         </button>
         <div class="header-info">
           <h1 class="page-title">{{ honeypot.name }}</h1>
-          <span class="mono-badge"><span class="status-dot" :class="{ off: honeypot.status !== 'active' }"></span>{{ honeypot.status === 'active' ? 'Actif' : 'Inactif' }}</span>
           <span class="mono-badge">{{ honeypot.type.toUpperCase() }}</span>
         </div>
       </div>
