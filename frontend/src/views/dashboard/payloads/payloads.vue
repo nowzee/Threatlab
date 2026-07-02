@@ -295,15 +295,15 @@ export default defineComponent({
 
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .data-table th {
-  text-align: left; padding: 12px 14px; background: #1c1c1c;
+  text-align: left; padding: 12px 14px; background: var(--table-header-bg);
   color: var(--text-color-muted); font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
   border-bottom: 1px solid var(--container-border-color);
 }
 .data-table td { padding: 11px 14px; border-bottom: 1px solid var(--container-border-color); color: var(--text-color); }
-.data-table tbody tr:hover { background: #1a1a1a; }
+.data-table tbody tr:hover { background: var(--card-background); }
 .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 .dim { color: var(--text-color-muted); }
-.cmd { max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #cfd3dc; cursor: pointer; }
+.cmd { max-width: 520px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-color); cursor: pointer; }
 .cmd:hover { color: var(--accent-color); }
 
 .modal-overlay {
@@ -325,8 +325,8 @@ export default defineComponent({
 .modal-cmd {
   margin: 0; padding: 16px 18px; overflow: auto; flex: 1;
   font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 12.5px;
-  color: #cfd3dc; white-space: pre-wrap; word-break: break-all; line-height: 1.6;
-  background: #0d0d0d; border-top: 1px solid var(--container-border-color);
+  color: var(--text-color); white-space: pre-wrap; word-break: break-all; line-height: 1.6;
+  background: var(--background-color-dark); border-top: 1px solid var(--container-border-color);
   border-bottom: 1px solid var(--container-border-color);
 }
 .modal-actions { padding: 12px 18px; display: flex; justify-content: flex-end; }

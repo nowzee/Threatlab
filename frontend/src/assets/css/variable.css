@@ -39,3 +39,57 @@
     --table-row-hover: #252525;
     --table-border: #2c2c2c;
 }
+
+/* ============================================================
+   LIGHT THEME ("paper") — mirrors the frontend-admin palette.
+   Activated via <html data-theme="light">. Dark stays the default
+   (:root above). The same variable names are remapped so the whole
+   app re-themes; a couple of contrast fixes follow for elements that
+   hardcode var(--white) on coloured backgrounds.
+   ============================================================ */
+[data-theme="light"] {
+    /* Base colors */
+    --background-color: #ECEAE4;
+    --background-color-dark: #F4F2ED;   /* page background (paper) */
+    --text-color: #0E1116;              /* ink */
+    --text-color-muted: #5B6472;
+    --white: #0E1116;                   /* "white" text -> ink on light surfaces */
+    --accent-color: oklch(0.72 0.14 150);
+    --accent-color-hover: oklch(0.66 0.15 150);
+    --danger-color: #d92d20;
+    --success-color: #14833b;
+    --warning-color: #b45309;
+    --info-color: #1d6fd8;
+
+    /* Container colors */
+    --container-background: #FFFFFF;
+    --container-background-lighter: #FBFAF7;
+    --container-shadow: rgba(14, 17, 22, 0.08);
+    --container-border-color: #E4E0D8;
+    --card-background: #FFFFFF;
+
+    /* Form elements */
+    --input-border: #D8D3C8;
+    --input-background: #FFFFFF;
+    --input-focus-border: var(--accent-color);
+
+    /* Button colors */
+    --button-background: oklch(0.72 0.14 150);
+    --button-text: #0E1116;
+    --button-hover-background-login: oklch(0.66 0.15 150);
+    --button-hover-background: rgba(30, 132, 73, 0.12);
+
+    /* Charts and data visualization */
+    --chart-grid-color: #E4E0D8;
+    --chart-line-color: var(--accent-color);
+
+    /* Table styles */
+    --table-header-bg: #F0EDE6;
+    --table-row-hover: #F6F4EF;
+    --table-border: #E4E0D8;
+}
+
+/* Danger buttons keep white text on the red background (var(--white) is ink in
+   light theme, which would be low-contrast on red). */
+[data-theme="light"] .btn-danger { color: #FFFFFF; }
+[data-theme="light"] .form-control:focus { box-shadow: 0 0 0 3px rgba(30, 132, 73, 0.15); }

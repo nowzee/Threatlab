@@ -13,7 +13,10 @@ CREATE TABLE IF NOT EXISTS honey_agents (
     alert_generated INT DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    secret_token_sha256 VARCHAR(255) UNIQUE
+    secret_token_sha256 VARCHAR(255) UNIQUE,
+    owner_id BIGINT,
+    auth_mode VARCHAR(20) NOT NULL DEFAULT 'any',
+    auth_whitelist TEXT
 );
 
 CREATE TABLE IF NOT EXISTS groups_agent (
@@ -155,7 +158,8 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     otp_code VARCHAR(255) UNIQUE,
-    otp_active INT DEFAULT 0
+    otp_active INT DEFAULT 0,
+    role VARCHAR(20) NOT NULL DEFAULT 'member'
 );
 
 CREATE TABLE IF NOT EXISTS api_keys (
@@ -174,4 +178,16 @@ CREATE TABLE IF NOT EXISTS log_attempt_account (
     ip_address VARCHAR(45) NOT NULL,
     status VARCHAR(50) NOT NULL,
     FOREIGN KEY (account_id) REFERENCES users (id)
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    actor_id BIGINT,
+    actor_username VARCHAR(255),
+    action VARCHAR(64) NOT NULL,
+    target_type VARCHAR(32),
+    target_id VARCHAR(64),
+    detail TEXT,
+    ip_address VARCHAR(45)
 );

@@ -10,11 +10,13 @@ from flask import Blueprint, jsonify, request, current_app, send_file, Response
 import jwt
 import os
 import hashlib
-from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction, get_agent_about, record_uploaded_file, ensure_interactive_column
+from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction, get_agent_about, record_uploaded_file
 from module.database.db_manager import DatabaseManagerHoneypot
 from module.ingestion.ingest import enqueue_report
 from string import Template
 from module.auth.decorator import agent_jwt_required
+from module.auth.session_helpers import current_user_id, current_username, is_admin
+from module.database.audit import log_audit
 
 agent_create_bp = Blueprint('agent_create', __name__, url_prefix='/api/agent')
 
@@ -63,6 +65,39 @@ def agent_create() -> Tuple[Response, int]:
         interactive = bool(request.json.get('interactive', True))
         allow_upload = bool(request.json.get('allow_upload', True))
 
+        # Interactive-shell auth policy. Credential capture is ALWAYS on; this
+        # only controls which credentials may enter the fake shell.
+        import json as _json
+        auth_mode = request.json.get('auth_mode', 'any')
+        if auth_mode not in ('any', 'whitelist'):
+            auth_mode = 'any'
+        raw_wl = request.json.get('auth_whitelist') or []
+        allow = []
+        if isinstance(raw_wl, list):
+            for e in raw_wl[:100]:
+                if not isinstance(e, dict):
+                    continue
+                u = str(e.get('username') or '').strip()[:255]
+                p = str(e.get('password') or '').strip()[:255]
+                if u or p:
+                    entry = {}
+                    if u:
+                        entry['username'] = u
+                    if p:
+                        entry['password'] = p
+                    allow.append(entry)
+        # A whitelist only makes sense in interactive mode and with real entries;
+        # otherwise fall back to 'any' so the shell stays reachable.
+        if not interactive or auth_mode != 'whitelist' or not allow:
+            auth_mode = 'any'
+            auth_whitelist_json = None
+        else:
+            auth_whitelist_json = _json.dumps(allow)
+
+        # Stamp ownership with the current session user so members only see
+        # their own honeypots (admins still see everything).
+        owner_id = current_user_id()
+
         agent_id, secret_token = create_agent_token(
             agent_name,
             ip_address=ip_address,
@@ -70,10 +105,16 @@ def agent_create() -> Tuple[Response, int]:
             service_type=agent_type,
             banner=banner,
             interactive=interactive,
-            allow_upload=allow_upload
+            allow_upload=allow_upload,
+            owner_id=owner_id,
+            auth_mode=auth_mode,
+            auth_whitelist=auth_whitelist_json
         )
 
         if agent_id:
+            log_audit('agent.create', actor_id=owner_id, actor_username=current_username(),
+                      target_type='agent', target_id=agent_id,
+                      detail=f"name={agent_name}, type={agent_type}", ip_address=request.remote_addr)
             return jsonify({
                 'success': True,
                 'secret_token': secret_token,
@@ -237,10 +278,10 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
     """
     try:
         # Get agent details from database including service_type
-        ensure_interactive_column()
         with DatabaseManagerHoneypot() as db:
             db.execute("""
-                       SELECT agent_name, banner, ip_address, service_type, interactive, allow_upload
+                       SELECT agent_name, banner, ip_address, service_type, interactive, allow_upload,
+                              auth_mode, auth_whitelist
                        FROM honey_agents
                        WHERE id = %s
                        """, (agent_id,))
@@ -256,6 +297,8 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
             service_type = result['service_type']
             interactive = bool(result.get('interactive', 1))
             allow_upload = bool(result.get('allow_upload', 1))
+            auth_mode = result.get('auth_mode') or 'any'
+            auth_whitelist_raw = result.get('auth_whitelist')
 
         # Read the template file
         template_path = os.path.join(
@@ -345,12 +388,26 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
             if banner:
                 default_config['ssh']['banner'] = banner
 
-        # Convert config to JSON string for injection into template
+        # Interactive-shell auth policy (credential capture is always on; this
+        # only controls which credentials may enter the fake shell).
         import json
-        config_json = json.dumps(default_config, indent=4)
+        auth_allow = []
+        if auth_whitelist_raw:
+            try:
+                parsed = json.loads(auth_whitelist_raw)
+                if isinstance(parsed, list):
+                    auth_allow = [e for e in parsed if isinstance(e, dict)]
+            except Exception:
+                auth_allow = []
+        default_config['auth'] = {
+            'mode': auth_mode if auth_mode in ('any', 'whitelist') else 'any',
+            'allow': auth_allow,
+        }
 
-        # Replace JSON booleans (true/false/null) with Python equivalents (True/False/None)
-        config_json = config_json.replace('true', 'True').replace('false', 'False').replace('null', 'None')
+        # Serialize config as JSON. The template parses it with json.loads(r\"\"\"...\"\"\"),
+        # so plain JSON (lowercase true/false/null) is correct and user-supplied
+        # strings (passwords) are embedded safely.
+        config_json = json.dumps(default_config, indent=4)
 
         # Load template and substitute placeholders with actual values
         with open(template_path, 'r') as f:
@@ -403,7 +460,8 @@ def about_agent(agent_id: int) -> Tuple[Response, int]:
         JSON with agent details, stats, attacks, and country ranking.
     """
     try:
-        data = get_agent_about(agent_id)
+        # Members can only inspect their own honeypots (returns 404 otherwise).
+        data = get_agent_about(agent_id, viewer_id=current_user_id(), is_admin=is_admin())
         if data is None:
             return jsonify({'success': False, 'error': 'Agent not found'}), 404
         return jsonify({'success': True, 'agent': data}), 200
@@ -445,10 +503,17 @@ def install_agent(agent_id: int) -> Tuple[Response, int]:
             host = request.host or 'localhost:5000'
             server_url = f"{scheme}://{host}"
 
-        # Read the install script template
+        # Pick the installer for the target OS: bash (.sh) for Linux (default),
+        # PowerShell (.ps1) for Windows. Both share the same {{PLACEHOLDER}} contract.
+        os_target = (request.args.get('os') or 'linux').lower()
+        if os_target in ('windows', 'win', 'ps', 'powershell'):
+            template_name, ext, mimetype = 'install_agent.ps1', 'ps1', 'text/plain'
+        else:
+            template_name, ext, mimetype = 'install_agent.sh', 'sh', 'text/x-shellscript'
+
         template_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            'module', 'templates', 'install_agent.sh'
+            'module', 'templates', template_name
         )
 
         with open(template_path, 'r') as f:
@@ -463,17 +528,17 @@ def install_agent(agent_id: int) -> Tuple[Response, int]:
         script_content = script_content.replace('{{BANNER}}', result['banner'] or 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
 
         import tempfile
-        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False)
+        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.' + ext, delete=False)
         temp_file.write(script_content)
         temp_file.close()
 
-        filename = f"install_{result['agent_name'].replace(' ', '_')}.sh"
+        filename = f"install_{result['agent_name'].replace(' ', '_')}.{ext}"
 
         response = send_file(
             temp_file.name,
             as_attachment=True,
             download_name=filename,
-            mimetype='text/x-shellscript'
+            mimetype=mimetype
         )
 
         return response

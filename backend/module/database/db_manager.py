@@ -79,10 +79,6 @@ class DatabaseManagerHoneypot:
     def __enter__(self):
         return self
 
-    def create_db(self):
-        # On MySQL, the schema is already loaded via schemas.sql in Docker
-        pass
-
     def execute(self, query, params=None):
         # Adapt the placeholder for MySQL (%s instead of ?)
         query = query.replace('?', '%s')
@@ -126,7 +122,6 @@ class DatabaseManagerUser:
         return self
 
     def create_db(self):
-        # MySQL-specific init: create admin user if needed
         self.create_admin_if_not_exists()
 
     def create_admin_if_not_exists(self):
@@ -143,10 +138,10 @@ class DatabaseManagerUser:
                 from module.crypto_utils.password_hash import hash_password
                 password_hash = hash_password(admin_password)
 
-                # Insert the admin user
+                # Insert the admin user (explicit admin role)
                 self.cursor.execute(
-                    "INSERT INTO users (id, username, password) VALUES (%s, %s, %s)",
-                    (admin_id, 'admin', password_hash)
+                    "INSERT INTO users (id, username, password, role) VALUES (%s, %s, %s, %s)",
+                    (admin_id, 'admin', password_hash, 'admin')
                 )
                 self.conn.commit()
                 print(f"Admin user created with password: {admin_password}")

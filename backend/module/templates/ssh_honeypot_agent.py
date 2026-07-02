@@ -22,8 +22,8 @@ from collections import defaultdict
 # ========== CONFIGURATION ==========
 CONFIG_FILE = "honeypot_config.json"
 
-# Default configuration (injected by server)
-DEFAULT_CONFIG = $default_config_json
+# Default configuration (injected by server as JSON, parsed safely at import).
+DEFAULT_CONFIG = json.loads(r"""$default_config_json""")
 
 # Global configuration
 config = {}
@@ -81,6 +81,26 @@ def queue_attack(data):
         collected_attacks.append(data)
 
 
+def _auth_allowed(username, password):
+    auth_cfg = config.get('auth', {}) if isinstance(config, dict) else {}
+    mode = str(auth_cfg.get('mode') or 'any').lower()
+    allow = auth_cfg.get('allow') or []
+    if mode != 'whitelist' or not allow:
+        return True
+    for entry in allow:
+        if not isinstance(entry, dict):
+            continue
+        u = entry.get('username')
+        p = entry.get('password')
+        has_u = u not in (None, '')
+        has_p = p not in (None, '')
+        if not has_u and not has_p:
+            continue  # empty entry -> ignore
+        if (not has_u or u == username) and (not has_p or p == password):
+            return True
+    return False
+
+
 class SSHServerHandler(paramiko.ServerInterface):
     """Handles SSH authentication and, in interactive mode, the emulated shell."""
 
@@ -94,23 +114,23 @@ class SSHServerHandler(paramiko.ServerInterface):
         self.sftp_requested = False
 
     def check_auth_password(self, username, password):
-        """Capture the user/pass attempt."""
-        if config.get('features', {}).get('auth_detection', True):
-            logger.info(f"SSH auth attempt from {self.client_address[0]}: {username}:{password}")
-            queue_attack({
-                'source_ip': self.client_address[0],
-                'source_port': self.client_address[1],
-                'target_port': config.get('ssh', {}).get('port', 22),
-                'username_attempt': username,
-                'password_attempt': password,
-                'service_type': 'ssh',
-                'attack_type': 'auth_attempt',
-                'classification': 'auth_attempt',
-            })
+        """Always capture the user/pass attempt, then grant the shell per policy."""
+        # Credential capture is ALWAYS on (never disabled, even in interactive mode).
+        logger.info(f"SSH auth attempt from {self.client_address[0]}: {username}:{password}")
+        queue_attack({
+            'source_ip': self.client_address[0],
+            'source_port': self.client_address[1],
+            'target_port': config.get('ssh', {}).get('port', 22),
+            'username_attempt': username,
+            'password_attempt': password,
+            'service_type': 'ssh',
+            'attack_type': 'auth_attempt',
+            'classification': 'auth_attempt',
+        })
 
-        # Interactive mode: accept the login to observe post-authentication
-        # behavior (commands, SFTP uploads). Otherwise: always reject.
-        if config.get('ssh', {}).get('interactive', False):
+        # Only interactive mode grants an emulated shell (to observe commands /
+        # SFTP uploads), and only for credentials allowed by the whitelist.
+        if config.get('ssh', {}).get('interactive', False) and _auth_allowed(username, password):
             self.username = username
             self.password = password
             return paramiko.AUTH_SUCCESSFUL
@@ -1208,17 +1228,17 @@ def handle_client_ftp(conn, addr):
 
                 elif cmd == "PASS":
                     password = arg
-                    # Always capture the credential attempt.
-                    if config.get('features', {}).get('auth_detection', True):
-                        logger.info(f"FTP auth attempt from {addr[0]}: {username}:{password}")
-                        queue_attack({
-                            'source_ip': addr[0], 'source_port': addr[1], 'target_port': ftp_port,
-                            'username_attempt': username or "", 'password_attempt': password or "",
-                            'service_type': 'ftp', 'attack_type': 'auth_attempt',
-                            'classification': 'auth_attempt',
-                        })
-                    # Interactive mode: granted to a single bot at a time.
-                    if interactive_enabled and not authenticated and ftp_interactive_lock.acquire(blocking=False):
+                    # Always capture the credential attempt (never disabled).
+                    logger.info(f"FTP auth attempt from {addr[0]}: {username}:{password}")
+                    queue_attack({
+                        'source_ip': addr[0], 'source_port': addr[1], 'target_port': ftp_port,
+                        'username_attempt': username or "", 'password_attempt': password or "",
+                        'service_type': 'ftp', 'attack_type': 'auth_attempt',
+                        'classification': 'auth_attempt',
+                    })
+                    # Interactive mode: granted to a single whitelisted bot at a time.
+                    if (interactive_enabled and _auth_allowed(username or "", password or "")
+                            and not authenticated and ftp_interactive_lock.acquire(blocking=False)):
                         authenticated = True
                         holds_slot = True
                         deadline = time.time() + random.randint(smin, smax)

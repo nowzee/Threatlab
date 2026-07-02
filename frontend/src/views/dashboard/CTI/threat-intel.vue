@@ -963,7 +963,7 @@ export default defineComponent({
 .result-value {
   font-size: 32px;
   font-weight: 700;
-  color: var(--white);
+  color: var(--text-color);
   margin: 0 0 20px 0;
   word-break: break-all;
   font-family: 'Courier New', monospace;
@@ -991,7 +991,7 @@ export default defineComponent({
 
 .stat-value {
   font-size: 18px;
-  color: var(--white);
+  color: var(--text-color);
   font-weight: 700;
 }
 
@@ -1077,7 +1077,7 @@ export default defineComponent({
 }
 
 .empty-content h3 {
-  color: var(--white);
+  color: var(--text-color);
   font-size: 20px;
   margin: 0 0 12px 0;
 }

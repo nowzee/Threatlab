@@ -63,11 +63,10 @@ def on_starting(server):
     from module.tls import ensure_self_signed_cert
     ensure_self_signed_cert(certfile, keyfile)
 
-    # 3) Database initialization (equivalent to app.py's old __main__ block).
-    from module.database.db_manager import DatabaseManagerUser, DatabaseManagerHoneypot
+    # 3) Database initialization: create the bootstrap admin if needed. The
+    #    honeypot schema is provided by database/schemas.sql (no runtime init).
+    from module.database.db_manager import DatabaseManagerUser
     with DatabaseManagerUser() as db:
-        db.create_db()
-    with DatabaseManagerHoneypot() as db:
         db.create_db()
 
 

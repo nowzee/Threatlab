@@ -1,11 +1,13 @@
 <script lang="ts">
 import { defineComponent, ref, computed, onMounted } from 'vue'
+import { useAuthStore } from '@/stores/auth'
 
 interface Honeypot {
   id: number
   name: string
   type: string
   ip: string
+  owner: string
   created_at: string
   last_activity: string
   alerts_count: number
@@ -14,6 +16,8 @@ interface Honeypot {
 export default defineComponent({
   name: "HoneypotManagementView",
   setup() {
+    const auth = useAuthStore()
+    const isAdmin = computed(() => auth.user?.role === 'admin')
     const honeypots = ref<Honeypot[]>([])
     const selectedHoneypots = ref<number[]>([])
     const showDeleteConfirm = ref(false)
@@ -33,6 +37,7 @@ export default defineComponent({
           name: item.agent_name,
           type: (item.service_type || 'ssh').toUpperCase(),
           ip: item.ip_address,
+          owner: item.owner_username || '—',
           created_at: item.created_at || '',
           last_activity: item.updated_at || '',
           alerts_count: item.alert_generated || 0
@@ -97,6 +102,7 @@ export default defineComponent({
 
     return {
       honeypots,
+      isAdmin,
       selectedHoneypots,
       filteredHoneypots,
       showDeleteConfirm,
@@ -168,6 +174,7 @@ export default defineComponent({
             </th>
             <th>Nom</th>
             <th>Type</th>
+            <th v-if="isAdmin">Proprietaire</th>
             <th>Adresse IP</th>
             <th>Alertes</th>
             <th>Derniere Activite</th>
@@ -182,6 +189,7 @@ export default defineComponent({
               <div class="name-secondary">ID: {{ honeypot.id }}</div>
             </td>
             <td><span class="type-badge">{{ honeypot.type }}</span></td>
+            <td v-if="isAdmin">{{ honeypot.owner }}</td>
             <td><code class="ip-address">{{ honeypot.ip }}</code></td>
             <td class="alerts-cell">{{ honeypot.alerts_count }}</td>
             <td class="activity-cell">{{ honeypot.last_activity }}</td>
@@ -192,7 +200,7 @@ export default defineComponent({
             </td>
           </tr>
           <tr v-if="filteredHoneypots.length === 0">
-            <td colspan="7" class="empty-state">Aucun honeypot trouve</td>
+            <td :colspan="isAdmin ? 8 : 7" class="empty-state">Aucun honeypot trouve</td>
           </tr>
         </tbody>
       </table>

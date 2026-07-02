@@ -54,29 +54,16 @@ def generate_jwt(agent_id: int) -> str:
     return token
 
 
-def ensure_interactive_column() -> None:
-    """Add the honey_agents.interactive / allow_upload columns if missing (existing deployments)."""
-    try:
-        with DatabaseManagerHoneypot() as db:
-            for column in ('interactive', 'allow_upload'):
-                db.execute("""
-                    SELECT COUNT(*) AS c FROM information_schema.columns
-                    WHERE table_schema = DATABASE()
-                      AND table_name = 'honey_agents' AND column_name = %s
-                """, (column,))
-                if db.fetchone()['c'] == 0:
-                    db.execute("ALTER TABLE honey_agents ADD COLUMN " + column + " INT DEFAULT 1")
-    except Exception as e:
-        print(f"Error ensuring agent columns: {e}")
-
-
 def create_agent_token(agent_name: str,
                        ip_address: str = "0.0.0.0",
                        country_name: Optional[str] = None,
                        service_type: str = "ssh",
                        banner: Optional[str] = None,
                        interactive: bool = True,
-                       allow_upload: bool = True) -> Tuple[Optional[int], Optional[str]]:
+                       allow_upload: bool = True,
+                       owner_id: Optional[int] = None,
+                       auth_mode: str = 'any',
+                       auth_whitelist: Optional[str] = None) -> Tuple[Optional[int], Optional[str]]:
     """
     Creates a record for a new honeypot agent and generates a unique token.
 
@@ -88,19 +75,20 @@ def create_agent_token(agent_name: str,
         banner (Optional[str], optional): Banner of the simulated service. Defaults to None.
         interactive (bool, optional): Enable interactive mode (SSH shell / FTP session). Defaults to True.
         allow_upload (bool, optional): Allow file uploads (SFTP/SCP for SSH, STOR for FTP). Defaults to True.
+        owner_id (Optional[int], optional): id of the user creating the agent (ownership). Defaults to None.
 
     Returns:
         Tuple[Optional[int], Optional[str]]: (agent_id, secret_token) if successful, otherwise (None, None).
     """
     try:
         print(f"[DEBUG] Starting create_agent_token for: {agent_name}")
-        ensure_interactive_column()
         with DatabaseManagerHoneypot() as db:
             db.execute("""
-                INSERT INTO honey_agents (agent_name, ip_address, country_name, service_type, banner, interactive, allow_upload)
-                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                INSERT INTO honey_agents (agent_name, ip_address, country_name, service_type, banner, interactive, allow_upload, owner_id, auth_mode, auth_whitelist)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             """, (agent_name, ip_address, country_name, service_type, banner,
-                  1 if interactive else 0, 1 if allow_upload else 0))
+                  1 if interactive else 0, 1 if allow_upload else 0, owner_id,
+                  auth_mode if auth_mode in ('any', 'whitelist') else 'any', auth_whitelist))
 
             # Step 2: Get the auto-generated ID of the newly inserted agent
             agent_id = db.cursor.lastrowid
@@ -679,94 +667,166 @@ def add_smtp_interaction(malicious_ip: str,
         print(f"Error adding SMTP interaction: {e}")
         return False
 
-def get_default_metric_data() -> Dict[str, int]:
+def get_default_metric_data(owner_id: Optional[int] = None) -> Dict[str, int]:
     """
     Retrieves the dashboard's default metrics.
 
+    When ``owner_id`` is given (a non-admin member), the metrics are scoped to
+    the honeypots owned by that user; otherwise they are platform-wide (admin).
+
     Returns:
-        Dict[str, int]: Dictionary containing:
-            - ip_count: Number of unique malicious IPs
-            - Sample_downloaded: Number of unique samples/payloads
-            - tentative_access: Total number of access attempts
-            - number_agents: Number of active honeypot agents
+        Dict[str, int]: {ip_count, Sample_downloaded, number_honeypot, tentative_access}
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''
-                   SELECT (SELECT COUNT(id) FROM malicious_ips) AS ip_count,
-                          (SELECT COUNT(id) FROM payloads)      AS Sample_downloaded,
-                          (SELECT COUNT(id) FROM honey_agents)  AS number_honeypot,
-                          (SELECT COUNT(id) FROM attack_logs)   AS tentative_access
-                   ''')
+        if owner_id is None:
+            db.execute('''
+                       SELECT (SELECT COUNT(id) FROM malicious_ips) AS ip_count,
+                              (SELECT COUNT(id) FROM payloads)      AS Sample_downloaded,
+                              (SELECT COUNT(id) FROM honey_agents)  AS number_honeypot,
+                              (SELECT COUNT(id) FROM attack_logs)   AS tentative_access
+                       ''')
+        else:
+            db.execute('''
+                SELECT
+                    (SELECT COUNT(DISTINCT r.ip_id)
+                       FROM ip_agent_relations r
+                       JOIN honey_agents ha ON ha.id = r.agent_id
+                       WHERE ha.owner_id = %s) AS ip_count,
+                    (SELECT COUNT(DISTINCT al.malware_hash)
+                       FROM attack_logs al
+                       JOIN honey_agents ha ON ha.id = al.agent_id
+                       WHERE ha.owner_id = %s AND al.malware_hash IS NOT NULL AND al.malware_hash != '') AS Sample_downloaded,
+                    (SELECT COUNT(id) FROM honey_agents WHERE owner_id = %s) AS number_honeypot,
+                    (SELECT COUNT(al.id)
+                       FROM attack_logs al
+                       JOIN honey_agents ha ON ha.id = al.agent_id
+                       WHERE ha.owner_id = %s) AS tentative_access
+            ''', (owner_id, owner_id, owner_id, owner_id))
 
         result = db.fetchone()
         return result
 
 
-def get_agent_details() -> List[Dict[str, Any]]:
+def get_agent_details(owner_id: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     Retrieves the details of the last 5 attack logs with agent information.
+
+    When ``owner_id`` is given, only logs for that user's honeypots are returned.
+    The admin (global) view also exposes the owning user's name.
 
     Returns:
         List[Dict[str, Any]]: List of dictionaries containing the log information.
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''
-                   SELECT al.country_name,
-                          al.source_ip,
-                          al.target_port,
-                          al.service_type,
-                          al.agent_id,
-                          ha.agent_name,
-                          al.created_at,
-                          al.id
-                   FROM attack_logs al
-                            LEFT JOIN honey_agents ha ON al.agent_id = ha.id
-                   ORDER BY al.id DESC
-                   LIMIT 5
-                   ''')
+        if owner_id is None:
+            db.execute('''
+                       SELECT al.country_name,
+                              al.source_ip,
+                              al.target_port,
+                              al.service_type,
+                              al.agent_id,
+                              ha.agent_name,
+                              u.username AS owner_username,
+                              al.created_at,
+                              al.id
+                       FROM attack_logs al
+                                LEFT JOIN honey_agents ha ON al.agent_id = ha.id
+                                LEFT JOIN users u ON ha.owner_id = u.id
+                       ORDER BY al.id DESC
+                       LIMIT 5
+                       ''')
+        else:
+            db.execute('''
+                       SELECT al.country_name,
+                              al.source_ip,
+                              al.target_port,
+                              al.service_type,
+                              al.agent_id,
+                              ha.agent_name,
+                              al.created_at,
+                              al.id
+                       FROM attack_logs al
+                                JOIN honey_agents ha ON al.agent_id = ha.id
+                       WHERE ha.owner_id = %s
+                       ORDER BY al.id DESC
+                       LIMIT 5
+                       ''', (owner_id,))
 
         return db.fetchall()
 
 
-def get_country_ranking() -> List[Dict[str, Any]]:
+def get_country_ranking(owner_id: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     Retrieves the country ranking by number of attacks for the dashboard.
+
+    Scoped to the user's honeypots when ``owner_id`` is provided.
 
     Returns:
         List[Dict[str, Any]]: List of the 10 countries with the most attacks, sorted in descending order.
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''
-                   SELECT country_name AS country_name,
-                          COUNT(*)     AS attack_count
-                   FROM attack_logs
-                   WHERE country_name IS NOT NULL
-                     AND country_name != ''
-                   GROUP BY country_name
-                   ORDER BY attack_count DESC
-                   LIMIT 10
-                   ''')
+        if owner_id is None:
+            db.execute('''
+                       SELECT country_name AS country_name,
+                              COUNT(*)     AS attack_count
+                       FROM attack_logs
+                       WHERE country_name IS NOT NULL
+                         AND country_name != ''
+                       GROUP BY country_name
+                       ORDER BY attack_count DESC
+                       LIMIT 10
+                       ''')
+        else:
+            db.execute('''
+                       SELECT al.country_name AS country_name,
+                              COUNT(*)        AS attack_count
+                       FROM attack_logs al
+                                JOIN honey_agents ha ON al.agent_id = ha.id
+                       WHERE ha.owner_id = %s
+                         AND al.country_name IS NOT NULL
+                         AND al.country_name != ''
+                       GROUP BY al.country_name
+                       ORDER BY attack_count DESC
+                       LIMIT 10
+                       ''', (owner_id,))
 
         return db.fetchall()
 
 
-def get_password_ranking() -> List[Dict[str, Any]]:
+def get_password_ranking(owner_id: Optional[int] = None) -> List[Dict[str, Any]]:
     """
     Retrieves the ranking of the 5 most attempted passwords.
+
+    Platform-wide by default; when ``owner_id`` is given, computed from the
+    attack logs of that user's honeypots only.
 
     Returns:
         List[Dict[str, Any]]: List of the 5 most popular passwords.
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''
-            SELECT
-                password,
-                MAX(count) AS count
-            FROM password_attempted
-            GROUP BY password
-            ORDER BY count DESC
-            LIMIT 5
-        ''')
+        if owner_id is None:
+            db.execute('''
+                SELECT
+                    password,
+                    MAX(count) AS count
+                FROM password_attempted
+                GROUP BY password
+                ORDER BY count DESC
+                LIMIT 5
+            ''')
+        else:
+            db.execute('''
+                SELECT al.password_attempt AS password,
+                       COUNT(*)            AS count
+                FROM attack_logs al
+                         JOIN honey_agents ha ON al.agent_id = ha.id
+                WHERE ha.owner_id = %s
+                  AND al.password_attempt IS NOT NULL
+                  AND al.password_attempt != ''
+                GROUP BY al.password_attempt
+                ORDER BY count DESC
+                LIMIT 5
+            ''', (owner_id,))
 
         return db.fetchall()
 
@@ -788,21 +848,29 @@ class ManagerAgent:
             return False
 
     @staticmethod
-    def remove(agent_id: int) -> bool:
+    def remove(agent_id: int, viewer_id: Optional[int] = None, is_admin: bool = True) -> bool:
         """
         Removes a honeypot agent from the database.
 
+        When ``is_admin`` is False, the agent is only removed if it is owned by
+        ``viewer_id`` (members can only delete their own honeypots).
+
         Args:
             agent_id (int): Identifier of the agent to remove.
+            viewer_id (Optional[int]): id of the requesting user (for ownership check).
+            is_admin (bool): True to bypass the ownership check.
 
         Returns:
-            bool: True if the agent was removed, False if it does not exist.
+            bool: True if the agent was removed, False if it does not exist or is not owned.
         """
         with DatabaseManagerHoneypot() as db:
 
-            db.execute('''SELECT id FROM honey_agents WHERE id = %s''', (int(agent_id),))
+            db.execute('''SELECT id, owner_id FROM honey_agents WHERE id = %s''', (int(agent_id),))
             agent = db.fetchone()
             if not agent:
+                return False
+            # Members may only delete honeypots they own.
+            if not is_admin and agent.get('owner_id') != viewer_id:
                 return False
 
             db.execute("UPDATE attack_logs SET agent_id = NULL WHERE agent_id = %s", (int(agent_id),))
@@ -811,24 +879,50 @@ class ManagerAgent:
             return True
 
     @staticmethod
-    def list() -> List[Dict[str, Any]]:
+    def list(viewer_id: Optional[int] = None, is_admin: bool = True) -> List[Dict[str, Any]]:
         """
-        Retrieves the complete list of all honeypot agents.
+        Retrieves the list of honeypot agents.
+
+        Admins get every agent (with the owning user's name); members get only
+        the agents they own.
+
+        Args:
+            viewer_id (Optional[int]): id of the requesting user (member filter).
+            is_admin (bool): True to return all agents.
 
         Returns:
             List[Dict[str, Any]]: List of dictionaries containing the agent information.
         """
         with DatabaseManagerHoneypot() as db:
-            db.execute("""
-                       SELECT id,
-                              agent_name,
-                              ip_address,
-                              service_type,
-                              updated_at,
-                              alert_generated,
-                              created_at
-                       FROM honey_agents
-                       """)
+            if is_admin:
+                db.execute("""
+                           SELECT ha.id,
+                                  ha.agent_name,
+                                  ha.ip_address,
+                                  ha.service_type,
+                                  ha.updated_at,
+                                  ha.alert_generated,
+                                  ha.created_at,
+                                  ha.owner_id,
+                                  u.username AS owner_username
+                           FROM honey_agents ha
+                                    LEFT JOIN users u ON ha.owner_id = u.id
+                           ORDER BY ha.id DESC
+                           """)
+            else:
+                db.execute("""
+                           SELECT ha.id,
+                                  ha.agent_name,
+                                  ha.ip_address,
+                                  ha.service_type,
+                                  ha.updated_at,
+                                  ha.alert_generated,
+                                  ha.created_at,
+                                  ha.owner_id
+                           FROM honey_agents ha
+                           WHERE ha.owner_id = %s
+                           ORDER BY ha.id DESC
+                           """, (viewer_id,))
 
             agents = db.fetchall()
             return agents
@@ -1090,28 +1184,40 @@ def get_credential_combinations(limit: Optional[int] = 15) -> List[Dict[str, Any
         return db.fetchall()
 
 
-def get_agent_about(agent_id: int) -> Optional[Dict[str, Any]]:
+def get_agent_about(agent_id: int, viewer_id: Optional[int] = None,
+                    is_admin: bool = True) -> Optional[Dict[str, Any]]:
     """
     Retrieves all the detailed information of a specific honeypot agent.
 
+    When ``is_admin`` is False, returns None unless the agent is owned by
+    ``viewer_id`` (hides other users' honeypots — same 404 as "not found").
+
     Args:
         agent_id (int): Identifier of the agent.
+        viewer_id (Optional[int]): id of the requesting user (ownership check).
+        is_admin (bool): True to bypass the ownership check.
 
     Returns:
-        Optional[Dict[str, Any]]: Dictionary with the agent details, or None if not found.
+        Optional[Dict[str, Any]]: Dictionary with the agent details, or None if not found/allowed.
     """
     try:
         with DatabaseManagerHoneypot() as db:
             # 1. Agent base info
             db.execute("""
-                SELECT id, agent_name, ip_address, country_name, service_type,
-                       banner, alert_generated, created_at, updated_at
-                FROM honey_agents
-                WHERE id = %s
+                SELECT ha.id, ha.agent_name, ha.ip_address, ha.country_name, ha.service_type,
+                       ha.banner, ha.alert_generated, ha.created_at, ha.updated_at,
+                       ha.owner_id, u.username AS owner_username
+                FROM honey_agents ha
+                LEFT JOIN users u ON ha.owner_id = u.id
+                WHERE ha.id = %s
             """, (agent_id,))
             agent = db.fetchone()
 
             if not agent:
+                return None
+
+            # Members can only inspect their own honeypots.
+            if not is_admin and agent.get('owner_id') != viewer_id:
                 return None
 
             # 2. Attack stats
@@ -1191,6 +1297,8 @@ def get_agent_about(agent_id: int) -> Optional[Dict[str, Any]]:
                 'ip': agent['ip_address'],
                 'country': agent['country_name'],
                 'banner': agent['banner'],
+                'owner_id': agent.get('owner_id'),
+                'owner_username': agent.get('owner_username'),
                 'alert_generated': agent['alert_generated'],
                 'created_at': agent['created_at'].isoformat() if agent['created_at'] else None,
                 'updated_at': agent['updated_at'].isoformat() if agent['updated_at'] else None,

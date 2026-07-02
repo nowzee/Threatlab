@@ -8,12 +8,18 @@ rankings, and generating reports for the user dashboard.
 from typing import Tuple
 from flask import Blueprint, jsonify, Response, request, send_file
 from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking, get_top_passwords, get_top_usernames, get_credential_combinations, get_wordlist_stats, get_uploaded_files_page, get_uploaded_file, get_shell_commands_page
+from module.auth.session_helpers import is_admin, current_user_id
 from datetime import datetime
 import os
 import traceback
 from jinja2 import Template
 
 agent_user_api_bp = Blueprint('agent_user_api', __name__, url_prefix='/api/agent/user')
+
+
+def _scope_owner():
+    """None for admins (platform-wide view), the user id for members (own data only)."""
+    return None if is_admin() else current_user_id()
 
 
 @agent_user_api_bp.route("/metric_dashboard", methods=['GET'])
@@ -25,7 +31,7 @@ def get_default_metric_data_agent() -> Response:
         JSON response with dashboard metrics including IP count,
         attack attempts, active honeypots, and samples downloaded.
     """
-    data = get_default_metric_data()
+    data = get_default_metric_data(_scope_owner())
 
     return jsonify(data)
 
@@ -38,7 +44,7 @@ def get_new_logs_agent() -> Response:
     Returns:
         JSON response with agent activity logs and details.
     """
-    data = get_agent_details()
+    data = get_agent_details(_scope_owner())
 
     return jsonify(data)
 
@@ -51,7 +57,7 @@ def get_country_ranking_data() -> Response:
     Returns:
         JSON response with countries ranked by attack frequency.
     """
-    data = get_country_ranking()
+    data = get_country_ranking(_scope_owner())
 
     return jsonify(data)
 
@@ -64,7 +70,7 @@ def get_password_ranking_data() -> Response:
     Returns:
         JSON response with password ranking statistics.
     """
-    data = get_password_ranking()
+    data = get_password_ranking(_scope_owner())
 
     return jsonify(data)
 

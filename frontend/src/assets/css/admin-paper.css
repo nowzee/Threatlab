@@ -1,0 +1,129 @@
+/* ============================================================
+   Admin "paper" design — ported from the Threatlab-pro frontend-admin
+   editorial look and scoped under .admin-paper so it never leaks into the
+   rest of the app. Local --ap-* variables hold the palette: paper by default
+   (light theme) and remapped to the Threatlab dark palette when the app is in
+   dark mode ([data-theme="dark"] .admin-paper).
+
+   Used by the two admin screens (Utilisateurs, Journaux d'audit).
+   ============================================================ */
+.admin-paper {
+  --ap-ink: #0E1116;
+  --ap-paper: #F4F2ED;
+  --ap-panel: #FFFFFF;
+  --ap-sand: #ECEAE4;
+  --ap-line: rgba(14, 17, 22, 0.08);
+  --ap-line-strong: rgba(14, 17, 22, 0.16);
+  --ap-accent: oklch(0.72 0.14 150);
+  --ap-accent-soft: rgba(106, 197, 146, 0.14);
+  --ap-gray: #6B7280;
+  --ap-crit: #d92d20;
+  --ap-high: #ff9145;
+  --ap-warn-bg: #fff3cd;
+  --ap-bad-bg: #ffe0e0;
+  --ap-mask: rgba(14, 17, 22, 0.5);
+  --ap-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--ap-ink);
+}
+
+/* Dark remap: same components, Threatlab dark palette. */
+[data-theme="dark"] .admin-paper {
+  --ap-ink: #e3e3e3;
+  --ap-paper: #111111;
+  --ap-panel: #1a1a1a;
+  --ap-sand: #1c1c1c;
+  --ap-line: #2c2c2c;
+  --ap-line-strong: #3a3a3a;
+  --ap-accent: #9c4dff;
+  --ap-accent-soft: rgba(156, 77, 255, 0.16);
+  --ap-gray: #a1a7b3;
+  --ap-crit: #ff5a6a;
+  --ap-high: #ffb74d;
+  --ap-warn-bg: rgba(255, 183, 77, 0.15);
+  --ap-bad-bg: rgba(255, 90, 106, 0.15);
+  --ap-mask: rgba(0, 0, 0, 0.6);
+}
+
+.admin-paper, .admin-paper *, .admin-paper *::before, .admin-paper *::after { box-sizing: border-box; }
+.admin-paper .mono { font-family: var(--ap-mono); }
+
+/* Page header */
+.admin-paper .head { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 24px; gap: 16px; flex-wrap: wrap; }
+.admin-paper .head h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.5px; margin: 0; color: var(--ap-ink); }
+.admin-paper .muted { color: var(--ap-gray); margin: 6px 0 0; font-size: 13px; }
+.admin-paper .actions { display: flex; gap: 10px; align-items: center; }
+.admin-paper .actions .btn { flex-shrink: 0; }
+.admin-paper .search { flex: 1 1 220px; width: auto; min-width: 0; max-width: 320px; }
+.admin-paper .small { font-size: 12px; color: var(--ap-gray); }
+.admin-paper .empty { padding: 40px; text-align: center; color: var(--ap-gray); font-size: 13px; }
+
+/* Buttons */
+.admin-paper .btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 8px 16px; font-size: 13px; font-weight: 500; white-space: nowrap;
+  border: 1px solid transparent; transition: all .15s; border-radius: 0; cursor: pointer;
+}
+.admin-paper .btn-primary { background: var(--ap-ink); color: var(--ap-paper); }
+.admin-paper .btn-primary:hover { opacity: .9; }
+.admin-paper .btn-ghost { background: transparent; color: var(--ap-ink); opacity: .75; }
+.admin-paper .btn-ghost:hover { opacity: 1; background: var(--ap-sand); }
+.admin-paper .btn-ghost.danger { color: var(--ap-crit); }
+.admin-paper .btn-ghost.danger:hover { background: var(--ap-sand); color: var(--ap-crit); opacity: 1; }
+.admin-paper .btn-danger { background: var(--ap-crit); color: #ffffff; }
+.admin-paper .btn-danger:hover { opacity: .9; }
+.admin-paper .btn-sm { padding: 5px 10px; font-size: 12px; }
+.admin-paper .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+/* Inputs */
+.admin-paper .input, .admin-paper .select {
+  width: 100%; padding: 10px 12px; border-radius: 0; box-sizing: border-box;
+  background: var(--ap-panel); border: 1px solid var(--ap-line-strong);
+  font-family: inherit; font-size: 13px; color: var(--ap-ink); outline: none;
+}
+.admin-paper .input:focus, .admin-paper .select:focus { border-color: var(--ap-accent); }
+.admin-paper .label { font-family: var(--ap-mono); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; color: var(--ap-gray); margin-bottom: 6px; display: block; }
+.admin-paper .field { margin-bottom: 12px; display: flex; flex-direction: column; }
+
+/* Password field with show/hide eye toggle */
+.admin-paper .pwd-wrap { position: relative; display: block; }
+.admin-paper .pwd-wrap .input { padding-right: 40px; }
+.admin-paper .pwd-eye {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; padding: 0; border: none; background: transparent;
+  color: var(--ap-gray); cursor: pointer; border-radius: 0;
+}
+.admin-paper .pwd-eye:hover { color: var(--ap-ink); }
+.admin-paper .error { background: var(--ap-bad-bg); padding: 8px 12px; font-size: 12px; border-left: 3px solid var(--ap-crit); margin-top: 10px; color: var(--ap-ink); }
+
+/* Card + table */
+.admin-paper .card { background: var(--ap-panel); border: 1px solid var(--ap-line); padding: 24px; border-radius: 0; }
+.admin-paper .no-pad { padding: 0; }
+.admin-paper .t { width: 100%; border-collapse: collapse; font-size: 13px; }
+.admin-paper .t th, .admin-paper .t td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--ap-line); color: var(--ap-ink); }
+.admin-paper .t th { font-family: var(--ap-mono); font-size: 10px; font-weight: 500; color: var(--ap-gray); text-transform: uppercase; letter-spacing: 1px; background: var(--ap-sand); }
+.admin-paper .t tbody tr:hover { background: var(--ap-sand); }
+
+/* Pills */
+.admin-paper .pill { display: inline-flex; align-items: center; gap: 6px; font-family: var(--ap-mono); font-size: 10px; letter-spacing: .8px; padding: 3px 8px; text-transform: uppercase; background: var(--ap-sand); color: var(--ap-ink); }
+.admin-paper .pill-ok { background: var(--ap-accent-soft); }
+.admin-paper .pill-warn { background: var(--ap-warn-bg); }
+.admin-paper .pill-bad { background: var(--ap-bad-bg); }
+.admin-paper .pill .d { width: 6px; height: 6px; border-radius: 50%; background: var(--ap-gray); }
+.admin-paper .pill-ok .d { background: var(--ap-accent); }
+.admin-paper .pill-warn .d { background: var(--ap-high); }
+.admin-paper .pill-bad .d { background: var(--ap-crit); }
+
+/* Pagination */
+.admin-paper .pager { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 16px; font-size: 13px; color: var(--ap-gray); }
+
+/* Modal */
+.admin-paper.modal-host { position: static; }
+.admin-paper .modal-mask { position: fixed; inset: 0; background: var(--ap-mask); display: flex; align-items: center; justify-content: center; z-index: 200; }
+.admin-paper .modal { background: var(--ap-paper); padding: 32px; width: 100%; max-width: 480px; border: 1px solid var(--ap-line); }
+.admin-paper .modal h2 { margin: 0 0 6px; font-size: 20px; font-weight: 600; letter-spacing: -.4px; color: var(--ap-ink); }
+.admin-paper .modal .sub { color: var(--ap-gray); margin: 0 0 24px; font-size: 13px; }
+.admin-paper .modal-foot { display: flex; gap: 8px; justify-content: flex-end; margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--ap-line); }
+
+/* Toast */
+.admin-paper .toast { position: fixed; bottom: 24px; right: 24px; z-index: 300; background: var(--ap-ink); color: var(--ap-paper); padding: 14px 20px; font-size: 13px; box-shadow: 0 10px 30px -10px rgba(0, 0, 0, .4); }

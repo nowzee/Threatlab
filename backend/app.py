@@ -16,7 +16,8 @@ from route.agent.manage_agent import agent_manage_bp
 from route.log_analyse.alerte_dashboard import log_analyse_bp
 from route.log_analyse.alerte_details import alert_details_bp
 from route.CTI.threat_intelligence import threat_intel_bp
-from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser
+from route.admin.admin_api import admin_bp
+from module.database.db_manager import DatabaseManagerUser
 from module.ingestion.ingest import start_worker
 import secrets
 
@@ -70,6 +71,7 @@ app.register_blueprint(agent_create_bp)
 app.register_blueprint(config_account_bp)
 app.register_blueprint(agent_user_api_bp)
 app.register_blueprint(config_api_key_bp)
+app.register_blueprint(admin_bp)
 
 @app.after_request
 def set_security_headers(response):
@@ -93,10 +95,6 @@ def before_request() -> tuple[Response, int] | None:
         Optional[Tuple[dict, int]]: JSON response with status code if authentication
                                     is required, None otherwise.
     """
-    # Define endpoints that don't require authentication
-    # Includes: static files, login, session check, Vue app, agent reporting,
-    # and agent install/download (fetched from the target host via curl|bash,
-    # which has no session).
     public_endpoints = ["static", "auth.login", "serve_static_or_index", "auth.session_state", "serve_vue_app", "agent_create.agent_report", "agent_create.agent_upload", "agent_create.install_agent", "agent_create.download_agent"]
 
     # Define endpoints accessible during 2FA validation process
@@ -114,12 +112,7 @@ def before_request() -> tuple[Response, int] | None:
 
 @app.route('/')
 def serve_vue_app() -> Response:
-    """
-    Serve the main Vue.js application index page.
 
-    Returns:
-        str: The index.html file content.
-    """
     return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/<path>', methods=['GET', 'POST'])
@@ -129,15 +122,7 @@ def serve_static_or_index(path) -> Response:
 start_worker()
 
 if __name__ == '__main__':
-    # Initialize user database (accounts, API keys, login attempts)
     with DatabaseManagerUser() as db:
         db.create_db()
 
-    # Initialize honeypot database (agents, attack logs, malicious IPs, payloads)
-    with DatabaseManagerHoneypot() as db:
-        db.create_db()
-
-    # Start Flask development server
-    # Listen on all interfaces (0.0.0.0) on port 5000
-    # Debug mode disabled for production-like behavior
     app.run(host='0.0.0.0', port=5000, debug=False, ssl_context='adhoc' )
