@@ -239,9 +239,13 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
 CMD ["python3", "-u", "/app/agent.py"]
 DOCKEREOF
     } > "${INSTALL_DIR}/Dockerfile"
-    docker build -t "${IMAGE_NAME}" "${INSTALL_DIR}" >"${INSTALL_DIR}/build.log" 2>&1 || {
-        echo; log_error "Docker build failed. Last lines:"; tail -n 20 "${INSTALL_DIR}/build.log"; exit 1;
-    }
+    # Stream the build context to Docker via stdin instead of passing a path.
+    # A snap-installed Docker CLI is confined and cannot read /opt directly
+    # ("unable to prepare context: path not found"); reading from a pipe avoids that.
+    local build_log="/tmp/threatlabs-agent-build-${AGENT_ID}.log"
+    if ! tar -C "${INSTALL_DIR}" -c Dockerfile agent.py 2>/dev/null | docker build -t "${IMAGE_NAME}" - >"${build_log}" 2>&1; then
+        echo; log_error "Docker build failed. Last lines:"; tail -n 20 "${build_log}"; exit 1
+    fi
 }
 
 docker_run_container() {
