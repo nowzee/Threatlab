@@ -55,7 +55,10 @@ progress_bar() {
         if [ "$i" -lt "$filled" ]; then bar+="#"; else bar+="-"; fi
     done
     printf "\r  ${CYAN}[%s]${NC} %3d%%  %-36s" "$bar" "$pct" "$label"
-    [ "$STEP_CURRENT" -ge "$STEP_TOTAL" ] && printf "\n"
+    # Use if/fi (not '[ ] && ...') so this never returns non-zero, which would
+    # abort the script under `set -e` when it isn't the final step.
+    if [ "$STEP_CURRENT" -ge "$STEP_TOTAL" ]; then printf "\n"; fi
+    return 0
 }
 # run_step "label" command [args...] : advance the bar then run the command.
 run_step() {
@@ -308,7 +311,7 @@ uninstall() {
         docker rm -f "${CONTAINER_NAME}" >/dev/null 2>&1 && log_success "Docker container removed" || true
         docker rmi "${IMAGE_NAME}" >/dev/null 2>&1 && log_success "Docker image removed" || true
     fi
-    [ -d "${INSTALL_DIR}" ] && rm -rf "${INSTALL_DIR}" && log_success "Removed ${INSTALL_DIR}"
+    if [ -d "${INSTALL_DIR}" ]; then rm -rf "${INSTALL_DIR}"; log_success "Removed ${INSTALL_DIR}"; fi
     rm -f "${LOG_FILE}"
     log_success "Uninstall complete"
 }
