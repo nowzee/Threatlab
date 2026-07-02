@@ -1,9 +1,12 @@
 import { defineStore } from 'pinia'
 
 type Credentials = { username: string; password: string }
+type SessionUser = { username: string; role: string | null }
 type SessionJson = {
   authenticated: boolean
   requires_a2f?: boolean
+  username?: string | null
+  role?: string | null
   error?: string
 }
 
@@ -13,7 +16,11 @@ export const useAuthStore = defineStore('auth', {
         requires_a2f: false as boolean,
         error: null as string | null,
         hasCheckedSession: false,
+        user: null as SessionUser | null,
     }),
+  getters: {
+    isAdmin: (s): boolean => s.user?.role === 'admin',
+  },
   actions: {
     async login(credentials: Credentials) {
         this.error = null
@@ -47,8 +54,9 @@ export const useAuthStore = defineStore('auth', {
             if (data.requires_a2f) {
                 this.requires_a2f = data.requires_a2f
             }
+          this.user = data.username ? { username: data.username, role: data.role ?? null } : null
           this.hasCheckedSession = true;
-          
+
         } catch (e: any) {
           this.error = e?.message || 'Erreur de connexion'
           this.hasCheckedSession = true;
@@ -68,6 +76,7 @@ export const useAuthStore = defineStore('auth', {
         if (!res.ok) {
           this.isAuthenticated = false
           this.requires_a2f = false
+          this.user = null
             this.hasCheckedSession = true
           return
         }
@@ -76,11 +85,13 @@ export const useAuthStore = defineStore('auth', {
         // authenticated reste true même si A2F requis
           this.isAuthenticated = data.authenticated
           this.requires_a2f = !!data.requires_a2f
+          this.user = data.username ? { username: data.username, role: data.role ?? null } : null
           this.hasCheckedSession = true
 
       } catch (e: any) {
           this.isAuthenticated = false
           this.requires_a2f = false
+          this.user = null
           this.error = e?.message || 'Erreur inconnue'
           this.hasCheckedSession = true
 
@@ -129,6 +140,7 @@ export const useAuthStore = defineStore('auth', {
       } finally {
         this.isAuthenticated = false
         this.requires_a2f = false
+        this.user = null
       }
     },
   },

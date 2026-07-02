@@ -44,6 +44,12 @@ export default defineComponent({
                 @click="navigateTo('/dashboard/settings/api')">
                 API
             </button>
+            <button
+                class="settings-tab"
+                :class="{ active: route.name === 'appearance_settings' }"
+                @click="navigateTo('/dashboard/settings/appearance')">
+                Apparence
+            </button>
         </div>
 
         <div class="settings-content">

@@ -9,6 +9,7 @@ interface AgentTypeConfig {
   bannerLabel: string
   bannerHelp: string
   placeholderName: string
+  interactiveHelp: string
 }
 
 interface AgentConfig {
@@ -17,9 +18,13 @@ interface AgentConfig {
   ipAddress: string
   country: string
   banner: string
+  interactive: boolean
+  allowUpload: boolean
+  authMode: string
+  authWhitelist: { username: string; password: string }[]
   networkConfig: {
     host: string
-    port: number
+    ports: string
     interface: string
   }
 }
@@ -32,6 +37,7 @@ const AGENT_TYPE_CONFIGS: Record<string, AgentTypeConfig> = {
     bannerLabel: 'Banniere SSH',
     bannerHelp: 'Banniere SSH affichee aux attaquants pour simuler un serveur specifique',
     placeholderName: 'Ex: SSH-Prod-01',
+    interactiveHelp: 'Emule un shell et un faux systeme de fichiers pour capturer les commandes des attaquants.',
   },
   ftp: {
     label: 'FTP',
@@ -40,6 +46,7 @@ const AGENT_TYPE_CONFIGS: Record<string, AgentTypeConfig> = {
     bannerLabel: 'Banniere FTP',
     bannerHelp: 'Banniere FTP affichee aux attaquants pour simuler un serveur specifique',
     placeholderName: 'Ex: FTP-Prod-01',
+    interactiveHelp: 'Autorise un bot a la fois a se connecter et uploader des fichiers (captures et hashes).',
   }
 }
 
@@ -68,9 +75,13 @@ export default defineComponent({
       ipAddress: '',
       country: '',
       banner: typeConfig.value.defaultBanner,
+      interactive: true,
+      allowUpload: true,
+      authMode: 'any',
+      authWhitelist: [{ username: '', password: '' }],
       networkConfig: {
         host: '0.0.0.0',
-        port: typeConfig.value.defaultPort,
+        ports: String(typeConfig.value.defaultPort),
         interface: 'eth0'
       }
     })
@@ -79,13 +90,14 @@ export default defineComponent({
       const cfg = AGENT_TYPE_CONFIGS[agentType.value]
       if (cfg) {
         agentConfig.banner = cfg.defaultBanner
-        agentConfig.networkConfig.port = cfg.defaultPort
+        agentConfig.networkConfig.ports = String(cfg.defaultPort)
       }
     })
 
     const isSubmitting = ref(false)
     const createdAgentId = ref<number | null>(null)
     const copiedCommand = ref<string | null>(null)
+    const deployOS = ref<'linux' | 'windows'>('linux')
     const serverUrl = window.location.origin
 
     const steps = [
@@ -101,8 +113,9 @@ export default defineComponent({
         if (!agentConfig.description.trim()) stepErrors.value.push('La description est obligatoire')
       }
       if (step === 2) {
-        if (agentConfig.networkConfig.port < 1 || agentConfig.networkConfig.port > 65535) {
-          stepErrors.value.push('Le port doit etre entre 1 et 65535')
+        const nums = agentConfig.networkConfig.ports.split(/[,\s]+/).filter(Boolean).map(Number)
+        if (!nums.length || nums.some(n => !Number.isInteger(n) || n < 1 || n > 65535)) {
+          stepErrors.value.push('Port(s) invalide(s) : entre 1 et 65535, séparés par une virgule ou un espace')
         }
       }
       return stepErrors.value.length === 0
@@ -119,6 +132,14 @@ export default defineComponent({
         stepErrors.value = []
         currentStep.value--
       }
+    }
+
+    const addWhitelistEntry = () => {
+      agentConfig.authWhitelist.push({ username: '', password: '' })
+    }
+    const removeWhitelistEntry = (i: number) => {
+      agentConfig.authWhitelist.splice(i, 1)
+      if (!agentConfig.authWhitelist.length) agentConfig.authWhitelist.push({ username: '', password: '' })
     }
 
     const goToStep = (step: number) => {
@@ -148,7 +169,14 @@ export default defineComponent({
             agent_type: agentType.value,
             ip_address: agentConfig.ipAddress || '0.0.0.0',
             country_name: agentConfig.country,
-            banner: agentConfig.banner
+            banner: agentConfig.banner,
+            port: agentConfig.networkConfig.ports,
+            interactive: agentConfig.interactive,
+            allow_upload: agentConfig.interactive && agentConfig.allowUpload,
+            auth_mode: agentConfig.interactive ? agentConfig.authMode : 'any',
+            auth_whitelist: (agentConfig.interactive && agentConfig.authMode === 'whitelist')
+              ? agentConfig.authWhitelist.filter(e => (e.username || '').trim() || (e.password || '').trim())
+              : []
           })
         })
         const data = await response.json()
@@ -166,8 +194,19 @@ export default defineComponent({
 
     const getInstallCommand = (method: string) => {
       if (!createdAgentId.value) return ''
-      const base = `curl -sSL ${serverUrl}/api/agent/install/${createdAgentId.value} | sudo bash`
-      if (method === 'interactive') return base
+      const id = createdAgentId.value
+      if (deployOS.value === 'windows') {
+        // PowerShell (Admin): fetch the .ps1 with the built-in curl.exe (handles
+        // the self-signed cert cleanly, unlike Invoke-WebRequest/SChannel) and run it.
+        const url = `${serverUrl}/api/agent/install/${id}?os=windows`
+        const base = `& ([scriptblock]::Create((curl.exe -ksSL "${url}" | Out-String)))`
+        if (method === 'auto') return base
+        const winMethod = method === 'direct' ? 'native' : method
+        return `${base} -Method ${winMethod}`
+      }
+      // Linux: one bash command, the installer picks Docker or systemd.
+      const base = `curl -ksSL ${serverUrl}/api/agent/install/${id} | sudo bash`
+      if (method === 'auto') return base
       return `${base} -s -- --method ${method}`
     }
 
@@ -199,6 +238,7 @@ export default defineComponent({
       agentType, typeConfig, currentStep, totalSteps, steps, stepErrors,
       agentConfig, isSubmitting, createdAgentId, copiedCommand,
       getStepState, nextStep, prevStep, goToStep,
+      addWhitelistEntry, removeWhitelistEntry, deployOS,
       createAgent, getInstallCommand, copyCommand, downloadAgent, goBack
     }
   }
@@ -274,12 +314,48 @@ export default defineComponent({
               <input id="network-host" v-model="agentConfig.networkConfig.host" type="text" class="form-input" placeholder="0.0.0.0" />
             </div>
             <div class="form-group">
-              <label for="network-port">Port</label>
-              <input id="network-port" v-model.number="agentConfig.networkConfig.port" type="number" class="form-input" min="1" max="65535" />
+              <label for="network-port">Port(s)</label>
+              <input id="network-port" v-model="agentConfig.networkConfig.ports" type="text" class="form-input" placeholder="Ex: 22 ou 22,2222" />
+              <small class="form-help">Un ou plusieurs ports (séparés par une virgule ou un espace).</small>
             </div>
             <div class="form-group">
               <label for="network-interface">Interface reseau</label>
               <input id="network-interface" v-model="agentConfig.networkConfig.interface" type="text" class="form-input" placeholder="eth0" />
+            </div>
+            <div class="form-group full-width">
+              <label class="toggle-row">
+                <input type="checkbox" v-model="agentConfig.interactive" class="toggle-input" />
+                <span>Mode interactif</span>
+              </label>
+              <small class="form-help">{{ typeConfig.interactiveHelp }}</small>
+            </div>
+            <div class="form-group full-width" v-if="agentConfig.interactive">
+              <label class="toggle-row">
+                <input type="checkbox" v-model="agentConfig.allowUpload" class="toggle-input" />
+                <span>Autoriser l'upload de fichiers ({{ agentType === 'ftp' ? 'STOR' : 'SFTP / SCP' }})</span>
+              </label>
+              <small class="form-help">Les binaires deposes par les bots sont captures, hashes et envoyes au serveur. Decoche pour ne capturer que les commandes / identifiants.</small>
+            </div>
+
+            <!-- Interactive-shell access policy -->
+            <div class="form-group full-width" v-if="agentConfig.interactive">
+              <label for="auth-mode">Acces au faux shell</label>
+              <select id="auth-mode" v-model="agentConfig.authMode" class="form-input">
+                <option value="any">Accepter tous les identifiants</option>
+                <option value="whitelist">Whitelist — n'autoriser que certains identifiants</option>
+              </select>
+              <small class="form-help">La capture des identifiants reste <b>toujours active</b>. La whitelist limite uniquement qui peut <b>entrer dans le shell</b>.</small>
+            </div>
+
+            <div class="form-group full-width" v-if="agentConfig.interactive && agentConfig.authMode === 'whitelist'">
+              <label>Identifiants autorises</label>
+              <div v-for="(entry, i) in agentConfig.authWhitelist" :key="i" class="wl-row">
+                <input v-model="entry.username" type="text" class="form-input" placeholder="Username (vide = tous)" />
+                <input v-model="entry.password" type="text" class="form-input" placeholder="Mot de passe (vide = tous)" />
+                <button type="button" class="btn btn-secondary btn-sm wl-del" @click="removeWhitelistEntry(i)" title="Supprimer">&times;</button>
+              </div>
+              <button type="button" class="btn btn-secondary btn-sm wl-add" @click="addWhitelistEntry">+ Ajouter un identifiant</button>
+              <small class="form-help">Par entree : <b>username seul</b> (tout mot de passe), <b>mot de passe seul</b> (tout username), ou <b>les deux</b> (combo exact). Une liste vide = tout est accepte.</small>
             </div>
           </div>
         </div>
@@ -304,9 +380,12 @@ export default defineComponent({
             <div class="review-section">
               <h4 class="review-section-title">Reseau</h4>
               <div class="review-grid">
-                <div class="review-item"><span class="review-label">Port</span><code class="review-value">{{ agentConfig.networkConfig.port }}</code></div>
+                <div class="review-item"><span class="review-label">Port(s)</span><code class="review-value">{{ agentConfig.networkConfig.ports }}</code></div>
                 <div class="review-item"><span class="review-label">Host</span><code class="review-value">{{ agentConfig.networkConfig.host }}</code></div>
                 <div class="review-item"><span class="review-label">Interface</span><code class="review-value">{{ agentConfig.networkConfig.interface }}</code></div>
+                <div class="review-item"><span class="review-label">Mode interactif</span><span class="review-value">{{ agentConfig.interactive ? 'Active' : 'Desactive' }}</span></div>
+                <div class="review-item" v-if="agentConfig.interactive"><span class="review-label">Upload fichiers</span><span class="review-value">{{ agentConfig.allowUpload ? 'Active' : 'Desactive' }}</span></div>
+                <div class="review-item" v-if="agentConfig.interactive"><span class="review-label">Acces shell</span><span class="review-value">{{ agentConfig.authMode === 'whitelist' ? ('Whitelist (' + agentConfig.authWhitelist.filter(e => (e.username||'').trim() || (e.password||'').trim()).length + ')') : 'Tous acceptes' }}</span></div>
                 <div class="review-item full-width"><span class="review-label">Banniere</span><code class="review-value review-banner">{{ agentConfig.banner }}</code></div>
               </div>
             </div>
@@ -315,12 +394,42 @@ export default defineComponent({
 
         <!-- Post-creation: Deploy -->
         <div v-if="createdAgentId" class="section-card deploy-card">
-          <h4 class="deploy-title">Methodes d'installation</h4>
+          <h4 class="deploy-title">Deploiement</h4>
+          <p class="deploy-hint">
+            Choisissez l'OS de la cible, puis lancez la commande (en root / administrateur).
+            Elle vous demande <strong>Docker</strong> ou <strong>Systeme</strong>, puis telecharge,
+            configure, demarre l'agent et l'active au demarrage — rien a faire a la main.
+          </p>
+
+          <!-- Target OS selector with real colored logos -->
+          <div class="os-tabs">
+            <button type="button" class="os-tab" :class="{ active: deployOS === 'linux' }" @click="deployOS = 'linux'">
+              <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true">
+                <ellipse cx="16" cy="21" rx="10" ry="10.5" fill="#111"/>
+                <ellipse cx="16" cy="22" rx="6.3" ry="7.8" fill="#fff"/>
+                <circle cx="16" cy="9" r="7" fill="#111"/>
+                <circle cx="13" cy="8.2" r="1.7" fill="#fff"/><circle cx="19" cy="8.2" r="1.7" fill="#fff"/>
+                <circle cx="13.2" cy="8.4" r="0.8" fill="#111"/><circle cx="18.8" cy="8.4" r="0.8" fill="#111"/>
+                <path d="M13.2 10.2 q2.8 2.6 5.6 0 l-2.8 2.2 z" fill="#f6a11f"/>
+                <path d="M10.5 30 l4.2 0 -2.4 -3.4 z M21.5 30 l-4.2 0 2.4 -3.4 z" fill="#f6a11f"/>
+              </svg>
+              <span>Linux</span>
+            </button>
+            <button type="button" class="os-tab" :class="{ active: deployOS === 'windows' }" @click="deployOS = 'windows'">
+              <svg viewBox="0 0 32 32" width="24" height="24" aria-hidden="true">
+                <rect x="3" y="3" width="11.5" height="11.5" fill="#0078D4"/>
+                <rect x="17.5" y="3" width="11.5" height="11.5" fill="#0078D4"/>
+                <rect x="3" y="17.5" width="11.5" height="11.5" fill="#0078D4"/>
+                <rect x="17.5" y="17.5" width="11.5" height="11.5" fill="#0078D4"/>
+              </svg>
+              <span>Windows</span>
+            </button>
+          </div>
 
           <div v-for="m in [
-            { key: 'docker', name: 'Docker', tag: 'Recommande' },
-            { key: 'direct', name: 'Direct (systemd)', tag: '' },
-            { key: 'manual', name: 'Manuel', tag: '' }
+            { key: 'auto', name: 'Installation (choix Docker ou Systeme)', tag: 'Recommande' },
+            { key: 'docker', name: 'Forcer Docker (conteneur isole)', tag: '' },
+            { key: 'direct', name: 'Forcer Systeme (natif)', tag: '' }
           ]" :key="m.key" class="deploy-method">
             <div class="method-top">
               <div class="method-info">
@@ -376,12 +485,12 @@ export default defineComponent({
   display: flex; align-items: center; justify-content: center;
   font-weight: 700; font-size: 15px; flex-shrink: 0; transition: all 0.3s;
 }
-.wizard-step-item.upcoming .step-circle { background: var(--card-background); border: 2px solid var(--container-border-color); color: #666; }
+.wizard-step-item.upcoming .step-circle { background: var(--card-background); border: 2px solid var(--container-border-color); color: var(--text-color-muted); }
 .wizard-step-item.active .step-circle { background: var(--accent-color); border: 2px solid var(--accent-color); color: #fff; box-shadow: 0 0 20px rgba(156, 77, 255, 0.3); }
 .wizard-step-item.completed .step-circle { background: var(--success-color); border: 2px solid var(--success-color); color: #fff; }
 
 .step-label { margin-left: 10px; font-size: 14px; font-weight: 600; white-space: nowrap; }
-.wizard-step-item.upcoming .step-label { color: #555; }
+.wizard-step-item.upcoming .step-label { color: var(--text-color-muted); }
 .wizard-step-item.active .step-label { color: var(--white); }
 .wizard-step-item.completed .step-label { color: var(--success-color); }
 
@@ -406,10 +515,12 @@ export default defineComponent({
 .form-group label { font-weight: 600; color: var(--white); font-size: 14px; }
 .form-input {
   padding: 12px; border: 1px solid var(--container-border-color); border-radius: 8px;
-  background: #111; color: var(--white); font-size: 14px; transition: border-color 0.2s, box-shadow 0.2s;
+  background: var(--input-background); color: var(--white); font-size: 14px; transition: border-color 0.2s, box-shadow 0.2s;
 }
 .form-input:focus { outline: none; border-color: var(--accent-color); box-shadow: 0 0 0 3px rgba(156, 77, 255, 0.1); }
 .form-help { color: var(--text-color-muted); font-size: 12px; }
+.toggle-row { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+.toggle-input { width: 18px; height: 18px; accent-color: var(--accent-color); cursor: pointer; }
 
 /* Review */
 .review-section { margin-bottom: 28px; }
@@ -430,15 +541,32 @@ export default defineComponent({
 }
 
 /* Deploy */
+.wl-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.wl-row .form-input { flex: 1; min-width: 0; }
+.wl-del { flex: 0 0 auto; padding: 0 14px; }
+.wl-add { margin-top: 4px; }
+
 .deploy-card { padding: 28px; }
-.deploy-title { font-size: 15px; font-weight: 700; color: var(--white); margin: 0 0 16px; }
+.deploy-title { font-size: 15px; font-weight: 700; color: var(--white); margin: 0 0 8px; }
+.deploy-hint { font-size: 13px; color: var(--text-color-muted); margin: 0 0 20px; line-height: 1.5; }
+.os-tabs { display: flex; gap: 10px; margin-bottom: 18px; }
+.os-tab {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border: 1px solid var(--container-border-color);
+  background: var(--input-background); color: var(--text-color);
+  border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600;
+  transition: border-color .15s, box-shadow .15s;
+}
+.os-tab:hover { border-color: var(--accent-color); }
+.os-tab.active { border-color: var(--accent-color); box-shadow: 0 0 0 2px var(--button-hover-background); }
+.os-tab svg { display: block; }
 .deploy-method {
-  margin-bottom: 14px; background: #0d0d0d; border-radius: 10px;
+  margin-bottom: 14px; background: var(--background-color-dark); border-radius: 10px;
   padding: 14px 16px; border: 1px solid var(--container-border-color);
 }
 .method-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
 .method-info { display: flex; align-items: center; gap: 10px; }
-.method-name { font-size: 14px; font-weight: 600; color: #ccc; }
+.method-name { font-size: 14px; font-weight: 600; color: var(--text-color-muted); }
 .method-tag {
   font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 4px;
   text-transform: uppercase; background: rgba(156, 77, 255, 0.15); color: var(--accent-color);
@@ -450,7 +578,7 @@ export default defineComponent({
 }
 .btn-copy:hover { background: rgba(156, 77, 255, 0.22); }
 .method-cmd {
-  display: block; font-size: 11px; color: #999; word-break: break-all;
+  display: block; font-size: 11px; color: var(--text-color-muted); word-break: break-all;
   line-height: 1.6; font-family: 'JetBrains Mono', 'Fira Code', monospace;
 }
 .deploy-actions { margin-top: 20px; display: flex; gap: 12px; }

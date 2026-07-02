@@ -234,7 +234,7 @@ export default defineComponent({
 .info-value {
   font-size: 14px;
   font-weight: 600;
-  color: var(--white);
+  color: var(--text-color);
 }
 
 .code-block {

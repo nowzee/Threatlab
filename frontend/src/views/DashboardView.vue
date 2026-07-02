@@ -20,6 +20,7 @@ export default defineComponent({
 
     return {
       route,
+      auth,
       onSubmit,
       navigateTo
     }
@@ -73,9 +74,9 @@ export default defineComponent({
                 </svg>
                 <span>Déployer un honeypot</span>
             </a>
-            <a 
-                class="btn-sidebar" 
-                :class="{ active: route.path === '/dashboard/honeypot-management' }"
+            <a
+                class="btn-sidebar"
+                :class="{ active: route.path.startsWith('/dashboard/honeypot-management') }"
                 id="manage-btn"
                 @click="navigateTo('/dashboard/honeypot-management')">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -126,6 +127,48 @@ export default defineComponent({
                 </svg>
                 <span>Wordlists</span>
             </a>
+          <a
+                class="btn-sidebar"
+                :class="{ active: route.path === '/dashboard/payloads' }"
+                @click="navigateTo('/dashboard/payloads')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                  <polyline points="14 2 14 8 20 8"></polyline>
+                  <line x1="16" y1="13" x2="8" y2="13"></line>
+                  <line x1="16" y1="17" x2="8" y2="17"></line>
+                </svg>
+                <span>Payloads &amp; Commandes</span>
+            </a>
+        </div>
+
+        <div class="sidebar-section" v-if="auth.user?.role === 'admin'">
+            <div class="sidebar-section-title">Administration</div>
+            <a
+                class="btn-sidebar"
+                :class="{ active: route.path === '/dashboard/admin/users' }"
+                id="admin-users-btn"
+                @click="navigateTo('/dashboard/admin/users')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <span>Utilisateurs</span>
+            </a>
+            <a
+                class="btn-sidebar"
+                :class="{ active: route.path === '/dashboard/admin/audit' }"
+                id="admin-audit-btn"
+                @click="navigateTo('/dashboard/admin/audit')">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+                    <line x1="7" y1="8" x2="17" y2="8"></line>
+                    <line x1="7" y1="12" x2="17" y2="12"></line>
+                    <line x1="7" y1="16" x2="13" y2="16"></line>
+                </svg>
+                <span>Journaux d'audit</span>
+            </a>
         </div>
 
         <div class="sidebar-section">
@@ -145,10 +188,10 @@ export default defineComponent({
 
         <div class="sidebar-footer">
             <div class="user-profile">
-                <div class="user-avatar">A</div>
+                <div class="user-avatar">{{ (auth.user?.username || 'U').charAt(0).toUpperCase() }}</div>
                 <div class="user-info">
-                    <div class="user-name">Admin</div>
-                    <div class="user-role">Administrateur</div>
+                    <div class="user-name">{{ auth.user?.username || 'Utilisateur' }}</div>
+                    <div class="user-role">{{ auth.user?.role === 'admin' ? 'Administrateur' : 'Membre' }}</div>
                 </div>
             </div>
             <a @click="onSubmit" class="btn-icon btn-secondary" id="deconnexion" style="margin-bottom: 10px;">

@@ -1,8 +1,8 @@
 """
-Module de gestion des agents honeypot et des données d'attaques.
+Module for managing honeypot agents and attack data.
 
-Ce module fournit les fonctions pour créer et gérer les agents honeypot,
-enregistrer les attaques, gérer les IPs malveillantes et générer des rapports.
+This module provides the functions to create and manage honeypot agents,
+record attacks, manage malicious IPs and generate reports.
 """
 from typing import Optional, Tuple, Dict, List, Any
 from module.database.db_manager import DatabaseManagerHoneypot
@@ -12,15 +12,37 @@ import os
 import hashlib
 from flask import current_app
 
-def generate_jwt(agent_id: int) -> str:
+
+def _clip(value: Any, max_len: int) -> Optional[str]:
     """
-    Génère un JWT unique pour un agent spécifique.
+    Truncate a value to the maximum length of a VARCHAR column.
+
+    Honeypots receive arbitrary and potentially oversized input (overflow,
+    malicious payloads). Truncating upfront avoids MySQL 1406 "Data too long"
+    errors that made the attack record fail (HTTP 500).
 
     Args:
-        agent_id (int): Identifiant de l'agent honeypot.
+        value: Value to insert (str or None).
+        max_len: Maximum length of the target column.
 
     Returns:
-        str: Token JWT signé contenant l'ID de l'agent et un nonce.
+        The truncated string, or None if the value is None.
+    """
+    if value is None:
+        return None
+    s = value if isinstance(value, str) else str(value)
+    return s[:max_len]
+
+
+def generate_jwt(agent_id: int) -> str:
+    """
+    Generates a unique JWT for a specific agent.
+
+    Args:
+        agent_id (int): Identifier of the honeypot agent.
+
+    Returns:
+        str: Signed JWT token containing the agent ID and a nonce.
     """
     secret_key = current_app.config.get('AGENT_SECRET_KEY') or current_app.config['SECRET_KEY']
     payload_to_encode = {
@@ -36,27 +58,38 @@ def create_agent_token(agent_name: str,
                        ip_address: str = "0.0.0.0",
                        country_name: Optional[str] = None,
                        service_type: str = "ssh",
-                       banner: Optional[str] = None) -> Tuple[Optional[int], Optional[str]]:
+                       banner: Optional[str] = None,
+                       interactive: bool = True,
+                       allow_upload: bool = True,
+                       owner_id: Optional[int] = None,
+                       auth_mode: str = 'any',
+                       auth_whitelist: Optional[str] = None,
+                       port: Optional[str] = None) -> Tuple[Optional[int], Optional[str]]:
     """
-    Crée un enregistrement pour un nouvel agent honeypot et génère un token unique.
+    Creates a record for a new honeypot agent and generates a unique token.
 
     Args:
-        agent_name (str): Nom de l'agent honeypot.
-        ip_address (str, optional): Adresse IP de l'agent. Par défaut "0.0.0.0".
-        country_name (Optional[str], optional): Nom du pays où l'agent est déployé. Par défaut None.
-        service_type (str, optional): Type de service simulé (ssh, smtp, ftp, etc.). Par défaut "ssh".
-        banner (Optional[str], optional): Banner du service simulé. Par défaut None.
+        agent_name (str): Name of the honeypot agent.
+        ip_address (str, optional): IP address of the agent. Defaults to "0.0.0.0".
+        country_name (Optional[str], optional): Name of the country where the agent is deployed. Defaults to None.
+        service_type (str, optional): Type of simulated service (ssh, smtp, ftp, etc.). Defaults to "ssh".
+        banner (Optional[str], optional): Banner of the simulated service. Defaults to None.
+        interactive (bool, optional): Enable interactive mode (SSH shell / FTP session). Defaults to True.
+        allow_upload (bool, optional): Allow file uploads (SFTP/SCP for SSH, STOR for FTP). Defaults to True.
+        owner_id (Optional[int], optional): id of the user creating the agent (ownership). Defaults to None.
 
     Returns:
-        Tuple[Optional[int], Optional[str]]: (agent_id, secret_token) si succès, sinon (None, None).
+        Tuple[Optional[int], Optional[str]]: (agent_id, secret_token) if successful, otherwise (None, None).
     """
     try:
         print(f"[DEBUG] Starting create_agent_token for: {agent_name}")
         with DatabaseManagerHoneypot() as db:
             db.execute("""
-                INSERT INTO honey_agents (agent_name, ip_address, country_name, service_type, banner)
-                VALUES (%s, %s, %s, %s, %s)
-            """, (agent_name, ip_address, country_name, service_type, banner))
+                INSERT INTO honey_agents (agent_name, ip_address, country_name, service_type, banner, interactive, allow_upload, owner_id, auth_mode, auth_whitelist, port)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """, (agent_name, ip_address, country_name, service_type, banner,
+                  1 if interactive else 0, 1 if allow_upload else 0, owner_id,
+                  auth_mode if auth_mode in ('any', 'whitelist') else 'any', auth_whitelist, port))
 
             # Step 2: Get the auto-generated ID of the newly inserted agent
             agent_id = db.cursor.lastrowid
@@ -90,20 +123,20 @@ def add_malicious_ip_address(agent_id: int,
                             country_code: Optional[str] = None,
                             classification: Optional[str] = None) -> bool:
     """
-    Ajoute ou met à jour une IP malveillante avec ses relations normalisées.
+    Adds or updates a malicious IP with its normalized relations.
 
-    Gère l'enregistrement de l'IP, la relation IP-Agent et le compteur d'attaques IP-Service.
+    Handles recording the IP, the IP-Agent relation and the IP-Service attack counter.
 
     Args:
-        agent_id (int): Identifiant de l'agent honeypot.
-        ip_address (str): Adresse IP malveillante.
-        service_type (str): Type de service ciblé (ssh, smtp, ftp, etc.).
-        country_name (Optional[str], optional): Nom du pays d'origine. Par défaut None.
-        country_code (Optional[str], optional): Code pays (ISO). Par défaut None.
-        classification (Optional[str], optional): Classification de la menace. Par défaut None.
+        agent_id (int): Identifier of the honeypot agent.
+        ip_address (str): Malicious IP address.
+        service_type (str): Type of targeted service (ssh, smtp, ftp, etc.).
+        country_name (Optional[str], optional): Name of the country of origin. Defaults to None.
+        country_code (Optional[str], optional): Country code (ISO). Defaults to None.
+        classification (Optional[str], optional): Threat classification. Defaults to None.
 
     Returns:
-        bool: True si l'opération a réussi, False sinon.
+        bool: True if the operation succeeded, False otherwise.
     """
     try:
         with DatabaseManagerHoneypot() as db:
@@ -125,13 +158,13 @@ def add_malicious_ip_address(agent_id: int,
                               WHERE id = %s""",
                            (new_total_count, country_name, country_code, classification, ip_id))
             else:
-                # Insert nouvelle IP
+                # Insert new IP
                 db.execute("""INSERT INTO malicious_ips
                                   (ip_address, country_name, country_code, classification)
                               VALUES (%s, %s, %s, %s)""",
                            (ip_address, country_name, country_code, classification))
 
-                # Récupérer l'ID auto-généré
+                # Retrieve the auto-generated ID
                 db.execute("SELECT id FROM malicious_ips WHERE ip_address = %s", (ip_address,))
                 ip_id = db.fetchone()['id']
 
@@ -148,15 +181,15 @@ def add_malicious_ip_address(agent_id: int,
 
 def _update_ip_agent_relation(db: DatabaseManagerHoneypot, ip_id: int, agent_id: int) -> None:
     """
-    Met à jour la relation entre une IP et un agent (fonction helper).
+    Updates the relation between an IP and an agent (helper function).
 
     Args:
-        db (DatabaseManagerHoneypot): Instance du gestionnaire de base de données.
-        ip_id (int): Identifiant de l'IP malveillante.
-        agent_id (int): Identifiant de l'agent honeypot.
+        db (DatabaseManagerHoneypot): Instance of the database manager.
+        ip_id (int): Identifier of the malicious IP.
+        agent_id (int): Identifier of the honeypot agent.
 
     Raises:
-        Exception: Si une erreur survient lors de la mise à jour.
+        Exception: If an error occurs during the update.
     """
     try:
         # Check if this IP has already been seen by this specific agent
@@ -183,15 +216,15 @@ def _update_ip_agent_relation(db: DatabaseManagerHoneypot, ip_id: int, agent_id:
 
 def _update_ip_service_attacks(db: DatabaseManagerHoneypot, ip_id: int, service_type: str) -> None:
     """
-    Met à jour le compteur d'attaques IP-Service (fonction helper).
+    Updates the IP-Service attack counter (helper function).
 
     Args:
-        db (DatabaseManagerHoneypot): Instance du gestionnaire de base de données.
-        ip_id (int): Identifiant de l'IP malveillante.
-        service_type (str): Type de service ciblé.
+        db (DatabaseManagerHoneypot): Instance of the database manager.
+        ip_id (int): Identifier of the malicious IP.
+        service_type (str): Type of targeted service.
 
     Raises:
-        Exception: Si une erreur survient lors de la mise à jour.
+        Exception: If an error occurs during the update.
     """
     try:
         # Check if this IP has targeted this service type before
@@ -221,20 +254,27 @@ def add_compromised_credential(malicious_ip: str,
                               password: str,
                               service_type: str) -> bool:
     """
-    Ajoute ou met à jour des credentials compromis.
+    Adds or updates compromised credentials.
 
-    Met également à jour les statistiques globales des usernames et passwords observés.
+    Also updates the global statistics of observed usernames and passwords.
 
     Args:
-        malicious_ip (str): Adresse IP malveillante.
-        username (str): Nom d'utilisateur tenté.
-        password (str): Mot de passe tenté.
-        service_type (str): Type de service ciblé.
+        malicious_ip (str): Malicious IP address.
+        username (str): Attempted username.
+        password (str): Attempted password.
+        service_type (str): Type of targeted service.
 
     Returns:
-        bool: True si l'opération a réussi, False sinon.
+        bool: True if the operation succeeded, False otherwise.
     """
     try:
+        # Truncate to the column limits (VARCHAR(255)/VARCHAR(50)) so that the
+        # lookup and the insertion are consistent and do not fail on oversized
+        # malicious inputs.
+        username = _clip(username, 255)
+        password = _clip(password, 255)
+        service_type = _clip(service_type, 50)
+
         with DatabaseManagerHoneypot() as db:
             # Lookup the IP ID from the malicious_ips table
             db.execute("SELECT id FROM malicious_ips WHERE ip_address = %s", (malicious_ip,))
@@ -301,25 +341,25 @@ def add_compromised_credential(malicious_ip: str,
 
 def add_attack_log(attack_data: Dict[str, Any]) -> bool:
     """
-    Insère un log d'attaque dans la base de données avec l'horodatage actuel.
+    Inserts an attack log into the database with the current timestamp.
 
     Args:
-        attack_data (Dict[str, Any]): Dictionnaire contenant les données de l'attaque:
-            - agent_id: Identifiant de l'agent
-            - source_ip: IP source de l'attaque
-            - source_port: Port source
-            - target_port: Port ciblé
-            - service_type: Type de service
-            - username_attempt: Tentative de username (optionnel)
-            - password_attempt: Tentative de password (optionnel)
-            - payload: Payload capturé (optionnel)
-            - malware_hash: Hash du malware (optionnel)
-            - classification: Type d'attaque (optionnel)
-            - country_code: Code pays (optionnel)
-            - country_name: Nom du pays (optionnel)
+        attack_data (Dict[str, Any]): Dictionary containing the attack data:
+            - agent_id: Identifier of the agent
+            - source_ip: Source IP of the attack
+            - source_port: Source port
+            - target_port: Targeted port
+            - service_type: Type of service
+            - username_attempt: Username attempt (optional)
+            - password_attempt: Password attempt (optional)
+            - payload: Captured payload (optional)
+            - malware_hash: Malware hash (optional)
+            - classification: Attack type (optional)
+            - country_code: Country code (optional)
+            - country_name: Country name (optional)
 
     Returns:
-        bool: True si l'insertion a réussi, False sinon.
+        bool: True if the insertion succeeded, False otherwise.
     """
     try:
         with DatabaseManagerHoneypot() as db:
@@ -332,21 +372,254 @@ def add_attack_log(attack_data: Dict[str, Any]) -> bool:
                          VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
                       (now,
                        attack_data.get('agent_id'),
-                       attack_data.get('source_ip'),
+                       _clip(attack_data.get('source_ip'), 45),
                        attack_data.get('source_port'),
                        attack_data.get('target_port'),
-                       attack_data.get('service_type'),
-                       attack_data.get('username_attempt'),
-                       attack_data.get('password_attempt'),
+                       _clip(attack_data.get('service_type'), 50),
+                       _clip(attack_data.get('username_attempt'), 255),
+                       _clip(attack_data.get('password_attempt'), 255),
                        attack_data.get('payload'),
-                       attack_data.get('malware_hash'),
-                       attack_data.get('classification'),
-                       attack_data.get('country_code'),
-                       attack_data.get('country_name')))
+                       _clip(attack_data.get('malware_hash'), 255),
+                       _clip(attack_data.get('classification'), 50),
+                       _clip(attack_data.get('country_code'), 10),
+                       _clip(attack_data.get('country_name'), 100)))
             return True
     except Exception as e:
         print(f"Error adding attack log: {e}")
         return False
+
+def add_attack_logs_batch(rows: List[Dict[str, Any]]) -> bool:
+    """
+    Insert several attack logs in a single query (batch insert).
+
+    Used by the async ingestion worker to absorb high volume: one multi-row
+    query instead of one INSERT per attack greatly reduces SQL round-trips.
+
+    Args:
+        rows (List[Dict[str, Any]]): List of attack dicts (same keys as
+            add_attack_log).
+
+    Returns:
+        bool: True if the insert succeeded, False otherwise.
+    """
+    if not rows:
+        return True
+    try:
+        with DatabaseManagerHoneypot() as db:
+            now = datetime.now()
+            params = [
+                (now,
+                 r.get('agent_id'),
+                 _clip(r.get('source_ip'), 45),
+                 r.get('source_port'),
+                 r.get('target_port'),
+                 _clip(r.get('service_type'), 50),
+                 _clip(r.get('username_attempt'), 255),
+                 _clip(r.get('password_attempt'), 255),
+                 r.get('payload'),
+                 _clip(r.get('malware_hash'), 255),
+                 _clip(r.get('classification'), 50),
+                 _clip(r.get('country_code'), 10),
+                 _clip(r.get('country_name'), 100))
+                for r in rows
+            ]
+            db.executemany("""INSERT INTO attack_logs
+                         (created_at, agent_id, source_ip, source_port, target_port, service_type,
+                          username_attempt, password_attempt, payload, malware_hash,
+                          attack_type, country_code, country_name)
+                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", params)
+            return True
+    except Exception as e:
+        print(f"Error adding attack log batch ({len(rows)} rows): {e}")
+        return False
+
+
+_uploaded_files_table_ready = False
+
+
+def _ensure_uploaded_files_table(db) -> None:
+    """Create the uploaded_files table if missing (existing deployments)."""
+    global _uploaded_files_table_ready
+    if _uploaded_files_table_ready:
+        return
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS uploaded_files (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            file_hash VARCHAR(64) UNIQUE NOT NULL,
+            file_name VARCHAR(255),
+            file_size BIGINT,
+            stored_path VARCHAR(512),
+            source_ip VARCHAR(45),
+            username VARCHAR(255),
+            password VARCHAR(255),
+            request_headers TEXT,
+            agent_id BIGINT,
+            service_type VARCHAR(50),
+            first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+            last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+            upload_count INT DEFAULT 1
+        )
+    """)
+    _uploaded_files_table_ready = True
+
+
+def upload_hash_exists(file_hash: str) -> bool:
+    """Return whether a file with this hash has already been recorded."""
+    try:
+        with DatabaseManagerHoneypot() as db:
+            _ensure_uploaded_files_table(db)
+            db.execute("SELECT id FROM uploaded_files WHERE file_hash = %s", (file_hash,))
+            return db.fetchone() is not None
+    except Exception as e:
+        print(f"Error checking upload hash: {e}")
+        return False
+
+
+def record_uploaded_file(file_hash: str, file_name: str, file_size: int, stored_path: str,
+                         source_ip: str, username: str, password: str, request_headers: str,
+                         agent_id: Optional[int], service_type: str) -> bool:
+    """
+    Record an uploaded file (deduplicated by hash).
+
+    Atomic INSERT with ON DUPLICATE KEY UPDATE: a hash already seen just bumps
+    the counter and refreshes the last observed name, without duplicating the row.
+
+    Returns:
+        bool: True if the record was stored successfully.
+    """
+    try:
+        with DatabaseManagerHoneypot() as db:
+            _ensure_uploaded_files_table(db)
+            db.execute("""
+                INSERT INTO uploaded_files
+                    (file_hash, file_name, file_size, stored_path, source_ip,
+                     username, password, request_headers, agent_id, service_type)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    last_seen = CURRENT_TIMESTAMP,
+                    upload_count = upload_count + 1,
+                    file_name = VALUES(file_name)
+            """, (file_hash, _clip(file_name, 255), file_size, _clip(stored_path, 512),
+                  _clip(source_ip, 45), _clip(username, 255), _clip(password, 255),
+                  request_headers, agent_id, _clip(service_type, 50)))
+            return True
+    except Exception as e:
+        print(f"Error recording uploaded file: {e}")
+        return False
+
+
+_UPLOAD_COLS = ("file_hash, file_name, file_size, stored_path, source_ip, username, "
+                "password, service_type, agent_id, upload_count, first_seen, last_seen")
+
+
+def get_uploaded_files_page(page: int = 1, limit: int = 10, q: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Paginated list of captured files.
+
+    If `q` is given, returns files whose metadata (name, ip, user, hash) OR
+    file content contains the string. Returns {items, total, page, limit}.
+    """
+    page = max(1, int(page))
+    limit = max(1, min(100, int(limit)))
+    try:
+        with DatabaseManagerHoneypot() as db:
+            _ensure_uploaded_files_table(db)
+
+            if not q:
+                db.execute("SELECT COUNT(*) AS c FROM uploaded_files")
+                total = db.fetchone()['c']
+                db.execute("SELECT " + _UPLOAD_COLS + " FROM uploaded_files "
+                           "ORDER BY last_seen DESC LIMIT %s OFFSET %s",
+                           (limit, (page - 1) * limit))
+                rows = db.fetchall()
+                return {'items': rows, 'total': total, 'page': page, 'limit': limit}
+
+            # Search: scan recent files, match metadata then file content.
+            db.execute("SELECT " + _UPLOAD_COLS + " FROM uploaded_files "
+                       "ORDER BY last_seen DESC LIMIT 3000")
+            candidates = db.fetchall()
+
+        ql = q.lower()
+        qb = q.encode('utf-8', 'ignore')
+        matches = []
+        for r in candidates:
+            meta = ' '.join(str(r.get(k) or '') for k in
+                            ('file_name', 'source_ip', 'username', 'password', 'file_hash')).lower()
+            hit = ql in meta
+            if not hit:
+                path = r.get('stored_path')
+                if path and (r.get('file_size') or 0) <= 10 * 1024 * 1024 and os.path.exists(path):
+                    try:
+                        with open(path, 'rb') as f:
+                            hit = qb in f.read()
+                    except Exception:
+                        hit = False
+            if hit:
+                matches.append(r)
+
+        total = len(matches)
+        start = (page - 1) * limit
+        return {'items': matches[start:start + limit], 'total': total, 'page': page, 'limit': limit}
+    except Exception as e:
+        print(f"Error listing uploaded files: {e}")
+        return {'items': [], 'total': 0, 'page': page, 'limit': limit}
+
+
+def get_uploaded_file(file_hash: str) -> Optional[Dict[str, Any]]:
+    """Return the stored path and name of a captured file by hash."""
+    try:
+        with DatabaseManagerHoneypot() as db:
+            _ensure_uploaded_files_table(db)
+            db.execute("SELECT stored_path, file_name FROM uploaded_files WHERE file_hash = %s",
+                       (file_hash,))
+            return db.fetchone()
+    except Exception as e:
+        print(f"Error fetching uploaded file: {e}")
+        return None
+
+
+def get_shell_commands_page(status: str = 'all', page: int = 1, limit: int = 10,
+                            q: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Paginated list of observed shell commands.
+
+    Args:
+        status: 'all', 'success' (recognized) or 'failed' (command not found).
+        page, limit: Pagination.
+        q: Optional substring to match against the command text.
+
+    Returns:
+        {items, total, page, limit}.
+    """
+    page = max(1, int(page))
+    limit = max(1, min(100, int(limit)))
+    try:
+        with DatabaseManagerHoneypot() as db:
+            where = "attack_type IN ('shell_command', 'shell_command_failed')"
+            params: List[Any] = []
+            if status == 'success':
+                where += " AND attack_type = %s"
+                params.append('shell_command')
+            elif status == 'failed':
+                where += " AND attack_type = %s"
+                params.append('shell_command_failed')
+            if q:
+                where += " AND payload LIKE %s"
+                params.append('%' + q + '%')
+
+            db.execute("SELECT COUNT(*) AS c FROM attack_logs WHERE " + where, tuple(params))
+            total = db.fetchone()['c']
+
+            db.execute("SELECT id, created_at, source_ip, country_code, agent_id, "
+                       "username_attempt, payload, attack_type, service_type "
+                       "FROM attack_logs WHERE " + where +
+                       " ORDER BY id DESC LIMIT %s OFFSET %s",
+                       tuple(params) + (limit, (page - 1) * limit))
+            return {'items': db.fetchall(), 'total': total, 'page': page, 'limit': limit}
+    except Exception as e:
+        print(f"Error listing shell commands: {e}")
+        return {'items': [], 'total': 0, 'page': page, 'limit': limit}
+
 
 def add_smtp_interaction(malicious_ip: str,
                         sender_email: str,
@@ -355,18 +628,18 @@ def add_smtp_interaction(malicious_ip: str,
                         message_content: str,
                         attachments: Optional[List[str]] = None) -> bool:
     """
-    Insère une interaction SMTP dans la base de données.
+    Inserts an SMTP interaction into the database.
 
     Args:
-        malicious_ip (str): Adresse IP du serveur malveillant.
-        sender_email (str): Email de l'expéditeur.
-        recipient_email (str): Email du destinataire.
-        subject (str): Sujet de l'email.
-        message_content (str): Contenu du message.
-        attachments (Optional[List[str]], optional): Liste des pièces jointes. Par défaut None.
+        malicious_ip (str): IP address of the malicious server.
+        sender_email (str): Sender's email.
+        recipient_email (str): Recipient's email.
+        subject (str): Subject of the email.
+        message_content (str): Content of the message.
+        attachments (Optional[List[str]], optional): List of attachments. Defaults to None.
 
     Returns:
-        bool: True si l'insertion a réussi, False sinon.
+        bool: True if the insertion succeeded, False otherwise.
     """
     try:
         with DatabaseManagerHoneypot() as db:
@@ -395,94 +668,166 @@ def add_smtp_interaction(malicious_ip: str,
         print(f"Error adding SMTP interaction: {e}")
         return False
 
-def get_default_metric_data() -> Dict[str, int]:
+def get_default_metric_data(owner_id: Optional[int] = None) -> Dict[str, int]:
     """
-    Récupère les métriques par défaut du dashboard.
+    Retrieves the dashboard's default metrics.
+
+    When ``owner_id`` is given (a non-admin member), the metrics are scoped to
+    the honeypots owned by that user; otherwise they are platform-wide (admin).
 
     Returns:
-        Dict[str, int]: Dictionnaire contenant:
-            - ip_count: Nombre d'IPs malveillantes uniques
-            - Sample_downloaded: Nombre de samples/payloads uniques
-            - tentative_access: Nombre total de tentatives d'accès
-            - number_agents: Nombre d'agents honeypot actifs
+        Dict[str, int]: {ip_count, Sample_downloaded, number_honeypot, tentative_access}
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''
-                   SELECT (SELECT COUNT(id) FROM malicious_ips) AS ip_count,
-                          (SELECT COUNT(id) FROM payloads)      AS Sample_downloaded,
-                          (SELECT COUNT(id) FROM honey_agents)  AS number_honeypot,
-                          (SELECT COUNT(id) FROM attack_logs)   AS tentative_access
-                   ''')
+        if owner_id is None:
+            db.execute('''
+                       SELECT (SELECT COUNT(id) FROM malicious_ips) AS ip_count,
+                              (SELECT COUNT(id) FROM payloads)      AS Sample_downloaded,
+                              (SELECT COUNT(id) FROM honey_agents)  AS number_honeypot,
+                              (SELECT COUNT(id) FROM attack_logs)   AS tentative_access
+                       ''')
+        else:
+            db.execute('''
+                SELECT
+                    (SELECT COUNT(DISTINCT r.ip_id)
+                       FROM ip_agent_relations r
+                       JOIN honey_agents ha ON ha.id = r.agent_id
+                       WHERE ha.owner_id = %s) AS ip_count,
+                    (SELECT COUNT(DISTINCT al.malware_hash)
+                       FROM attack_logs al
+                       JOIN honey_agents ha ON ha.id = al.agent_id
+                       WHERE ha.owner_id = %s AND al.malware_hash IS NOT NULL AND al.malware_hash != '') AS Sample_downloaded,
+                    (SELECT COUNT(id) FROM honey_agents WHERE owner_id = %s) AS number_honeypot,
+                    (SELECT COUNT(al.id)
+                       FROM attack_logs al
+                       JOIN honey_agents ha ON ha.id = al.agent_id
+                       WHERE ha.owner_id = %s) AS tentative_access
+            ''', (owner_id, owner_id, owner_id, owner_id))
 
         result = db.fetchone()
         return result
 
 
-def get_agent_details() -> List[Dict[str, Any]]:
+def get_agent_details(owner_id: Optional[int] = None) -> List[Dict[str, Any]]:
     """
-    Récupère les détails des 5 derniers logs d'attaques avec informations des agents.
+    Retrieves the details of the last 5 attack logs with agent information.
+
+    When ``owner_id`` is given, only logs for that user's honeypots are returned.
+    The admin (global) view also exposes the owning user's name.
 
     Returns:
-        List[Dict[str, Any]]: Liste de dictionnaires contenant les informations des logs.
+        List[Dict[str, Any]]: List of dictionaries containing the log information.
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''
-                   SELECT al.country_name,
-                          al.source_ip,
-                          al.target_port,
-                          al.service_type,
-                          al.agent_id,
-                          ha.agent_name,
-                          al.created_at,
-                          al.id
-                   FROM attack_logs al
-                            LEFT JOIN honey_agents ha ON al.agent_id = ha.id
-                   ORDER BY al.id DESC
-                   LIMIT 5
-                   ''')
+        if owner_id is None:
+            db.execute('''
+                       SELECT al.country_name,
+                              al.source_ip,
+                              al.target_port,
+                              al.service_type,
+                              al.agent_id,
+                              ha.agent_name,
+                              u.username AS owner_username,
+                              al.created_at,
+                              al.id
+                       FROM attack_logs al
+                                LEFT JOIN honey_agents ha ON al.agent_id = ha.id
+                                LEFT JOIN users u ON ha.owner_id = u.id
+                       ORDER BY al.id DESC
+                       LIMIT 5
+                       ''')
+        else:
+            db.execute('''
+                       SELECT al.country_name,
+                              al.source_ip,
+                              al.target_port,
+                              al.service_type,
+                              al.agent_id,
+                              ha.agent_name,
+                              al.created_at,
+                              al.id
+                       FROM attack_logs al
+                                JOIN honey_agents ha ON al.agent_id = ha.id
+                       WHERE ha.owner_id = %s
+                       ORDER BY al.id DESC
+                       LIMIT 5
+                       ''', (owner_id,))
 
         return db.fetchall()
 
 
-def get_country_ranking() -> List[Dict[str, Any]]:
+def get_country_ranking(owner_id: Optional[int] = None) -> List[Dict[str, Any]]:
     """
-    Récupère le classement des pays par nombre d'attaques pour le dashboard.
+    Retrieves the country ranking by number of attacks for the dashboard.
+
+    Scoped to the user's honeypots when ``owner_id`` is provided.
 
     Returns:
-        List[Dict[str, Any]]: Liste des 10 pays avec le plus d'attaques, triés par ordre décroissant.
+        List[Dict[str, Any]]: List of the 10 countries with the most attacks, sorted in descending order.
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''
-                   SELECT country_name AS country_name,
-                          COUNT(*)     AS attack_count
-                   FROM attack_logs
-                   WHERE country_name IS NOT NULL
-                     AND country_name != ''
-                   GROUP BY country_name
-                   ORDER BY attack_count DESC
-                   LIMIT 10
-                   ''')
+        if owner_id is None:
+            db.execute('''
+                       SELECT country_name AS country_name,
+                              COUNT(*)     AS attack_count
+                       FROM attack_logs
+                       WHERE country_name IS NOT NULL
+                         AND country_name != ''
+                       GROUP BY country_name
+                       ORDER BY attack_count DESC
+                       LIMIT 10
+                       ''')
+        else:
+            db.execute('''
+                       SELECT al.country_name AS country_name,
+                              COUNT(*)        AS attack_count
+                       FROM attack_logs al
+                                JOIN honey_agents ha ON al.agent_id = ha.id
+                       WHERE ha.owner_id = %s
+                         AND al.country_name IS NOT NULL
+                         AND al.country_name != ''
+                       GROUP BY al.country_name
+                       ORDER BY attack_count DESC
+                       LIMIT 10
+                       ''', (owner_id,))
 
         return db.fetchall()
 
 
-def get_password_ranking() -> List[Dict[str, Any]]:
+def get_password_ranking(owner_id: Optional[int] = None) -> List[Dict[str, Any]]:
     """
-    Récupère le classement des 5 mots de passe les plus tentés.
+    Retrieves the ranking of the 5 most attempted passwords.
+
+    Platform-wide by default; when ``owner_id`` is given, computed from the
+    attack logs of that user's honeypots only.
 
     Returns:
-        List[Dict[str, Any]]: Liste des 5 mots de passe les plus populaires.
+        List[Dict[str, Any]]: List of the 5 most popular passwords.
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''
-            SELECT
-                password,
-                MAX(count) AS count
-            FROM password_attempted
-            GROUP BY password
-            ORDER BY count DESC
-            LIMIT 5
-        ''')
+        if owner_id is None:
+            db.execute('''
+                SELECT
+                    password,
+                    MAX(count) AS count
+                FROM password_attempted
+                GROUP BY password
+                ORDER BY count DESC
+                LIMIT 5
+            ''')
+        else:
+            db.execute('''
+                SELECT al.password_attempt AS password,
+                       COUNT(*)            AS count
+                FROM attack_logs al
+                         JOIN honey_agents ha ON al.agent_id = ha.id
+                WHERE ha.owner_id = %s
+                  AND al.password_attempt IS NOT NULL
+                  AND al.password_attempt != ''
+                GROUP BY al.password_attempt
+                ORDER BY count DESC
+                LIMIT 5
+            ''', (owner_id,))
 
         return db.fetchall()
 
@@ -490,7 +835,7 @@ def get_password_ranking() -> List[Dict[str, Any]]:
 
 class ManagerAgent:
     """
-    Classe pour gérer les opérations CRUD sur les agents honeypot.
+    Class to manage CRUD operations on honeypot agents.
     """
 
     @staticmethod
@@ -504,44 +849,81 @@ class ManagerAgent:
             return False
 
     @staticmethod
-    def remove(agent_id: int) -> bool:
+    def remove(agent_id: int, viewer_id: Optional[int] = None, is_admin: bool = True) -> bool:
         """
-        Supprime un agent honeypot de la base de données.
+        Removes a honeypot agent from the database.
+
+        When ``is_admin`` is False, the agent is only removed if it is owned by
+        ``viewer_id`` (members can only delete their own honeypots).
 
         Args:
-            agent_id (int): Identifiant de l'agent à supprimer.
+            agent_id (int): Identifier of the agent to remove.
+            viewer_id (Optional[int]): id of the requesting user (for ownership check).
+            is_admin (bool): True to bypass the ownership check.
 
         Returns:
-            bool: True si l'agent a été supprimé, False s'il n'existe pas.
+            bool: True if the agent was removed, False if it does not exist or is not owned.
         """
         with DatabaseManagerHoneypot() as db:
 
-            db.execute('''SELECT id FROM honey_agents WHERE id = %s''', (int(agent_id),))
+            db.execute('''SELECT id, owner_id FROM honey_agents WHERE id = %s''', (int(agent_id),))
             agent = db.fetchone()
-            if agent:
-                db.execute("DELETE FROM honey_agents WHERE id = %s", (int(agent_id),))
-                return True
-            return False
+            if not agent:
+                return False
+            # Members may only delete honeypots they own.
+            if not is_admin and agent.get('owner_id') != viewer_id:
+                return False
+
+            db.execute("UPDATE attack_logs SET agent_id = NULL WHERE agent_id = %s", (int(agent_id),))
+            db.execute("DELETE FROM ip_agent_relations WHERE agent_id = %s", (int(agent_id),))
+            db.execute("DELETE FROM honey_agents WHERE id = %s", (int(agent_id),))
+            return True
 
     @staticmethod
-    def list() -> List[Dict[str, Any]]:
+    def list(viewer_id: Optional[int] = None, is_admin: bool = True) -> List[Dict[str, Any]]:
         """
-        Récupère la liste complète de tous les agents honeypot.
+        Retrieves the list of honeypot agents.
+
+        Admins get every agent (with the owning user's name); members get only
+        the agents they own.
+
+        Args:
+            viewer_id (Optional[int]): id of the requesting user (member filter).
+            is_admin (bool): True to return all agents.
 
         Returns:
-            List[Dict[str, Any]]: Liste de dictionnaires contenant les informations des agents.
+            List[Dict[str, Any]]: List of dictionaries containing the agent information.
         """
         with DatabaseManagerHoneypot() as db:
-            db.execute("""
-                       SELECT id,
-                              agent_name,
-                              ip_address,
-                              service_type,
-                              updated_at,
-                              alert_generated,
-                              created_at
-                       FROM honey_agents
-                       """)
+            if is_admin:
+                db.execute("""
+                           SELECT ha.id,
+                                  ha.agent_name,
+                                  ha.ip_address,
+                                  ha.service_type,
+                                  ha.updated_at,
+                                  ha.alert_generated,
+                                  ha.created_at,
+                                  ha.owner_id,
+                                  u.username AS owner_username
+                           FROM honey_agents ha
+                                    LEFT JOIN users u ON ha.owner_id = u.id
+                           ORDER BY ha.id DESC
+                           """)
+            else:
+                db.execute("""
+                           SELECT ha.id,
+                                  ha.agent_name,
+                                  ha.ip_address,
+                                  ha.service_type,
+                                  ha.updated_at,
+                                  ha.alert_generated,
+                                  ha.created_at,
+                                  ha.owner_id
+                           FROM honey_agents ha
+                           WHERE ha.owner_id = %s
+                           ORDER BY ha.id DESC
+                           """, (viewer_id,))
 
             agents = db.fetchall()
             return agents
@@ -552,7 +934,7 @@ class ManagerAgent:
 
 def get_wordlist_stats() -> Dict[str, Any]:
     """
-    Recupere les statistiques globales des wordlists (count + total attempts) via COUNT/SUM SQL.
+    Retrieves the global wordlist statistics (count + total attempts) via COUNT/SUM SQL.
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
@@ -569,13 +951,13 @@ def get_wordlist_stats() -> Dict[str, Any]:
 
 def get_top_passwords(limit: Optional[int] = 20) -> List[Dict[str, Any]]:
     """
-    Récupère les mots de passe les plus tentés.
+    Retrieves the most attempted passwords.
 
     Args:
-        limit: Nombre maximum de résultats. None = tous.
+        limit: Maximum number of results. None = all.
 
     Returns:
-        List[Dict[str, Any]]: Liste des mots de passe avec leur nombre d'occurrences.
+        List[Dict[str, Any]]: List of passwords with their number of occurrences.
     """
     with DatabaseManagerHoneypot() as db:
         query = 'SELECT password, count FROM password_attempted WHERE password IS NOT NULL ORDER BY count DESC'
@@ -589,13 +971,13 @@ def get_top_passwords(limit: Optional[int] = 20) -> List[Dict[str, Any]]:
 
 def get_top_usernames(limit: Optional[int] = 20) -> List[Dict[str, Any]]:
     """
-    Récupère les noms d'utilisateur les plus tentés.
+    Retrieves the most attempted usernames.
 
     Args:
-        limit: Nombre maximum de résultats. None = tous.
+        limit: Maximum number of results. None = all.
 
     Returns:
-        List[Dict[str, Any]]: Liste des usernames avec leur nombre d'occurrences.
+        List[Dict[str, Any]]: List of usernames with their number of occurrences.
     """
     with DatabaseManagerHoneypot() as db:
         query = 'SELECT username, count FROM username_viewed WHERE username IS NOT NULL ORDER BY count DESC'
@@ -610,10 +992,10 @@ def get_top_usernames(limit: Optional[int] = 20) -> List[Dict[str, Any]]:
 
 def get_service_distribution() -> List[Dict[str, Any]]:
     """
-    Récupère la distribution des attaques par type de service.
+    Retrieves the distribution of attacks by service type.
 
     Returns:
-        List[Dict[str, Any]]: Liste des services ciblés avec le nombre d'attaques.
+        List[Dict[str, Any]]: List of targeted services with the number of attacks.
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
@@ -629,13 +1011,13 @@ def get_service_distribution() -> List[Dict[str, Any]]:
 
 def get_top_malicious_ips(limit: int = 20) -> List[Dict[str, Any]]:
     """
-    Récupère les IPs malveillantes les plus agressives.
+    Retrieves the most aggressive malicious IPs.
 
     Args:
-        limit (int, optional): Nombre maximum de résultats. Par défaut 20.
+        limit (int, optional): Maximum number of results. Defaults to 20.
 
     Returns:
-        List[Dict[str, Any]]: Liste des IPs avec leurs détails et statistiques.
+        List[Dict[str, Any]]: List of IPs with their details and statistics.
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
@@ -655,13 +1037,13 @@ def get_top_malicious_ips(limit: int = 20) -> List[Dict[str, Any]]:
 
 def get_attacks_by_day(days: int = 7) -> List[Dict[str, Any]]:
     """
-    Récupère le nombre d'attaques pour les N derniers jours.
+    Retrieves the number of attacks for the last N days.
 
     Args:
-        days (int, optional): Nombre de jours à analyser. Par défaut 7.
+        days (int, optional): Number of days to analyze. Defaults to 7.
 
     Returns:
-        List[Dict[str, Any]]: Liste des dates avec le nombre d'attaques par jour.
+        List[Dict[str, Any]]: List of dates with the number of attacks per day.
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
@@ -678,10 +1060,10 @@ def get_attacks_by_day(days: int = 7) -> List[Dict[str, Any]]:
 
 def get_attacks_by_hour() -> List[Dict[str, Any]]:
     """
-    Récupère le nombre d'attaques par heure pour les dernières 24 heures.
+    Retrieves the number of attacks per hour for the last 24 hours.
 
     Returns:
-        List[Dict[str, Any]]: Liste des heures avec le nombre d'attaques.
+        List[Dict[str, Any]]: List of hours with the number of attacks.
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
@@ -708,10 +1090,10 @@ def get_attacks_by_hour() -> List[Dict[str, Any]]:
 
 def get_agent_statistics() -> List[Dict[str, Any]]:
     """
-    Récupère les statistiques pour tous les agents honeypot.
+    Retrieves the statistics for all honeypot agents.
 
     Returns:
-        List[Dict[str, Any]]: Liste des agents avec leurs statistiques détaillées.
+        List[Dict[str, Any]]: List of agents with their detailed statistics.
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
@@ -733,10 +1115,10 @@ def get_agent_statistics() -> List[Dict[str, Any]]:
 
 def get_payload_statistics() -> List[Dict[str, Any]]:
     """
-    Récupère les statistiques sur les payloads/malwares capturés.
+    Retrieves the statistics on captured payloads/malware.
 
     Returns:
-        List[Dict[str, Any]]: Liste des types de payloads avec leur compteur.
+        List[Dict[str, Any]]: List of payload types with their counter.
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
@@ -756,10 +1138,10 @@ def get_payload_statistics() -> List[Dict[str, Any]]:
 
 def get_port_distribution() -> List[Dict[str, Any]]:
     """
-    Récupère la distribution des ports ciblés.
+    Retrieves the distribution of targeted ports.
 
     Returns:
-        List[Dict[str, Any]]: Liste des 10 ports les plus ciblés avec leur compteur.
+        List[Dict[str, Any]]: List of the 10 most targeted ports with their counter.
     """
     with DatabaseManagerHoneypot() as db:
         db.execute('''
@@ -775,49 +1157,68 @@ def get_port_distribution() -> List[Dict[str, Any]]:
         return db.fetchall()
 
 
-def get_credential_combinations() -> List[Dict[str, Any]]:
+def get_credential_combinations(limit: Optional[int] = 15) -> List[Dict[str, Any]]:
     """
-    Récupère les 15 combinaisons username/password les plus observées.
+    Retrieves the observed username/password combinations, sorted by frequency.
+
+    Args:
+        limit: Maximum number of combinations. None = all unique combinations.
 
     Returns:
-        List[Dict[str, Any]]: Liste des combinaisons de credentials avec leur compteur.
+        List[Dict[str, Any]]: List of credential combinations with their counter.
     """
     with DatabaseManagerHoneypot() as db:
-        db.execute('''
-                   SELECT username,
-                          password,
-                          SUM(attempt_count) AS count
-                   FROM compromised_credentials
-                   GROUP BY username, password
-                   ORDER BY count DESC
-                   LIMIT 15
-                   ''')
+        query = '''
+                SELECT username,
+                       password,
+                       SUM(attempt_count) AS count
+                FROM compromised_credentials
+                GROUP BY username, password
+                ORDER BY count DESC
+                '''
+        if limit is not None:
+            query += ' LIMIT %s'
+            db.execute(query, (limit,))
+        else:
+            db.execute(query)
 
         return db.fetchall()
 
 
-def get_agent_about(agent_id: int) -> Optional[Dict[str, Any]]:
+def get_agent_about(agent_id: int, viewer_id: Optional[int] = None,
+                    is_admin: bool = True) -> Optional[Dict[str, Any]]:
     """
-    Récupère toutes les informations détaillées d'un agent honeypot spécifique.
+    Retrieves all the detailed information of a specific honeypot agent.
+
+    When ``is_admin`` is False, returns None unless the agent is owned by
+    ``viewer_id`` (hides other users' honeypots — same 404 as "not found").
 
     Args:
-        agent_id (int): Identifiant de l'agent.
+        agent_id (int): Identifier of the agent.
+        viewer_id (Optional[int]): id of the requesting user (ownership check).
+        is_admin (bool): True to bypass the ownership check.
 
     Returns:
-        Optional[Dict[str, Any]]: Dictionnaire avec les détails de l'agent, ou None si non trouvé.
+        Optional[Dict[str, Any]]: Dictionary with the agent details, or None if not found/allowed.
     """
     try:
         with DatabaseManagerHoneypot() as db:
             # 1. Agent base info
             db.execute("""
-                SELECT id, agent_name, ip_address, country_name, service_type,
-                       banner, alert_generated, created_at, updated_at
-                FROM honey_agents
-                WHERE id = %s
+                SELECT ha.id, ha.agent_name, ha.ip_address, ha.country_name, ha.service_type,
+                       ha.banner, ha.alert_generated, ha.created_at, ha.updated_at,
+                       ha.owner_id, u.username AS owner_username
+                FROM honey_agents ha
+                LEFT JOIN users u ON ha.owner_id = u.id
+                WHERE ha.id = %s
             """, (agent_id,))
             agent = db.fetchone()
 
             if not agent:
+                return None
+
+            # Members can only inspect their own honeypots.
+            if not is_admin and agent.get('owner_id') != viewer_id:
                 return None
 
             # 2. Attack stats
@@ -897,6 +1298,8 @@ def get_agent_about(agent_id: int) -> Optional[Dict[str, Any]]:
                 'ip': agent['ip_address'],
                 'country': agent['country_name'],
                 'banner': agent['banner'],
+                'owner_id': agent.get('owner_id'),
+                'owner_username': agent.get('owner_username'),
                 'alert_generated': agent['alert_generated'],
                 'created_at': agent['created_at'].isoformat() if agent['created_at'] else None,
                 'updated_at': agent['updated_at'].isoformat() if agent['updated_at'] else None,
@@ -920,22 +1323,22 @@ def get_agent_about(agent_id: int) -> Optional[Dict[str, Any]]:
 
 def get_complete_report_data() -> Dict[str, Any]:
     """
-    Récupère toutes les données nécessaires pour un rapport complet.
+    Retrieves all the data needed for a complete report.
 
     Returns:
-        Dict[str, Any]: Dictionnaire contenant toutes les métriques et statistiques:
-            - metrics: Métriques générales
-            - country_ranking: Classement des pays
-            - top_passwords: Mots de passe les plus tentés
-            - top_usernames: Usernames les plus tentés
-            - service_distribution: Distribution des services
-            - top_ips: IPs les plus agressives
-            - attacks_by_day: Attaques par jour
-            - attacks_by_hour: Attaques par heure
-            - agents: Statistiques des agents
-            - payloads: Statistiques des payloads
-            - port_distribution: Distribution des ports
-            - credential_combinations: Combinaisons de credentials
+        Dict[str, Any]: Dictionary containing all the metrics and statistics:
+            - metrics: General metrics
+            - country_ranking: Country ranking
+            - top_passwords: Most attempted passwords
+            - top_usernames: Most attempted usernames
+            - service_distribution: Service distribution
+            - top_ips: Most aggressive IPs
+            - attacks_by_day: Attacks per day
+            - attacks_by_hour: Attacks per hour
+            - agents: Agent statistics
+            - payloads: Payload statistics
+            - port_distribution: Port distribution
+            - credential_combinations: Credential combinations
     """
     return {
         'metrics': get_default_metric_data(),

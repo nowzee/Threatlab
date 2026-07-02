@@ -9,10 +9,14 @@ from typing import Tuple
 from flask import Blueprint, jsonify, request, current_app, send_file, Response
 import jwt
 import os
-from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction, get_agent_about
+import hashlib
+from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction, get_agent_about, record_uploaded_file
 from module.database.db_manager import DatabaseManagerHoneypot
+from module.ingestion.ingest import enqueue_report
 from string import Template
 from module.auth.decorator import agent_jwt_required
+from module.auth.session_helpers import current_user_id, current_username, is_admin
+from module.database.audit import log_audit
 
 agent_create_bp = Blueprint('agent_create', __name__, url_prefix='/api/agent')
 
@@ -58,16 +62,84 @@ def agent_create() -> Tuple[Response, int]:
         ip_address = request.json.get('ip_address', '0.0.0.0')
         country_name = request.json.get('country_name')
         banner = request.json.get('banner', 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
+        interactive = bool(request.json.get('interactive', True))
+        allow_upload = bool(request.json.get('allow_upload', True))
+
+        # Listening port(s) chosen by the user. Accepts a single value, a list,
+        # or a "22,2222"/"22 2222" string. Stored as a comma-separated list.
+        default_port = 22 if agent_type == 'ssh' else (21 if agent_type == 'ftp' else 22)
+        raw_ports = request.json.get('port')
+        if raw_ports is None:
+            raw_ports = request.json.get('ports')
+        if isinstance(raw_ports, list):
+            candidates = raw_ports
+        elif raw_ports is None:
+            candidates = []
+        else:
+            candidates = str(raw_ports).replace(',', ' ').split()
+        ports = []
+        for c in candidates:
+            try:
+                pi = int(c)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= pi <= 65535 and pi not in ports:
+                ports.append(pi)
+        if not ports:
+            ports = [default_port]
+        port = ','.join(str(p) for p in ports)
+
+        # Interactive-shell auth policy. Credential capture is ALWAYS on; this
+        # only controls which credentials may enter the fake shell.
+        import json as _json
+        auth_mode = request.json.get('auth_mode', 'any')
+        if auth_mode not in ('any', 'whitelist'):
+            auth_mode = 'any'
+        raw_wl = request.json.get('auth_whitelist') or []
+        allow = []
+        if isinstance(raw_wl, list):
+            for e in raw_wl[:100]:
+                if not isinstance(e, dict):
+                    continue
+                u = str(e.get('username') or '').strip()[:255]
+                p = str(e.get('password') or '').strip()[:255]
+                if u or p:
+                    entry = {}
+                    if u:
+                        entry['username'] = u
+                    if p:
+                        entry['password'] = p
+                    allow.append(entry)
+        # A whitelist only makes sense in interactive mode and with real entries;
+        # otherwise fall back to 'any' so the shell stays reachable.
+        if not interactive or auth_mode != 'whitelist' or not allow:
+            auth_mode = 'any'
+            auth_whitelist_json = None
+        else:
+            auth_whitelist_json = _json.dumps(allow)
+
+        # Stamp ownership with the current session user so members only see
+        # their own honeypots (admins still see everything).
+        owner_id = current_user_id()
 
         agent_id, secret_token = create_agent_token(
             agent_name,
             ip_address=ip_address,
             country_name=country_name,
             service_type=agent_type,
-            banner=banner
+            banner=banner,
+            interactive=interactive,
+            allow_upload=allow_upload,
+            owner_id=owner_id,
+            auth_mode=auth_mode,
+            auth_whitelist=auth_whitelist_json,
+            port=port
         )
 
         if agent_id:
+            log_audit('agent.create', actor_id=owner_id, actor_username=current_username(),
+                      target_type='agent', target_id=agent_id,
+                      detail=f"name={agent_name}, type={agent_type}", ip_address=request.remote_addr)
             return jsonify({
                 'success': True,
                 'secret_token': secret_token,
@@ -81,6 +153,69 @@ def agent_create() -> Tuple[Response, int]:
         print(f"Error in agent_create: {e}")
         print(f"Traceback: {traceback.format_exc()}")
         return jsonify({'success': False, 'error': f'Internal error: {str(e)}'}), 500
+
+
+@agent_create_bp.route("/upload", methods=['POST'])
+@agent_jwt_required
+def agent_upload() -> Tuple[Response, int]:
+    """
+    Receive a file uploaded to an interactive honeypot (e.g. FTP STOR).
+
+    The agent sends the raw file plus metadata (hash, ip, username, password,
+    request headers). The server recomputes the SHA-256 (no trust in the agent
+    hash), stores the file once (dedup by hash) in a created folder, and records
+    the metadata in the uploaded_files table.
+
+    Returns JSON: {success, new, hash}. `new` is False if this hash was already
+    known (file not re-stored).
+    """
+    try:
+        f = request.files.get('file')
+        if f is None:
+            return jsonify({'success': False, 'error': 'no file provided'}), 400
+
+        file_bytes = f.read()
+        if not file_bytes:
+            return jsonify({'success': False, 'error': 'empty file'}), 400
+
+        # Hash recomputed server-side (we don't trust the agent-provided hash).
+        file_hash = hashlib.sha256(file_bytes).hexdigest()
+
+        form = request.form
+        upload_dir = os.getenv('UPLOAD_DIR', '/app/uploads')
+        os.makedirs(upload_dir, exist_ok=True)
+        stored_path = os.path.join(upload_dir, file_hash)
+
+        # Storage dedup: only write the file if the hash is unknown.
+        is_new = not os.path.exists(stored_path)
+        if is_new:
+            with open(stored_path, 'wb') as out:
+                out.write(file_bytes)
+
+        agent_id = form.get('agent_id')
+        try:
+            agent_id = int(agent_id) if agent_id else None
+        except (TypeError, ValueError):
+            agent_id = None
+
+        record_uploaded_file(
+            file_hash=file_hash,
+            file_name=form.get('file_name') or f.filename,
+            file_size=len(file_bytes),
+            stored_path=stored_path,
+            source_ip=form.get('source_ip'),
+            username=form.get('username'),
+            password=form.get('password'),
+            request_headers=form.get('request_headers'),
+            agent_id=agent_id,
+            service_type=form.get('service_type', 'ftp'),
+        )
+
+        return jsonify({'success': True, 'new': is_new, 'hash': file_hash}), 200
+
+    except Exception as e:
+        print(f"Error in agent_upload: {e}")
+        return jsonify({'success': False, 'error': 'internal server error'}), 500
 
 
 @agent_create_bp.route("/report", methods=['POST'])
@@ -106,8 +241,7 @@ def agent_report() -> tuple[Response, int] | Response:
         HTTP status codes: 200 (success), 400 (missing fields), 500 (database error).
     """
     try:
-        data = request.json
-        agent_id = data.get('agent_id')
+        data = request.json or {}
 
         # Validate that essential fields are present
         required_fields = ['source_ip', 'service_type']
@@ -115,14 +249,11 @@ def agent_report() -> tuple[Response, int] | Response:
             if not data.get(field):
                 return jsonify({'success': False, 'error': f'Missing required field: {field}'}), 400
 
-        source_ip = data.get('source_ip')
-        service_type = data.get('service_type')
-        country_name = data.get('country_name')
-        attack_type = data.get('attack_type', 'auth_attempt')
-
-        # Build attack data dictionary with all available fields
-        attack_data = {
-            'agent_id': data.get('agent_id'),  # Use agent_id from JWT payload
+        # Build a normalized report and hand it to the async ingestion worker.
+        # The heavy DB work (IP upsert, attack log, credentials) is done off the
+        # request thread, with attack_logs written in batches.
+        report = {
+            'agent_id': data.get('agent_id'),
             'source_ip': data.get('source_ip'),
             'service_type': data.get('service_type'),
             'source_port': data.get('source_port'),
@@ -132,46 +263,22 @@ def agent_report() -> tuple[Response, int] | Response:
             'payload': data.get('payload'),
             'malware_hash': data.get('malware_hash'),
             'classification': data.get('classification'),
+            'attack_type': data.get('attack_type', 'auth_attempt'),
             'country_code': data.get('country_code'),
-            'country_name': data.get('country_name')
+            'country_name': data.get('country_name'),
+            # SMTP-specific fields (ignored for other service types)
+            'sender_email': data.get('sender_email'),
+            'recipient_email': data.get('recipient_email'),
+            'subject': data.get('subject'),
+            'message_content': data.get('message_content'),
+            'attachments': data.get('attachments'),
         }
 
-        # Register or update IP in malicious_ips table with relationships
-        if not add_malicious_ip_address(agent_id, source_ip, service_type, country_name,
-                                        data.get('country_code'), data.get('classification')):
-            return jsonify({'success': False, 'error': 'Failed to add malicious IP'}), 500
+        # Queue full = overload: return 503, the agent re-queues and retries.
+        if not enqueue_report(report):
+            return jsonify({'success': False, 'error': 'ingestion overloaded, retry later'}), 503
 
-        # Insert detailed attack log for forensics and analysis
-        if not add_attack_log(attack_data):
-            return jsonify({'success': False, 'error': 'Failed to add attack log'}), 500
-
-        # Process service-specific data
-        if service_type in ['ssh', 'ftp']:
-            username_attempt = data.get('username_attempt')
-            password_attempt = data.get('password_attempt')
-
-            # Track compromised credentials for brute-force analysis
-            if username_attempt and password_attempt:
-                if not add_compromised_credential(source_ip, username_attempt, password_attempt, service_type):
-                    return jsonify({'success': False, 'error': 'Failed to add compromised credential'}), 500
-
-        elif service_type == 'smtp':
-            sender_email = data.get('sender_email')
-            recipient_email = data.get('recipient_email')
-            subject = data.get('subject')
-            message_content = data.get('message_content')
-            attachments = data.get('attachments')
-
-            # Store SMTP-specific data for phishing/spam analysis
-            if not add_smtp_interaction(source_ip, sender_email, recipient_email,
-                                        subject, message_content, attachments):
-                return jsonify({'success': False, 'error': 'Failed to add SMTP interaction'}), 500
-
-        elif service_type == 'port_scan':
-            # Port scan specific logging already handled in attack_log
-            pass
-
-        return jsonify({'success': True, 'message': f'{service_type.upper()} attack data processed successfully'})
+        return jsonify({'success': True, 'message': 'attack report queued'}), 200
 
     except Exception as e:
         print(f"Error in agent_report: {e}")
@@ -198,7 +305,8 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
         # Get agent details from database including service_type
         with DatabaseManagerHoneypot() as db:
             db.execute("""
-                       SELECT agent_name, banner, ip_address, service_type
+                       SELECT agent_name, banner, ip_address, service_type, interactive, allow_upload,
+                              auth_mode, auth_whitelist, port
                        FROM honey_agents
                        WHERE id = %s
                        """, (agent_id,))
@@ -212,6 +320,11 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
             banner = result['banner']
             ip_address = result['ip_address']
             service_type = result['service_type']
+            interactive = bool(result.get('interactive', 1))
+            allow_upload = bool(result.get('allow_upload', 1))
+            auth_mode = result.get('auth_mode') or 'any'
+            auth_whitelist_raw = result.get('auth_whitelist')
+            port_val = result.get('port')
 
         # Read the template file
         template_path = os.path.join(
@@ -252,12 +365,22 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
                 "host": ip_address if ip_address else "0.0.0.0",
                 "port": 22,
                 "banner": "SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5",
-                "host_key_file": "ssh_host_key.pem"
+                "host_key_file": "ssh_host_key.pem",
+                "interactive": interactive,
+                "allow_upload": allow_upload,
+                "fetch_downloads": allow_upload,
+                "hostname": "srv01"
             },
             "ftp": {
                 "host": ip_address if ip_address else "0.0.0.0",
                 "port": 21,
-                "banner": "220 FTP server ready"
+                "banner": "220 FTP server ready",
+                "interactive": interactive,
+                "allow_upload": allow_upload,
+                "session_min_seconds": 600,
+                "session_max_seconds": 900,
+                "max_upload_bytes": 52428800,
+                "public_ip": ip_address or ""
             },
             "reporting": {
                 "interval": 30,
@@ -291,12 +414,43 @@ def download_agent(agent_id: int) -> Tuple[Response, int]:
             if banner:
                 default_config['ssh']['banner'] = banner
 
-        # Convert config to JSON string for injection into template
+        # Interactive-shell auth policy (credential capture is always on; this
+        # only controls which credentials may enter the fake shell).
         import json
-        config_json = json.dumps(default_config, indent=4)
+        auth_allow = []
+        if auth_whitelist_raw:
+            try:
+                parsed = json.loads(auth_whitelist_raw)
+                if isinstance(parsed, list):
+                    auth_allow = [e for e in parsed if isinstance(e, dict)]
+            except Exception:
+                auth_allow = []
+        default_config['auth'] = {
+            'mode': auth_mode if auth_mode in ('any', 'whitelist') else 'any',
+            'allow': auth_allow,
+        }
 
-        # Replace JSON booleans (true/false/null) with Python equivalents (True/False/None)
-        config_json = config_json.replace('true', 'True').replace('false', 'False').replace('null', 'None')
+        # Apply the user-chosen listening port(s) to the active service. The DB
+        # stores a comma-separated list; the agent listens on all of them.
+        default_p = 21 if service_type == 'ftp' else 22
+        eff_ports = []
+        for c in str(port_val or '').replace(',', ' ').split():
+            try:
+                pi = int(c)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= pi <= 65535 and pi not in eff_ports:
+                eff_ports.append(pi)
+        if not eff_ports:
+            eff_ports = [default_p]
+        svc_key = 'ftp' if service_type == 'ftp' else 'ssh'
+        default_config[svc_key]['ports'] = eff_ports
+        default_config[svc_key]['port'] = eff_ports[0]
+
+        # Serialize config as JSON. The template parses it with json.loads(r\"\"\"...\"\"\"),
+        # so plain JSON (lowercase true/false/null) is correct and user-supplied
+        # strings (passwords) are embedded safely.
+        config_json = json.dumps(default_config, indent=4)
 
         # Load template and substitute placeholders with actual values
         with open(template_path, 'r') as f:
@@ -349,7 +503,8 @@ def about_agent(agent_id: int) -> Tuple[Response, int]:
         JSON with agent details, stats, attacks, and country ranking.
     """
     try:
-        data = get_agent_about(agent_id)
+        # Members can only inspect their own honeypots (returns 404 otherwise).
+        data = get_agent_about(agent_id, viewer_id=current_user_id(), is_admin=is_admin())
         if data is None:
             return jsonify({'success': False, 'error': 'Agent not found'}), 404
         return jsonify({'success': True, 'agent': data}), 200
@@ -372,7 +527,7 @@ def install_agent(agent_id: int) -> Tuple[Response, int]:
     try:
         with DatabaseManagerHoneypot() as db:
             db.execute("""
-                SELECT agent_name, banner, ip_address, service_type
+                SELECT agent_name, banner, ip_address, service_type, port
                 FROM honey_agents
                 WHERE id = %s
             """, (agent_id,))
@@ -391,10 +546,17 @@ def install_agent(agent_id: int) -> Tuple[Response, int]:
             host = request.host or 'localhost:5000'
             server_url = f"{scheme}://{host}"
 
-        # Read the install script template
+        # Pick the installer for the target OS: bash (.sh) for Linux (default),
+        # PowerShell (.ps1) for Windows. Both share the same {{PLACEHOLDER}} contract.
+        os_target = (request.args.get('os') or 'linux').lower()
+        if os_target in ('windows', 'win', 'ps', 'powershell'):
+            template_name, ext, mimetype = 'install_agent.ps1', 'ps1', 'text/plain'
+        else:
+            template_name, ext, mimetype = 'install_agent.sh', 'sh', 'text/x-shellscript'
+
         template_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-            'module', 'templates', 'install_agent.sh'
+            'module', 'templates', template_name
         )
 
         with open(template_path, 'r') as f:
@@ -407,19 +569,33 @@ def install_agent(agent_id: int) -> Tuple[Response, int]:
         script_content = script_content.replace('{{SERVICE_TYPE}}', result['service_type'] or 'ssh')
         script_content = script_content.replace('{{AGENT_NAME}}', result['agent_name'] or f'agent-{agent_id}')
         script_content = script_content.replace('{{BANNER}}', result['banner'] or 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
+        _svc = result['service_type'] or 'ssh'
+        _default_p = 21 if _svc == 'ftp' else 22
+        _ports = []
+        for c in str(result.get('port') or '').replace(',', ' ').split():
+            try:
+                pi = int(c)
+            except (TypeError, ValueError):
+                continue
+            if 1 <= pi <= 65535 and pi not in _ports:
+                _ports.append(pi)
+        if not _ports:
+            _ports = [_default_p]
+        # Space-separated list, e.g. "22 2222" — used by the installer for -p / EXPOSE.
+        script_content = script_content.replace('{{PORTS}}', ' '.join(str(p) for p in _ports))
 
         import tempfile
-        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.sh', delete=False)
+        temp_file = tempfile.NamedTemporaryFile(mode='w', suffix='.' + ext, delete=False)
         temp_file.write(script_content)
         temp_file.close()
 
-        filename = f"install_{result['agent_name'].replace(' ', '_')}.sh"
+        filename = f"install_{result['agent_name'].replace(' ', '_')}.{ext}"
 
         response = send_file(
             temp_file.name,
             as_attachment=True,
             download_name=filename,
-            mimetype='text/x-shellscript'
+            mimetype=mimetype
         )
 
         return response

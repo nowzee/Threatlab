@@ -6,14 +6,20 @@ rankings, and generating reports for the user dashboard.
 """
 
 from typing import Tuple
-from flask import Blueprint, jsonify, Response
-from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking, get_top_passwords, get_top_usernames, get_credential_combinations, get_wordlist_stats
+from flask import Blueprint, jsonify, Response, request, send_file
+from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking, get_top_passwords, get_top_usernames, get_credential_combinations, get_wordlist_stats, get_uploaded_files_page, get_uploaded_file, get_shell_commands_page
+from module.auth.session_helpers import is_admin, current_user_id
 from datetime import datetime
 import os
 import traceback
 from jinja2 import Template
 
 agent_user_api_bp = Blueprint('agent_user_api', __name__, url_prefix='/api/agent/user')
+
+
+def _scope_owner():
+    """None for admins (platform-wide view), the user id for members (own data only)."""
+    return None if is_admin() else current_user_id()
 
 
 @agent_user_api_bp.route("/metric_dashboard", methods=['GET'])
@@ -25,7 +31,7 @@ def get_default_metric_data_agent() -> Response:
         JSON response with dashboard metrics including IP count,
         attack attempts, active honeypots, and samples downloaded.
     """
-    data = get_default_metric_data()
+    data = get_default_metric_data(_scope_owner())
 
     return jsonify(data)
 
@@ -38,7 +44,7 @@ def get_new_logs_agent() -> Response:
     Returns:
         JSON response with agent activity logs and details.
     """
-    data = get_agent_details()
+    data = get_agent_details(_scope_owner())
 
     return jsonify(data)
 
@@ -51,7 +57,7 @@ def get_country_ranking_data() -> Response:
     Returns:
         JSON response with countries ranked by attack frequency.
     """
-    data = get_country_ranking()
+    data = get_country_ranking(_scope_owner())
 
     return jsonify(data)
 
@@ -64,7 +70,7 @@ def get_password_ranking_data() -> Response:
     Returns:
         JSON response with password ranking statistics.
     """
-    data = get_password_ranking()
+    data = get_password_ranking(_scope_owner())
 
     return jsonify(data)
 
@@ -219,7 +225,7 @@ def download_wordlist(wordlist_type: str) -> Tuple[Response, int]:
             filename = f"threatlab_usernames_{timestamp}.txt"
 
         elif wordlist_type == 'combinations':
-            data = get_credential_combinations()
+            data = get_credential_combinations(None)
             lines = [f"{entry['username']}:{entry['password']}" for entry in data
                      if entry.get('username') and entry.get('password')]
             filename = f"threatlab_credentials_{timestamp}.txt"
@@ -249,3 +255,46 @@ def download_wordlist(wordlist_type: str) -> Tuple[Response, int]:
         print(f"Error downloading wordlist: {e}")
         traceback.print_exc()
         return jsonify({'error': 'Failed to generate wordlist'}), 500
+
+
+@agent_user_api_bp.route("/payloads", methods=['GET'])
+def list_payloads() -> Tuple[Response, int]:
+    """Paginated list of captured files. ?page=&limit=&q=<search in metadata/content>"""
+    try:
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 10))
+        q = (request.args.get('q') or '').strip() or None
+        return jsonify(get_uploaded_files_page(page, limit, q)), 200
+    except Exception as e:
+        print(f"Error listing payloads: {e}")
+        return jsonify({'error': 'Failed to list payloads'}), 500
+
+
+@agent_user_api_bp.route("/payloads/download/<file_hash>", methods=['GET'])
+def download_payload(file_hash: str) -> Tuple[Response, int]:
+    """Download a captured binary by its hash."""
+    try:
+        row = get_uploaded_file(file_hash)
+        if not row or not row.get('stored_path') or not os.path.exists(row['stored_path']):
+            return jsonify({'error': 'Payload not found'}), 404
+        return send_file(row['stored_path'], as_attachment=True,
+                         download_name=row.get('file_name') or file_hash)
+    except Exception as e:
+        print(f"Error downloading payload: {e}")
+        return jsonify({'error': 'Failed to download payload'}), 500
+
+
+@agent_user_api_bp.route("/commands", methods=['GET'])
+def list_commands() -> Tuple[Response, int]:
+    """Paginated shell commands. ?status=all|success|failed&page=&limit=&q=<search>"""
+    try:
+        status = request.args.get('status', 'all')
+        if status not in ('all', 'success', 'failed'):
+            status = 'all'
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 10))
+        q = (request.args.get('q') or '').strip() or None
+        return jsonify(get_shell_commands_page(status, page, limit, q)), 200
+    except Exception as e:
+        print(f"Error listing commands: {e}")
+        return jsonify({'error': 'Failed to list commands'}), 500

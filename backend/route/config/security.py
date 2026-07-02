@@ -9,7 +9,9 @@ from typing import Tuple
 from flask import Blueprint, request, session, jsonify, Response
 from module.database.account import change_password_account
 from module.database.auth import auth_user, get_otp_secret, update_otp_status, a2f_active
-import re
+from module.auth.password_policy import validate_password
+from module.database.audit import log_audit
+from module.auth.session_helpers import current_user_id
 import pyotp
 import qrcode
 import io
@@ -21,15 +23,7 @@ config_account_bp = Blueprint('account', __name__, url_prefix='/account')
 
 @config_account_bp.route("/change-password", methods=['POST'])
 def change_password() -> Response:
-    """
-    Handle password change requests.
 
-    Validates password requirements (length, complexity) and updates
-    the user's password if all checks pass.
-
-    Returns:
-        JSON response with success status and error message if applicable.
-    """
     old_password = str(request.form.get('old_password'))
     new_password = str(request.form.get('new_password'))
     confirm_password = str(request.form.get('confirm_password'))
@@ -37,50 +31,26 @@ def change_password() -> Response:
     if not old_password or not new_password or not confirm_password:
         return jsonify({'success': False, 'error': 'Tous les champs sont obligatoires'})
 
-    # Enforce minimum length of 12 characters for security
-    if len(new_password) < 12:
-        return jsonify({'success': False, 'error': 'Le mot de passe doit contenir au moins 12 caractères'})
-
-    # Enforce maximum length to prevent DoS attacks
-    if len(new_password) > 140:
-        return jsonify({'success': False, 'error': 'Le mot de passe ne doit pas dépasser 140 caractères'})
-
-    # Verify both password fields match to prevent typos
     if new_password != confirm_password:
         return jsonify({'success': False, 'error': 'Les mots de passe ne correspondent pas'})
 
-    # Enforce complexity requirements using regex with positive lookaheads
-    # (?=.*[a-z]) - requires at least one lowercase letter
-    # (?=.*[A-Z]) - requires at least one uppercase letter
-    # (?=.*[0-9]) - requires at least one digit
-    # (?=.*[!@#$%^&*(),.?":{}|<>]) - requires at least one special character
-    password_pattern = re.compile(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[!@#$%^&*(),.?":{}|<>]).*$')
-
-    if not password_pattern.match(new_password):
-        return jsonify({
-            'success': False,
-            'error': 'Le mot de passe doit contenir au moins une lettre minuscule, une majuscule, un chiffre et un caractère spécial'
-        })
+    ok, msg = validate_password(new_password)
+    if not ok:
+        return jsonify({'success': False, 'error': msg})
 
     if change_password_account(session['username'], old_password, new_password):
+        log_audit('account.password_changed', actor_id=current_user_id(),
+                  actor_username=session.get('username'), ip_address=request.remote_addr)
         return jsonify({'success': True})
     else:
+        log_audit('account.password_change_failed', actor_id=current_user_id(),
+                  actor_username=session.get('username'), detail='Ancien mot de passe incorrect',
+                  ip_address=request.remote_addr)
         return jsonify({'success': False})
 
 
 @config_account_bp.route("/active_a2f", methods=['POST'])
 def active_a2f() -> Response:
-    """
-    Enable or disable two-factor authentication for the user.
-
-    When enabling A2F, generates a TOTP secret and QR code for the user.
-    When disabling, requires verification of a TOTP code.
-
-    Returns:
-        JSON response with success status, and for activation:
-        - secret: The TOTP secret
-        - qrcode: Base64-encoded QR code image
-    """
     activated = request.form.get('active')
     password = request.form.get('password')
 
@@ -97,7 +67,6 @@ def active_a2f() -> Response:
         totp = pyotp.TOTP(secret)
 
         # Create provisioning URI for authenticator apps (Google Authenticator, Authy, etc.)
-        # Format: otpauth://totp/Threatlab:username?secret=XXX&issuer=Threatlab
         provisioning_url = totp.provisioning_uri(name=session['username'], issuer_name='Threatlab')
 
         # Generate QR code image that encodes the provisioning URI
@@ -144,6 +113,8 @@ def active_a2f() -> Response:
         if totp.verify(code):
             # Code valid - disable 2FA by setting status to 0
             if update_otp_status(session['username'], 0):
+                log_audit('account.2fa_disabled', actor_id=current_user_id(),
+                          actor_username=session.get('username'), ip_address=request.remote_addr)
                 return jsonify({'success': True})
             else:
                 return jsonify({'success': False, 'error': 'Erreur lors de la désactivation de l\'A2F'})
@@ -155,13 +126,6 @@ def active_a2f() -> Response:
 
 @config_account_bp.route("/check_a2f_status", methods=['GET'])
 def check_a2f_status() -> Tuple[Response, int]:
-    """
-    Check if two-factor authentication is enabled for the logged-in user.
-
-    Returns:
-        JSON response with A2F activation status.
-        HTTP status codes: 200 (success), 401 (not authenticated), 500 (error).
-    """
     if not session.get('logged_in') or not session.get('username'):
         return jsonify({'success': False, 'error': 'Non authentifié'}), 401
 
@@ -180,15 +144,6 @@ def check_a2f_status() -> Tuple[Response, int]:
 
 @config_account_bp.route("/validation_a2f", methods=['POST'])
 def valide_a2f() -> Response:
-    """
-    Validate that the user has stored their A2F secret correctly.
-
-    Confirms that the user can provide a valid TOTP code from their
-    authenticator app, proving they have saved the secret.
-
-    Returns:
-        JSON response indicating validation success or failure.
-    """
     code = request.form.get('code')
     secret = get_otp_secret(session['username'])
 
@@ -197,6 +152,8 @@ def valide_a2f() -> Response:
     # Verify the code
     if totp.verify(code):
         update_otp_status(session['username'], 2, secret)
+        log_audit('account.2fa_enabled', actor_id=current_user_id(),
+                  actor_username=session.get('username'), ip_address=request.remote_addr)
         return jsonify({'success': True})
     else:
         update_otp_status(session['username'], active_code=0)

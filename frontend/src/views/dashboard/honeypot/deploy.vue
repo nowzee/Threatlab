@@ -313,13 +313,13 @@ export default defineComponent({
     }
 
     .template-disabled .deploy-honeypot-btn {
-        background-color: #444;
+        background-color: var(--container-border-color);
         cursor: not-allowed;
     }
 
     .badge-secondary {
         background-color: rgba(158, 158, 158, 0.2);
-        color: #9e9e9e;
+        color: var(--text-color-muted);
     }
 
     /* Styles pour le guide de déploiement */

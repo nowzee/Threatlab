@@ -3,8 +3,8 @@ Account management module.
 
 Provides functions for password changes and login attempt logging.
 """
-import hashlib
 from module.database.db_manager import DatabaseManagerUser
+from module.crypto_utils.password_hash import hash_password, verify_password
 
 
 def change_password_account(username: str, old_password: str, new_password: str) -> bool:
@@ -21,20 +21,14 @@ def change_password_account(username: str, old_password: str, new_password: str)
     Returns:
         bool: True if password was changed successfully, False otherwise.
     """
-    # Hash the old password to compare with stored hash
-    old_password = hashlib.sha256(old_password.encode()).hexdigest()
-
     with DatabaseManagerUser() as db:
-        # Verify that username and old password match before allowing change
-        db.execute("SELECT id FROM users WHERE username = ? AND password = ?", (username, old_password))
+        db.execute("SELECT id, password FROM users WHERE username = ?", (username,))
         result = db.fetchone()
-        if result:
-            # Old password is correct, hash and update with new password
-            new_password = hashlib.sha256(new_password.encode()).hexdigest()
-            db.execute("UPDATE users SET password = ? WHERE id = ?", (new_password, result[0]))
+        if result and verify_password(result[1], old_password):
+            db.execute("UPDATE users SET password = ? WHERE id = ?",
+                       (hash_password(new_password), result[0]))
             return True
         else:
-            # Old password verification failed
             return False
 
 

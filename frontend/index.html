@@ -5,6 +5,16 @@
     <link rel="icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Threatlab</title>
+    <script>
+      (function () {
+        try {
+          var p = localStorage.getItem('tl_theme');
+          var t = (p === 'light' || p === 'dark') ? p
+            : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          document.documentElement.setAttribute('data-theme', t);
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="app"></div>

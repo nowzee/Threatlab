@@ -35,5 +35,4 @@ COPY --from=frontend-builder /app/frontend/dist /app/frontend/dist
 # Expose the port the app runs on
 EXPOSE 5000
 
-# Run with Flask development server
-CMD ["python", "app.py"]
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "app:app"]

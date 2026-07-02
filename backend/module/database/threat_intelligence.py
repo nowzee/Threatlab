@@ -5,7 +5,7 @@ import re
 
 
 def is_valid_ip(ip_string: str) -> bool:
-    """Vérifie si la chaîne est une adresse IP valide"""
+    """Checks whether the string is a valid IP address"""
     # Regex validates IPv4 format: 4 groups of 1-3 digits separated by dots
     pattern = r'^(\d{1,3}\.){3}\d{1,3}$'
     if not re.match(pattern, ip_string):
@@ -17,10 +17,10 @@ def is_valid_ip(ip_string: str) -> bool:
 
 def search_ip(ip_address: str) -> dict:
     """
-    Recherche toutes les informations liées à une adresse IP
+    Searches for all information related to an IP address
     """
     with DatabaseManagerHoneypot() as db:
-        # Informations générales sur l'IP
+        # General information about the IP
         db.execute("""
             SELECT
                 ip_address,
@@ -37,7 +37,7 @@ def search_ip(ip_address: str) -> dict:
         ip_info = db.fetchone()
 
         if not ip_info:
-            # Si l'IP n'est pas dans malicious_ips, chercher dans attack_logs
+            # If the IP is not in malicious_ips, search in attack_logs
             db.execute("""
                 SELECT
                     source_ip,
@@ -56,7 +56,7 @@ def search_ip(ip_address: str) -> dict:
             if not ip_info:
                 return None
 
-        # Passwords utilisés par cette IP
+        # Passwords used by this IP
         db.execute("""
             SELECT
                 password_attempt,
@@ -75,7 +75,7 @@ def search_ip(ip_address: str) -> dict:
                 "count": row['count']
             })
 
-        # Usernames utilisés par cette IP
+        # Usernames used by this IP
         db.execute("""
             SELECT
                 username_attempt,
@@ -94,7 +94,7 @@ def search_ip(ip_address: str) -> dict:
                 "count": row['count']
             })
 
-        # Services ciblés
+        # Targeted services
         db.execute("""
             SELECT
                 service_type,
@@ -164,10 +164,10 @@ def search_ip(ip_address: str) -> dict:
 
 def search_password(password: str) -> dict:
     """
-    Recherche toutes les informations liées à un mot de passe
+    Searches for all information related to a password
     """
     with DatabaseManagerHoneypot() as db:
-        # Nombre total d'utilisations
+        # Total number of uses
         db.execute("""
             SELECT
                 COUNT(*) as total_count,
@@ -182,7 +182,7 @@ def search_password(password: str) -> dict:
         if not info or info['total_count'] == 0:
             return None
 
-        # IPs qui ont utilisé ce password
+        # IPs that used this password
         db.execute("""
             SELECT
                 source_ip,
@@ -203,7 +203,7 @@ def search_password(password: str) -> dict:
                 "count": row['count']
             })
 
-        # Usernames associés
+        # Associated usernames
         db.execute("""
             SELECT
                 username_attempt,
@@ -222,7 +222,7 @@ def search_password(password: str) -> dict:
                 "count": row['count']
             })
 
-        # Services où ce password a été tenté
+        # Services where this password was attempted
         db.execute("""
             SELECT
                 service_type,
@@ -240,7 +240,7 @@ def search_password(password: str) -> dict:
                 "count": row['count']
             })
 
-        # Pays d'origine
+        # Origin countries
         db.execute("""
             SELECT
                 country_name,
@@ -274,7 +274,7 @@ def search_password(password: str) -> dict:
                 "percentage": round(percentage, 1)
             })
 
-        # Timeline d'activité
+        # Activity timeline
         db.execute("""
             SELECT COUNT(*) as count
             FROM attack_logs
@@ -319,10 +319,10 @@ def search_password(password: str) -> dict:
 
 def search_username(username: str) -> dict:
     """
-    Recherche toutes les informations liées à un nom d'utilisateur
+    Searches for all information related to a username
     """
     with DatabaseManagerHoneypot() as db:
-        # Nombre total d'utilisations
+        # Total number of uses
         db.execute("""
             SELECT
                 COUNT(*) as total_count,
@@ -337,7 +337,7 @@ def search_username(username: str) -> dict:
         if not info or info['total_count'] == 0:
             return None
 
-        # IPs qui ont utilisé ce username
+        # IPs that used this username
         db.execute("""
             SELECT
                 source_ip,
@@ -358,7 +358,7 @@ def search_username(username: str) -> dict:
                 "count": row['count']
             })
 
-        # Passwords associés
+        # Associated passwords
         db.execute("""
             SELECT
                 password_attempt,
@@ -377,7 +377,7 @@ def search_username(username: str) -> dict:
                 "count": row['count']
             })
 
-        # Services où ce username a été tenté
+        # Services where this username was attempted
         db.execute("""
             SELECT
                 service_type,
@@ -395,7 +395,7 @@ def search_username(username: str) -> dict:
                 "count": row['count']
             })
 
-        # Pays d'origine
+        # Origin countries
         db.execute("""
             SELECT
                 country_name,
@@ -429,7 +429,7 @@ def search_username(username: str) -> dict:
                 "percentage": round(percentage, 1)
             })
 
-        # Timeline d'activité
+        # Activity timeline
         db.execute("""
             SELECT COUNT(*) as count
             FROM attack_logs
@@ -474,7 +474,7 @@ def search_username(username: str) -> dict:
 
 def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
     """
-    Récupère les données temporelles pour une IP spécifique
+    Retrieves the time-series data for a specific IP
     """
     with DatabaseManagerHoneypot() as db:
         # Map timeline parameter to MySQL datetime expression
@@ -571,9 +571,9 @@ def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
                     "label": label,
                     "count": count
                 })
-        else:  # "all" - grouper par jour depuis le début
+        else:  # "all" - group by day since the beginning
             if logs and len(logs) > 0:
-                # Trouver la première date - handle both datetime objects and strings
+                # Find the first date - handle both datetime objects and strings
                 if isinstance(logs[0]['created_at'], datetime):
                     first_date = logs[0]['created_at']
                 else:
@@ -586,7 +586,7 @@ def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
                 current_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
                 days_diff = (current_date - first_date).days
 
-                # Limiter à 365 jours max pour éviter trop de données
+                # Limit to 365 days max to avoid too much data
                 if days_diff > 365:
                     days_diff = 365
                     first_date = current_date - timedelta(days=365)

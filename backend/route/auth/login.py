@@ -7,8 +7,9 @@ login, two-factor authentication (A2F), session management, and logout.
 
 from typing import Tuple
 from flask import Blueprint, jsonify, session, request, Response
-from module.database.auth import auth_user, a2f_active, get_otp_secret
+from module.database.auth import auth_user, a2f_active, get_otp_secret, get_user_auth
 from module.database.account import log_attempt_account
+from module.database.audit import log_audit
 import pyotp
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -29,10 +30,22 @@ def session_state() -> Tuple[Response, int]:
     authenticated = bool(session.get('logged_in'))
     requires_a2f = session.get('a2f_validate') is False
     username = session.get('username') if authenticated else None
+    role = None
+    if authenticated and username:
+        role = session.get('role')
+        # Lazily backfill sessions created before roles existed (post-deploy),
+        # so users are not forced to log in again.
+        if role is None:
+            info = get_user_auth(username)
+            if info:
+                session['user_id'] = info['id']
+                session['role'] = info['role']
+                role = info['role']
     return jsonify({
         "authenticated": authenticated and not requires_a2f,
         "requires_a2f": requires_a2f,
-        "username": username
+        "username": username,
+        "role": role
     }), 200
 
 
@@ -64,23 +77,39 @@ def login() -> Tuple[Response, int]:
         if not auth_user(username, password):
             # Log failed attempt for security monitoring
             log_attempt_account(username, request.remote_addr, 'Failed login')
+            log_audit('auth.login.failed', actor_username=username,
+                      detail='Identifiants invalides', ip_address=request.remote_addr)
             return jsonify({"error": "Invalid username or password"}), 401
 
 
         # Credentials valid - establish session
         session['logged_in'] = True
         session['username'] = username
+        # Stamp the numeric id + role so downstream endpoints can scope data and
+        # gate admin-only routes without another DB lookup.
+        info = get_user_auth(username)
+        role = None
+        if info:
+            session['user_id'] = info['id']
+            session['role'] = info['role']
+            role = info['role']
 
         # Check if user has 2FA enabled
+        actor_id = info['id'] if info else None
         if a2f_active(username):
             # Mark session as requiring 2FA verification before full access
             session['a2f_validate'] = False
             log_attempt_account(username, request.remote_addr, 'A2F required')
-            return jsonify({"authenticated": True, "requires_a2f": True}), 200
+            log_audit('auth.login.2fa_required', actor_id=actor_id, actor_username=username,
+                      detail='Mot de passe validé, 2FA requise', ip_address=request.remote_addr)
+            return jsonify({"authenticated": True, "requires_a2f": True,
+                            "username": username, "role": role}), 200
 
         # No 2FA required grant full access
         log_attempt_account(username, request.remote_addr, 'Successful login')
-        return jsonify({"authenticated": True}), 200
+        log_audit('auth.login.success', actor_id=actor_id, actor_username=username,
+                  ip_address=request.remote_addr)
+        return jsonify({"authenticated": True, "username": username, "role": role}), 200
 
 
 @auth_bp.route("/a2f", methods=['GET', 'POST'])
@@ -125,10 +154,16 @@ def a2f() -> tuple[Response, int] | None:
                 # Code valid - complete authentication process
                 session['a2f_validate'] = True
                 log_attempt_account(session['username'], request.remote_addr, 'A2F validated')
+                log_audit('auth.login.success', actor_id=session.get('user_id'),
+                          actor_username=session.get('username'), detail='2FA validée',
+                          ip_address=request.remote_addr)
                 return jsonify({"authenticated": True, "requires_a2f": False}), 200
             else:
                 # Code invalid - log failed attempt for security monitoring
                 log_attempt_account(session['username'], request.remote_addr, 'A2F failed')
+                log_audit('auth.2fa.failed', actor_id=session.get('user_id'),
+                          actor_username=session.get('username'), detail='Code 2FA invalide',
+                          ip_address=request.remote_addr)
                 return jsonify({"error": "Code de vérification invalide"}), 400
 
 

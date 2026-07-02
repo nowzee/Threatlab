@@ -16,7 +16,9 @@ from route.agent.manage_agent import agent_manage_bp
 from route.log_analyse.alerte_dashboard import log_analyse_bp
 from route.log_analyse.alerte_details import alert_details_bp
 from route.CTI.threat_intelligence import threat_intel_bp
-from module.database.db_manager import DatabaseManagerHoneypot, DatabaseManagerUser
+from route.admin.admin_api import admin_bp
+from module.database.db_manager import DatabaseManagerUser
+from module.ingestion.ingest import start_worker
 import secrets
 
 # Initialize Flask app with Vue.js frontend static files
@@ -27,7 +29,7 @@ def _load_or_create_secret_key() -> str:
     os.makedirs(SECRETS_DIR, exist_ok=True)
     app_KEY_FILE = os.path.join(SECRETS_DIR, '.app_secret_key')
 
-    # Charger ou générer la clé
+    # Load or generate the key
     if os.path.exists(app_KEY_FILE):
         with open(app_KEY_FILE, 'r') as f:
             return f.read().strip()
@@ -46,10 +48,10 @@ app.config['SESSION_COOKIE_SAMESITE'] = 'Strict'
 
 os.makedirs(SECRETS_DIR, exist_ok=True)
 
-# Fichier de la clé agent
+# Agent key file
 AGENT_KEY_FILE = os.path.join(SECRETS_DIR, '.agent_secret_key')
 
-# Charger ou générer la clé
+# Load or generate the key
 if os.path.exists(AGENT_KEY_FILE):
     with open(AGENT_KEY_FILE, 'r') as f:
         app.config['AGENT_SECRET_KEY'] = f.read().strip()
@@ -69,6 +71,7 @@ app.register_blueprint(agent_create_bp)
 app.register_blueprint(config_account_bp)
 app.register_blueprint(agent_user_api_bp)
 app.register_blueprint(config_api_key_bp)
+app.register_blueprint(admin_bp)
 
 @app.after_request
 def set_security_headers(response):
@@ -92,9 +95,7 @@ def before_request() -> tuple[Response, int] | None:
         Optional[Tuple[dict, int]]: JSON response with status code if authentication
                                     is required, None otherwise.
     """
-    # Define endpoints that don't require authentication
-    # Includes: static files, login, session check, Vue app, and agent reporting
-    public_endpoints = ["static", "auth.login", "serve_static_or_index", "auth.session_state", "serve_vue_app", "agent_create.agent_report"]
+    public_endpoints = ["static", "auth.login", "serve_static_or_index", "auth.session_state", "serve_vue_app", "agent_create.agent_report", "agent_create.agent_upload", "agent_create.install_agent", "agent_create.download_agent"]
 
     # Define endpoints accessible during 2FA validation process
     a2f_endpoints = ['auth.a2f', 'static', 'serve_static_or_index', 'serve_vue_app']
@@ -111,28 +112,17 @@ def before_request() -> tuple[Response, int] | None:
 
 @app.route('/')
 def serve_vue_app() -> Response:
-    """
-    Serve the main Vue.js application index page.
 
-    Returns:
-        str: The index.html file content.
-    """
     return send_from_directory(app.static_folder, 'index.html')
 
 @app.route('/<path>', methods=['GET', 'POST'])
 def serve_static_or_index(path) -> Response:
     return send_from_directory(app.static_folder, 'index.html')
 
+start_worker()
+
 if __name__ == '__main__':
-    # Initialize user database (accounts, API keys, login attempts)
     with DatabaseManagerUser() as db:
         db.create_db()
 
-    # Initialize honeypot database (agents, attack logs, malicious IPs, payloads)
-    with DatabaseManagerHoneypot() as db:
-        db.create_db()
-
-    # Start Flask development server
-    # Listen on all interfaces (0.0.0.0) on port 5000
-    # Debug mode disabled for production-like behavior
     app.run(host='0.0.0.0', port=5000, debug=False, ssl_context='adhoc' )

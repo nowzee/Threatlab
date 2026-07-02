@@ -502,7 +502,7 @@ export default defineComponent({
   border-radius: 6px;
   font-size: 13px;
   font-family: 'JetBrains Mono', 'Fira Code', monospace;
-  color: #e0e0e0;
+  color: var(--text-color);
 }
 
 /* Frequency bar */

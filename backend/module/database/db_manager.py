@@ -5,17 +5,21 @@ import string
 import secrets
 import hashlib
 
-# Configuration de la base de données via variables d'environnement
+# Database configuration via environment variables
 DB_TYPE = 'mysql'
 DB_HOST = os.getenv('DB_HOST', 'localhost')
 DB_USER = os.getenv('DB_USER', 'threatlabs_user')
 DB_PASSWORD = os.getenv('DB_PASSWORD', 'threatlabs_password')
 DB_NAME = os.getenv('DB_NAME', 'threatlabs')
 
-# Créer le pool de connexions une seule fois
+# Configurable pool size (careful: multiplied by the number of gunicorn workers;
+# keep workers * DB_POOL_SIZE under MySQL's max_connections ~151)
+DB_POOL_SIZE = int(os.getenv('DB_POOL_SIZE', '10'))
+
+# Create the connection pool once (per process)
 connection_pool = pooling.MySQLConnectionPool(
     pool_name="threatlabs_pool",
-    pool_size=10,
+    pool_size=DB_POOL_SIZE,
     pool_reset_session=True,
     host=DB_HOST,
     user=DB_USER,
@@ -25,7 +29,7 @@ connection_pool = pooling.MySQLConnectionPool(
 
 
 def generate_custom_snowflake(username: str) -> int:
-    # Paramètres fixes pour éviter des IDs trop grands
+    # Fixed parameters to avoid overly large IDs
     SEQUENCE_BITS = 12
     WORKER_ID_BITS = 5
     DATACENTER_ID_BITS = 5
@@ -43,11 +47,11 @@ def generate_custom_snowflake(username: str) -> int:
     # Horodatage actuel en millisecondes
     timestamp = int(time.time() * 1000)
 
-    # Datacenter et Worker aléatoires
+    # Random datacenter and worker
     datacenter_id = secrets.randbelow(MAX_DATACENTER_ID + 1)
     worker_id = secrets.randbelow(MAX_WORKER_ID + 1)
 
-    # Générer une "sequence" pseudo-aléatoire basée sur username + timestamp
+    # Generate a pseudo-random "sequence" based on username + timestamp
     hash_input = f"{username}-{timestamp}".encode()
     hash_digest = hashlib.sha256(hash_input).hexdigest()
     sequence = int(hash_digest[:3], 16) & MAX_SEQUENCE
@@ -75,18 +79,19 @@ class DatabaseManagerHoneypot:
     def __enter__(self):
         return self
 
-    def create_db(self):
-        # En MySQL, le schéma est déjà chargé via schemas.sql dans Docker
-        pass
-
     def execute(self, query, params=None):
-        # Adapter le placeholder pour MySQL (%s au lieu de ?)
+        # Adapt the placeholder for MySQL (%s instead of ?)
         query = query.replace('?', '%s')
 
         if params is not None:
             self.cursor.execute(query, params)
         else:
             self.cursor.execute(query)
+
+    def executemany(self, query, seq_params):
+        """Execute a query over a sequence of parameter sets (batch insert)."""
+        query = query.replace('?', '%s')
+        self.cursor.executemany(query, seq_params)
 
     def fetchall(self):
         return self.cursor.fetchall()
@@ -95,17 +100,17 @@ class DatabaseManagerHoneypot:
         return self.cursor.fetchone()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Sortie du context manager - TOUJOURS appelée"""
+        """Context manager exit - ALWAYS called"""
         try:
             if exc_type is None:
-                # Pas d'erreur : on commit les changements
+                # No error: commit the changes
                 self.conn.commit()
             else:
-                # Il y a eu une erreur : on rollback
+                # An error occurred: roll back
                 print(f"erreur cote db honeypot : {exc_type.__name__}: {exc_val}")
                 self.conn.rollback()
         finally:
-            # Dans tous les cas : on ferme la connexion
+            # In all cases: close the connection
             self.conn.close()
 
 class DatabaseManagerUser:
@@ -117,28 +122,26 @@ class DatabaseManagerUser:
         return self
 
     def create_db(self):
-        # Initialisation spécifique MySQL : créer admin user si nécessaire
         self.create_admin_if_not_exists()
 
     def create_admin_if_not_exists(self):
-        """Créer un utilisateur admin par défaut s'il n'existe pas."""
+        """Create a default admin user if it does not exist."""
         try:
             self.cursor.execute("SELECT COUNT(*) FROM users WHERE username = %s", ('admin',))
             count = self.cursor.fetchone()[0]
 
             if count == 0:
-                # Générer un mot de passe aléatoire
+                # Generate a random password
                 admin_password = generate_random_string(16)
                 admin_id = generate_custom_snowflake('admin')
 
-                # Hacher le mot de passe
-                import hashlib
-                password_hash = hashlib.sha256(admin_password.encode()).hexdigest()
+                from module.crypto_utils.password_hash import hash_password
+                password_hash = hash_password(admin_password)
 
-                # Insérer l'utilisateur admin
+                # Insert the admin user (explicit admin role)
                 self.cursor.execute(
-                    "INSERT INTO users (id, username, password) VALUES (%s, %s, %s)",
-                    (admin_id, 'admin', password_hash)
+                    "INSERT INTO users (id, username, password, role) VALUES (%s, %s, %s, %s)",
+                    (admin_id, 'admin', password_hash, 'admin')
                 )
                 self.conn.commit()
                 print(f"Admin user created with password: {admin_password}")
@@ -147,7 +150,7 @@ class DatabaseManagerUser:
             print(f"Error creating admin user: {e}")
 
     def execute(self, query, params=None):
-        # Adapter le placeholder pour MySQL (%s au lieu de ?)
+        # Adapt the placeholder for MySQL (%s instead of ?)
         query = query.replace('?', '%s')
 
         if params is not None:
@@ -162,15 +165,15 @@ class DatabaseManagerUser:
         return self.cursor.fetchone()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Sortie du context manager - TOUJOURS appelée"""
+        """Context manager exit - ALWAYS called"""
         try:
             if exc_type is None:
-                # Pas d'erreur : on commit les changements
+                # No error: commit the changes
                 self.conn.commit()
             else:
-                # Il y a eu une erreur : on rollback
+                # An error occurred: roll back
                 print(f"erreur cote db user : {exc_type.__name__}: {exc_val}")
                 self.conn.rollback()
         finally:
-            # Dans tous les cas : on ferme la connexion
+            # In all cases: close the connection
             self.conn.close()

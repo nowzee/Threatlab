@@ -1,8 +1,8 @@
 """
-Module de gestion du chiffrement AES pour les données sensibles.
+AES encryption management module for sensitive data.
 
-Ce module fournit une classe pour chiffrer et déchiffrer des données
-en utilisant AES-GCM avec une clé stockée de manière sécurisée.
+This module provides a class to encrypt and decrypt data
+using AES-GCM with a securely stored key.
 """
 import base64
 import os
@@ -12,22 +12,22 @@ from Crypto.Cipher import AES
 
 class Key_manager_db:
     """
-    Gestionnaire de chiffrement AES-GCM pour les données sensibles de la base de données.
+    AES-GCM encryption manager for sensitive database data.
 
-    Cette classe gère une clé AES de 256 bits stockée dans un fichier '.key'.
-    Elle utilise le mode GCM (Galois/Counter Mode) pour garantir à la fois
-    la confidentialité et l'intégrité des données chiffrées.
+    This class manages a 256-bit AES key stored in a '.key' file.
+    It uses GCM mode (Galois/Counter Mode) to guarantee both
+    the confidentiality and the integrity of the encrypted data.
 
     Attributes:
-        AES_KEY (bytes): Clé AES de 256 bits utilisée pour le chiffrement/déchiffrement.
+        AES_KEY (bytes): 256-bit AES key used for encryption/decryption.
     """
 
     def __init__(self) -> None:
         """
-        Initialise le gestionnaire de clés.
+        Initialize the key manager.
 
-        Charge la clé AES depuis le fichier '.key' ou en crée une nouvelle
-        si le fichier n'existe pas.
+        Loads the AES key from the '.key' file or creates a new one
+        if the file does not exist.
         """
 
         if not os.path.exists('secrets/.key'):
@@ -42,16 +42,16 @@ class Key_manager_db:
 
     def encrypt(self, data: str) -> str:
         """
-        Chiffre une chaîne de caractères en utilisant AES-GCM.
+        Encrypt a string using AES-GCM.
 
-        Le chiffrement génère un nonce aléatoire de 12 octets, un tag d'authentification
-        de 16 octets, et le texte chiffré. Ces éléments sont concaténés et encodés en base64.
+        Encryption generates a random 12-byte nonce, a 16-byte authentication
+        tag, and the ciphertext. These elements are concatenated and base64-encoded.
 
         Args:
-            data (str): Données en clair à chiffrer.
+            data (str): Plaintext data to encrypt.
 
         Returns:
-            str: Données chiffrées encodées en base64 (nonce + tag + ciphertext).
+            str: Base64-encoded encrypted data (nonce + tag + ciphertext).
         """
         # Generate random 12-byte nonce (number used once) for GCM mode
         nonce = get_random_bytes(12)
@@ -68,19 +68,19 @@ class Key_manager_db:
 
     def decrypt(self, data: str) -> str:
         """
-        Déchiffre des données chiffrées avec AES-GCM.
+        Decrypt data encrypted with AES-GCM.
 
-        Extrait le nonce, le tag d'authentification et le texte chiffré depuis
-        les données encodées en base64, puis déchiffre et vérifie l'intégrité.
+        Extracts the nonce, the authentication tag and the ciphertext from
+        the base64-encoded data, then decrypts and verifies integrity.
 
         Args:
-            data (str): Données chiffrées encodées en base64.
+            data (str): Base64-encoded encrypted data.
 
         Returns:
-            str: Données déchiffrées en clair.
+            str: Decrypted plaintext data.
 
         Raises:
-            ValueError: Si le tag d'authentification ne correspond pas (données altérées).
+            ValueError: If the authentication tag does not match (tampered data).
         """
         # Decode from base64 to get raw bytes
         blob = base64.b64decode(data)

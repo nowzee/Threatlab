@@ -6,11 +6,23 @@ CREATE TABLE IF NOT EXISTS honey_agents (
     ip_address VARCHAR(45) NOT NULL,
     country_name VARCHAR(100),
     service_type VARCHAR(50) NOT NULL,
+    groupe VARCHAR(100),
     banner TEXT,
+    interactive INT DEFAULT 1,
+    allow_upload INT DEFAULT 1,
     alert_generated INT DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    secret_token_sha256 VARCHAR(255) UNIQUE
+    secret_token_sha256 VARCHAR(255) UNIQUE,
+    owner_id BIGINT,
+    auth_mode VARCHAR(20) NOT NULL DEFAULT 'any',
+    auth_whitelist TEXT,
+    port VARCHAR(255)
+);
+
+CREATE TABLE IF NOT EXISTS groups_agent (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    group_name VARCHAR(100) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS attack_logs (
@@ -21,6 +33,7 @@ CREATE TABLE IF NOT EXISTS attack_logs (
     source_port INT,
     target_port INT,
     service_type VARCHAR(50) NOT NULL,
+    command TEXT,
     username_attempt VARCHAR(255),
     password_attempt VARCHAR(255),
     payload TEXT,
@@ -40,7 +53,8 @@ CREATE TABLE IF NOT EXISTS malicious_ips (
     country_code VARCHAR(10),
     country_name VARCHAR(100),
     reputation_score INT DEFAULT 0,
-    classification VARCHAR(100)
+    classification VARCHAR(100),
+    notes TEXT
 );
 
 CREATE TABLE IF NOT EXISTS ip_agent_relations (
@@ -66,6 +80,35 @@ CREATE TABLE IF NOT EXISTS ip_service_attacks (
     UNIQUE(ip_id, service_type)
 );
 
+CREATE TABLE IF NOT EXISTS payloads (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    malicious_ip_id INT,
+    service_type VARCHAR(50) NOT NULL,
+    payload_name VARCHAR(255) NOT NULL,
+    payload_hash VARCHAR(255) UNIQUE NOT NULL,
+    file_extension VARCHAR(10),
+    file_size INT,
+    payload_content LONGTEXT,
+    payload_type VARCHAR(50),
+    malware_family VARCHAR(100),
+    first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+    detection_count INT DEFAULT 1,
+    FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
+);
+
+CREATE TABLE IF NOT EXISTS smtp_interactions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    malicious_server_ip_id INT,
+    sender_email VARCHAR(255),
+    recipient_email VARCHAR(255),
+    subject TEXT,
+    message_content LONGTEXT,
+    attachments TEXT,
+    timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (malicious_server_ip_id) REFERENCES malicious_ips (id)
+);
+
 CREATE TABLE IF NOT EXISTS compromised_credentials (
     id INT AUTO_INCREMENT PRIMARY KEY,
     malicious_ip_id INT,
@@ -76,6 +119,23 @@ CREATE TABLE IF NOT EXISTS compromised_credentials (
     last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
     attempt_count INT DEFAULT 1,
     FOREIGN KEY (malicious_ip_id) REFERENCES malicious_ips (id)
+);
+
+CREATE TABLE IF NOT EXISTS uploaded_files (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    file_hash VARCHAR(64) UNIQUE NOT NULL,
+    file_name VARCHAR(255),
+    file_size BIGINT,
+    stored_path VARCHAR(512),
+    source_ip VARCHAR(45),
+    username VARCHAR(255),
+    password VARCHAR(255),
+    request_headers TEXT,
+    agent_id BIGINT,
+    service_type VARCHAR(50),
+    first_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+    last_seen DATETIME DEFAULT CURRENT_TIMESTAMP,
+    upload_count INT DEFAULT 1
 );
 
 CREATE TABLE IF NOT EXISTS password_attempted (
@@ -99,7 +159,8 @@ CREATE TABLE IF NOT EXISTS users (
     username VARCHAR(255) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
     otp_code VARCHAR(255) UNIQUE,
-    otp_active INT DEFAULT 0
+    otp_active INT DEFAULT 0,
+    role VARCHAR(20) NOT NULL DEFAULT 'member'
 );
 
 CREATE TABLE IF NOT EXISTS api_keys (
@@ -118,4 +179,16 @@ CREATE TABLE IF NOT EXISTS log_attempt_account (
     ip_address VARCHAR(45) NOT NULL,
     status VARCHAR(50) NOT NULL,
     FOREIGN KEY (account_id) REFERENCES users (id)
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    actor_id BIGINT,
+    actor_username VARCHAR(255),
+    action VARCHAR(64) NOT NULL,
+    target_type VARCHAR(32),
+    target_id VARCHAR(64),
+    detail TEXT,
+    ip_address VARCHAR(45)
 );

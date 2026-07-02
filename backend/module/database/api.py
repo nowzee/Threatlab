@@ -1,8 +1,8 @@
 """
-Module de gestion des clés API pour les intégrations externes.
+API key management module for external integrations.
 
-Ce module fournit des fonctions pour créer, lister et mettre à jour les clés API
-stockées de manière chiffrée dans la base de données.
+This module provides functions to create, list and update API keys
+stored in encrypted form in the database.
 """
 from typing import List, Dict, Any
 from module.database.db_manager import DatabaseManagerUser
@@ -12,13 +12,13 @@ from datetime import datetime
 
 def verify_api_key(api_key: str) -> bool:
     """
-    Vérifie si une clé API existe dans la base de données.
+    Check whether an API key exists in the database.
 
     Args:
-        api_key (str): Clé API à vérifier (chiffrée).
+        api_key (str): API key to check (encrypted).
 
     Returns:
-        bool: True si la clé existe, False sinon.
+        bool: True if the key exists, False otherwise.
     """
     with DatabaseManagerUser() as db:
         # Query database for existing encrypted API key (use backticks for 'key' reserved word)
@@ -29,25 +29,25 @@ def verify_api_key(api_key: str) -> bool:
 
 class ManageApiKey:
     """
-    Classe de gestion des clés API pour les intégrations externes.
+    API key management class for external integrations.
 
-    Cette classe permet d'ajouter, lister et mettre à jour les clés API
-    stockées de manière sécurisée (chiffrées) dans la base de données.
+    This class allows adding, listing and updating API keys
+    stored securely (encrypted) in the database.
     """
 
     def add(self, api_key: str, name: str, integration: str) -> bool:
         """
-        Ajoute une nouvelle clé API dans la base de données.
+        Add a new API key to the database.
 
-        La clé est chiffrée avant d'être stockée pour garantir sa sécurité.
+        The key is encrypted before being stored to guarantee its security.
 
         Args:
-            api_key (str): Clé API en clair à ajouter.
-            name (str): Nom descriptif de la clé API.
-            integration (str): Type d'intégration (ex: "opencti", "elasticsearch").
+            api_key (str): Plaintext API key to add.
+            name (str): Descriptive name of the API key.
+            integration (str): Integration type (e.g.: "opencti", "elasticsearch").
 
         Returns:
-            bool: True si l'ajout a réussi, False si la clé existe déjà.
+            bool: True if the addition succeeded, False if the key already exists.
         """
         # Encrypt the API key using AES-GCM to protect sensitive data
         key_manager = Key_manager_db()
@@ -69,16 +69,16 @@ class ManageApiKey:
 
     def list(self) -> List[Dict[str, Any]]:
         """
-        Liste toutes les clés API enregistrées.
+        List all registered API keys.
 
-        Les clés sont déchiffrées avant d'être retournées.
+        The keys are decrypted before being returned.
 
         Returns:
-            List[Dict[str, Any]]: Liste de dictionnaires contenant:
-                - id: Identifiant de la clé
-                - key: Clé API déchiffrée
-                - name: Nom de la clé
-                - integration: Type d'intégration
+            List[Dict[str, Any]]: List of dictionaries containing:
+                - id: Key identifier
+                - key: Decrypted API key
+                - name: Key name
+                - integration: Integration type
         """
         key_manager = Key_manager_db()
         with DatabaseManagerUser() as db:
@@ -100,15 +100,15 @@ class ManageApiKey:
 
     def update(self, api_key: str, name: str, integration: str) -> bool:
         """
-        Met à jour les informations d'une clé API existante.
+        Update the information of an existing API key.
 
         Args:
-            api_key (str): Clé API en clair à mettre à jour.
-            name (str): Nouveau nom pour la clé.
-            integration (str): Nouveau type d'intégration.
+            api_key (str): Plaintext API key to update.
+            name (str): New name for the key.
+            integration (str): New integration type.
 
         Returns:
-            bool: True si la mise à jour a réussi, False si la clé n'existe pas.
+            bool: True if the update succeeded, False if the key does not exist.
         """
         # Encrypt the API key to match stored format
         key_manager = Key_manager_db()
