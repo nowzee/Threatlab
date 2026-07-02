@@ -132,39 +132,50 @@ prompt_method() {
 }
 
 # ====================== DEPENDENCY / WORK STEPS (quiet: driven by the bar) ======================
-install_python() {
+ensure_python_env() {
+    # Ensure python3 + venv + pip are present (idempotent). On Ubuntu/Debian
+    # python3 exists by default but python3-venv / python3-pip usually do NOT,
+    # so we always (re)install them here. Failures are tolerated, then checked.
     case "${OS_ID}" in
         ubuntu|debian)
-            apt-get update -qq >/dev/null 2>&1
-            apt-get install -y -qq python3 python3-pip python3-venv >/dev/null 2>&1 ;;
+            apt-get update -qq >/dev/null 2>&1 || true
+            DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3 python3-venv python3-pip >/dev/null 2>&1 || true ;;
         centos|rhel|fedora|rocky|alma)
-            if check_command dnf; then dnf install -y -q python3 python3-pip >/dev/null 2>&1
-            else yum install -y -q python3 python3-pip >/dev/null 2>&1; fi ;;
+            if check_command dnf; then dnf install -y -q python3 python3-pip >/dev/null 2>&1 || true
+            else yum install -y -q python3 python3-pip >/dev/null 2>&1 || true; fi ;;
         alpine)
-            apk add --no-cache python3 py3-pip >/dev/null 2>&1 ;;
+            apk add --no-cache python3 py3-pip >/dev/null 2>&1 || true ;;
         *)
-            if check_command apt-get; then apt-get update -qq >/dev/null 2>&1 && apt-get install -y -qq python3 python3-pip python3-venv >/dev/null 2>&1
-            elif check_command dnf; then dnf install -y -q python3 python3-pip >/dev/null 2>&1
-            elif check_command yum; then yum install -y -q python3 python3-pip >/dev/null 2>&1
-            else echo; log_error "Cannot install Python. Please install Python 3.8+ manually."; exit 1; fi ;;
+            if check_command apt-get; then apt-get update -qq >/dev/null 2>&1 || true; DEBIAN_FRONTEND=noninteractive apt-get install -y -qq python3 python3-venv python3-pip >/dev/null 2>&1 || true
+            elif check_command dnf; then dnf install -y -q python3 python3-pip >/dev/null 2>&1 || true
+            elif check_command yum; then yum install -y -q python3 python3-pip >/dev/null 2>&1 || true
+            else apk add --no-cache python3 py3-pip >/dev/null 2>&1 || true; fi ;;
     esac
-}
-
-install_docker_engine() {
-    curl -fsSL https://get.docker.com | sh >/tmp/tl-docker-install.log 2>&1 || {
-        echo; log_error "Docker installation failed. See /tmp/tl-docker-install.log"; exit 1;
-    }
+    if ! check_command python3; then
+        echo; log_error "Python 3 is required but could not be installed. Install it and re-run."; exit 1
+    fi
 }
 
 install_python_deps() {
+    # Prefer an isolated venv (avoids PEP 668 "externally-managed" errors on
+    # Ubuntu 24.04 / Debian 12). Fall back to system pip if venv is unavailable.
+    PYTHON_BIN=""
     python3 -m venv "${INSTALL_DIR}/venv" >/dev/null 2>&1 || true
-    if [ -f "${INSTALL_DIR}/venv/bin/pip" ]; then
-        "${INSTALL_DIR}/venv/bin/pip" install --quiet --upgrade pip >/dev/null 2>&1
-        "${INSTALL_DIR}/venv/bin/pip" install --quiet paramiko requests >/dev/null 2>&1
-    else
-        pip3 install --quiet --break-system-packages paramiko requests >/dev/null 2>&1 || \
-        pip3 install --quiet paramiko requests >/dev/null 2>&1
+    if [ -x "${INSTALL_DIR}/venv/bin/pip" ]; then
+        "${INSTALL_DIR}/venv/bin/pip" install --quiet --upgrade pip >/dev/null 2>&1 || true
+        if "${INSTALL_DIR}/venv/bin/pip" install --quiet paramiko requests >/dev/null 2>&1; then
+            PYTHON_BIN="${INSTALL_DIR}/venv/bin/python3"
+            return 0
+        fi
     fi
+    # Fallbacks: system pip (with and without --break-system-packages).
+    if pip3 install --quiet --break-system-packages paramiko requests >/dev/null 2>&1 \
+       || python3 -m pip install --quiet --break-system-packages paramiko requests >/dev/null 2>&1 \
+       || pip3 install --quiet paramiko requests >/dev/null 2>&1; then
+        PYTHON_BIN="$(command -v python3)"
+        return 0
+    fi
+    echo; log_error "Could not install Python dependencies (paramiko, requests). Check network / pip."; exit 1
 }
 
 download_agent() {
@@ -214,11 +225,9 @@ docker_run_container() {
 }
 
 create_systemd_service() {
-    if [ -f "${INSTALL_DIR}/venv/bin/python3" ]; then
-        PYTHON_BIN="${INSTALL_DIR}/venv/bin/python3"
-    else
-        PYTHON_BIN=$(command -v python3)
-    fi
+    # PYTHON_BIN is set by install_python_deps (venv or system python that has
+    # the deps). Fall back to system python3 just in case.
+    local py="${PYTHON_BIN:-$(command -v python3)}"
     cat > "/etc/systemd/system/${SERVICE_NAME}.service" <<SERVICEEOF
 [Unit]
 Description=Threatlabs Honeypot Agent (${AGENT_NAME})
@@ -229,7 +238,7 @@ Wants=network-online.target
 Type=simple
 User=root
 WorkingDirectory=${INSTALL_DIR}
-ExecStart=${PYTHON_BIN} ${INSTALL_DIR}/agent.py
+ExecStart=${py} ${INSTALL_DIR}/agent.py
 Restart=always
 RestartSec=10
 StandardOutput=append:${LOG_FILE}
@@ -249,11 +258,10 @@ enable_systemd_service() {
 install_docker() {
     STEP_CURRENT=0; STEP_TOTAL=4
     echo -e "${BOLD}Installing via Docker...${NC}"
-    if check_command docker; then
-        run_step "Checking Docker" true
-    else
-        run_step "Installing Docker" install_docker_engine
+    if ! check_command docker; then
+        echo; log_error "Docker is not installed. Install Docker first, or re-run and choose option 2 (System)."; exit 1
     fi
+    run_step "Checking Docker" true
     systemctl enable --now docker >/dev/null 2>&1 || true
     run_step "Downloading agent" download_agent
     run_step "Building image" docker_build_image
@@ -270,11 +278,7 @@ install_docker() {
 install_direct() {
     STEP_CURRENT=0; STEP_TOTAL=5
     echo -e "${BOLD}Installing natively (systemd)...${NC}"
-    if check_command python3; then
-        run_step "Checking Python" true
-    else
-        run_step "Installing Python" install_python
-    fi
+    run_step "Preparing Python" ensure_python_env
     run_step "Downloading agent" download_agent
     run_step "Installing dependencies" install_python_deps
     run_step "Creating systemd service" create_systemd_service
