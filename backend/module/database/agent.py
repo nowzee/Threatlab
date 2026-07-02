@@ -902,7 +902,9 @@ class ManagerAgent:
                                   ha.ip_address,
                                   ha.service_type,
                                   ha.updated_at,
-                                  ha.alert_generated,
+                                  (SELECT COUNT(*) FROM attack_logs al
+                                    WHERE al.agent_id = ha.id
+                                      AND al.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS alert_generated,
                                   ha.created_at,
                                   ha.owner_id,
                                   u.username AS owner_username
@@ -917,7 +919,9 @@ class ManagerAgent:
                                   ha.ip_address,
                                   ha.service_type,
                                   ha.updated_at,
-                                  ha.alert_generated,
+                                  (SELECT COUNT(*) FROM attack_logs al
+                                    WHERE al.agent_id = ha.id
+                                      AND al.created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)) AS alert_generated,
                                   ha.created_at,
                                   ha.owner_id
                            FROM honey_agents ha

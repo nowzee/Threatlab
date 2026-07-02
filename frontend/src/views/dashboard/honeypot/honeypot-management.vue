@@ -23,7 +23,6 @@ const searchQuery = ref('')
 const deleting = ref(false)
 const toast = ref('')
 
-const totalAlerts = computed(() => honeypots.value.reduce((sum, h) => sum + h.alerts_count, 0))
 const distinctTypes = computed(() => new Set(honeypots.value.map(h => h.type)).size)
 
 const filteredHoneypots = computed(() => {
@@ -116,6 +115,17 @@ function fmt(d: string): string {
   return isNaN(date.getTime()) ? d : date.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
+// Format compact : 2000 -> "2k", 2340 -> "2.3k", 1500000 -> "1.5M".
+function compact(n: number): string {
+  if (n < 1000) return String(n)
+  if (n < 1_000_000) {
+    const v = n / 1000
+    return (v < 10 ? v.toFixed(1).replace(/\.0$/, '') : Math.round(v).toString()) + 'k'
+  }
+  const v = n / 1_000_000
+  return (v < 10 ? v.toFixed(1).replace(/\.0$/, '') : Math.round(v).toString()) + 'M'
+}
+
 let toastTimer: ReturnType<typeof setTimeout>
 function flash(m: string) {
   toast.value = m
@@ -147,10 +157,6 @@ onMounted(loadHoneypots)
       <div class="hp-stat">
         <div class="n">{{ honeypots.length }}</div>
         <div class="l">Honeypots</div>
-      </div>
-      <div class="hp-stat">
-        <div class="n">{{ totalAlerts }}</div>
-        <div class="l">Alertes générées</div>
       </div>
       <div class="hp-stat">
         <div class="n">{{ distinctTypes }}</div>
@@ -203,9 +209,9 @@ onMounted(loadHoneypots)
         </div>
 
         <div class="hp-foot">
-          <div class="hp-alerts">
-            <span class="num">{{ h.alerts_count }}</span>
-            <span class="lbl">alertes</span>
+          <div class="hp-alerts" :title="`${h.alerts_count} alerte(s) sur les dernières 24 h`">
+            <span class="num">{{ compact(h.alerts_count) }}</span>
+            <span class="lbl">alertes · 24 h</span>
           </div>
           <router-link :to="{ name: 'honeypot-detail', params: { id: h.id } }" class="btn btn-ghost btn-sm">Détails</router-link>
         </div>
@@ -243,12 +249,14 @@ onMounted(loadHoneypots)
 
 /* Stat tiles — no colour, just a structural ink rule on the left */
 .hp-stats {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px;
   margin-bottom: 24px;
 }
 .hp-stat {
+  flex: 1 1 180px;
+  max-width: 260px;
   background: var(--ap-panel);
   border: 1px solid var(--ap-line);
   padding: 20px 22px;
