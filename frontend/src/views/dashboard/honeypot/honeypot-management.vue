@@ -59,7 +59,7 @@ async function loadHoneypots() {
       ip: item.ip_address,
       owner: item.owner_username || '—',
       created_at: item.created_at || '',
-      last_activity: item.updated_at || '',
+      last_activity: item.last_activity || '',
       alerts_count: item.alert_generated || 0
     }))
   } catch (error) {

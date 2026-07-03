@@ -876,60 +876,35 @@ class ManagerAgent:
 
     @staticmethod
     def list(viewer_id: Optional[int] = None, is_admin: bool = True) -> List[Dict[str, Any]]:
-        """
-        Retrieves the list of honeypot agents.
 
-        Admins get every agent (with the owning user's name); members get only
-        the agents they own.
+        owner_column = ", u.username AS owner_username" if is_admin else ""
+        owner_join = "LEFT JOIN users u ON ha.owner_id = u.id" if is_admin else ""
+        where_clause = "" if is_admin else "WHERE ha.owner_id = %s"
+        params = None if is_admin else (viewer_id,)
 
-        Args:
-            viewer_id (Optional[int]): id of the requesting user (member filter).
-            is_admin (bool): True to return all agents.
-
-        Returns:
-            List[Dict[str, Any]]: List of dictionaries containing the agent information.
-        """
         with DatabaseManagerHoneypot() as db:
-            if is_admin:
-                db.execute("""
-                           SELECT ha.id,
-                                  ha.agent_name,
-                                  ha.ip_address,
-                                  ha.service_type,
-                                  ha.updated_at,
-                                  COALESCE(a.cnt, 0) AS alert_generated,
-                                  ha.created_at,
-                                  ha.owner_id,
-                                  u.username AS owner_username
-                           FROM honey_agents ha
-                                    LEFT JOIN users u ON ha.owner_id = u.id
-                                    LEFT JOIN (SELECT agent_id, COUNT(*) AS cnt
-                                               FROM attack_logs
-                                               WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-                                               GROUP BY agent_id) a ON a.agent_id = ha.id
-                           ORDER BY ha.id DESC
-                           """)
-            else:
-                db.execute("""
-                           SELECT ha.id,
-                                  ha.agent_name,
-                                  ha.ip_address,
-                                  ha.service_type,
-                                  ha.updated_at,
-                                  COALESCE(a.cnt, 0) AS alert_generated,
-                                  ha.created_at,
-                                  ha.owner_id
-                           FROM honey_agents ha
-                                    LEFT JOIN (SELECT agent_id, COUNT(*) AS cnt
-                                               FROM attack_logs
-                                               WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
-                                               GROUP BY agent_id) a ON a.agent_id = ha.id
-                           WHERE ha.owner_id = %s
-                           ORDER BY ha.id DESC
-                           """, (viewer_id,))
-
-            agents = db.fetchall()
-            return agents
+            db.execute(f"""
+                       SELECT ha.id,
+                              ha.agent_name,
+                              ha.ip_address,
+                              ha.service_type,
+                              COALESCE(a.cnt, 0) AS alert_generated,
+                              la.last_activity,
+                              ha.created_at,
+                              ha.owner_id{owner_column}
+                       FROM honey_agents ha
+                                {owner_join}
+                                LEFT JOIN (SELECT agent_id, COUNT(*) AS cnt
+                                           FROM attack_logs
+                                           WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                                           GROUP BY agent_id) a ON a.agent_id = ha.id
+                                LEFT JOIN (SELECT agent_id, MAX(created_at) AS last_activity
+                                           FROM attack_logs
+                                           GROUP BY agent_id) la ON la.agent_id = ha.id
+                       {where_clause}
+                       ORDER BY ha.id DESC
+                       """, params)
+            return db.fetchall()
 
 
 

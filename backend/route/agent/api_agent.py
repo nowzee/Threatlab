@@ -10,7 +10,7 @@ from flask import Blueprint, jsonify, request, current_app, send_file, Response
 import jwt
 import os
 import hashlib
-from module.database.agent import create_agent_token, add_malicious_ip_address, add_compromised_credential, add_attack_log, add_smtp_interaction, get_agent_about, record_uploaded_file
+from module.database.agent import create_agent_token, get_agent_about, record_uploaded_file
 from module.database.db_manager import DatabaseManagerHoneypot
 from module.ingestion.ingest import enqueue_report
 from string import Template
@@ -274,7 +274,6 @@ def agent_report() -> tuple[Response, int] | Response:
             'attachments': data.get('attachments'),
         }
 
-        # Queue full = overload: return 503, the agent re-queues and retries.
         if not enqueue_report(report):
             return jsonify({'success': False, 'error': 'ingestion overloaded, retry later'}), 503
 
