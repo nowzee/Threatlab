@@ -122,22 +122,6 @@ def add_malicious_ip_address(agent_id: int,
                             country_name: Optional[str] = None,
                             country_code: Optional[str] = None,
                             classification: Optional[str] = None) -> bool:
-    """
-    Adds or updates a malicious IP with its normalized relations.
-
-    Handles recording the IP, the IP-Agent relation and the IP-Service attack counter.
-
-    Args:
-        agent_id (int): Identifier of the honeypot agent.
-        ip_address (str): Malicious IP address.
-        service_type (str): Type of targeted service (ssh, smtp, ftp, etc.).
-        country_name (Optional[str], optional): Name of the country of origin. Defaults to None.
-        country_code (Optional[str], optional): Country code (ISO). Defaults to None.
-        classification (Optional[str], optional): Threat classification. Defaults to None.
-
-    Returns:
-        bool: True if the operation succeeded, False otherwise.
-    """
     try:
         with DatabaseManagerHoneypot() as db:
             # Step 1: Check if IP already exists in malicious_ips table
@@ -148,6 +132,8 @@ def add_malicious_ip_address(agent_id: int,
                 ip_id = existing_ip['id']
                 total_attack_count = existing_ip['total_attack_count']
                 new_total_count = total_attack_count + 1
+
+                db.execute("""UPDATE honey_agents  SET alert_generated = alert_generated + 1  WHERE id = %s""", (agent_id,))
 
                 db.execute("""UPDATE malicious_ips
                               SET last_seen          = CURRENT_TIMESTAMP,
@@ -889,8 +875,8 @@ class ManagerAgent:
                               ha.ip_address,
                               ha.service_type,
                               COALESCE(a.cnt, 0) AS alert_generated,
-                              la.last_activity,
                               ha.created_at,
+                              ha.updated_at,
                               ha.owner_id{owner_column}
                        FROM honey_agents ha
                                 {owner_join}
@@ -898,9 +884,6 @@ class ManagerAgent:
                                            FROM attack_logs
                                            WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
                                            GROUP BY agent_id) a ON a.agent_id = ha.id
-                                LEFT JOIN (SELECT agent_id, MAX(created_at) AS last_activity
-                                           FROM attack_logs
-                                           GROUP BY agent_id) la ON la.agent_id = ha.id
                        {where_clause}
                        ORDER BY ha.id DESC
                        """, params)
