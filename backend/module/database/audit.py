@@ -50,9 +50,6 @@ def list_audit(page: int = 1, limit: int = 25) -> Dict[str, Any]:
                 LIMIT %s OFFSET %s
             """, (limit, (page - 1) * limit))
             rows: List[Dict[str, Any]] = db.fetchall()
-            for r in rows:
-                if r.get('created_at') is not None:
-                    r['created_at'] = r['created_at'].isoformat()
             return {'items': rows, 'total': total, 'page': page, 'limit': limit}
     except Exception as e:
         print(f"Error listing audit logs: {e}")

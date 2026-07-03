@@ -5,10 +5,14 @@ Main application module for the Threatlabs honeypot management platform.
 Handles authentication, agent management, threat intelligence and log analysis.
 """
 from flask import Flask, request, session, jsonify, send_from_directory, Response
+from flask.json.provider import DefaultJSONProvider
 from typing import Tuple, Optional
+from datetime import datetime, date
+from module.config.app_settings import DISPLAY_FMT
 import os
 from route.auth.login import auth_bp
 from route.config.security import config_account_bp
+from route.config.system import config_system_bp
 from route.agent.api_agent import agent_create_bp
 from route.agent.api_user import agent_user_api_bp
 from route.config.api_key import config_api_key_bp
@@ -21,8 +25,21 @@ from module.database.db_manager import DatabaseManagerUser
 from module.ingestion.ingest import start_worker
 import secrets
 
+
+class LocalizedJSONProvider(DefaultJSONProvider):
+    """Format datetimes (already localized by MySQL) as display strings."""
+
+    def default(self, o):
+        if isinstance(o, datetime):
+            return o.strftime(DISPLAY_FMT)
+        if isinstance(o, date):
+            return o.isoformat()
+        return super().default(o)
+
+
 # Initialize Flask app with Vue.js frontend static files
 app = Flask(__name__, static_folder='./frontend/dist', static_url_path='')
+app.json = LocalizedJSONProvider(app)
 SECRETS_DIR = os.path.join(app.root_path, 'secrets')
 
 def _load_or_create_secret_key() -> str:
@@ -69,6 +86,7 @@ app.register_blueprint(auth_bp)
 app.register_blueprint(agent_manage_bp)
 app.register_blueprint(agent_create_bp)
 app.register_blueprint(config_account_bp)
+app.register_blueprint(config_system_bp)
 app.register_blueprint(agent_user_api_bp)
 app.register_blueprint(config_api_key_bp)
 app.register_blueprint(admin_bp)

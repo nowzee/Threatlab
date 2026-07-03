@@ -119,7 +119,7 @@ export default defineComponent({
       const i = Math.floor(Math.log(n) / Math.log(1024))
       return (n / Math.pow(1024, i)).toFixed(i ? 1 : 0) + ' ' + u[i]
     }
-    const formatDate = (s: string) => s ? new Date(s).toLocaleString('fr-FR') : '-'
+    const formatDate = (s: string) => s || '-'
     const shortHash = (h: string) => h ? h.slice(0, 12) + '…' : ''
 
     const copyCmd = async () => {

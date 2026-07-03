@@ -1,12 +1,14 @@
 <script lang="ts">
 import {defineComponent} from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
 
 export default defineComponent({
   name: "settings",
   setup() {
     const route = useRoute()
     const router = useRouter()
+    const auth = useAuthStore()
 
     const navigateTo = (path: string) => {
       router.push(path)
@@ -14,6 +16,7 @@ export default defineComponent({
 
     return {
       route,
+      auth,
       navigateTo
     }
   }
@@ -49,6 +52,13 @@ export default defineComponent({
                 :class="{ active: route.name === 'appearance_settings' }"
                 @click="navigateTo('/dashboard/settings/appearance')">
                 Apparence
+            </button>
+            <button
+                v-if="auth.isAdmin"
+                class="settings-tab"
+                :class="{ active: route.name === 'server_settings' }"
+                @click="navigateTo('/dashboard/settings/server')">
+                Serveur
             </button>
         </div>
 

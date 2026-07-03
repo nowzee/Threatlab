@@ -363,15 +363,12 @@ def add_attack_log(attack_data: Dict[str, Any]) -> bool:
     """
     try:
         with DatabaseManagerHoneypot() as db:
-            now = datetime.now()
-
             db.execute("""INSERT INTO attack_logs
-                         (created_at, agent_id, source_ip, source_port, target_port, service_type,
+                         (agent_id, source_ip, source_port, target_port, service_type,
                           username_attempt, password_attempt, payload, malware_hash,
                           attack_type, country_code, country_name)
-                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
-                      (now,
-                       attack_data.get('agent_id'),
+                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+                      (attack_data.get('agent_id'),
                        _clip(attack_data.get('source_ip'), 45),
                        attack_data.get('source_port'),
                        attack_data.get('target_port'),
@@ -406,10 +403,8 @@ def add_attack_logs_batch(rows: List[Dict[str, Any]]) -> bool:
         return True
     try:
         with DatabaseManagerHoneypot() as db:
-            now = datetime.now()
             params = [
-                (now,
-                 r.get('agent_id'),
+                (r.get('agent_id'),
                  _clip(r.get('source_ip'), 45),
                  r.get('source_port'),
                  r.get('target_port'),
@@ -424,10 +419,10 @@ def add_attack_logs_batch(rows: List[Dict[str, Any]]) -> bool:
                 for r in rows
             ]
             db.executemany("""INSERT INTO attack_logs
-                         (created_at, agent_id, source_ip, source_port, target_port, service_type,
+                         (agent_id, source_ip, source_port, target_port, service_type,
                           username_attempt, password_attempt, payload, malware_hash,
                           attack_type, country_code, country_name)
-                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", params)
+                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", params)
             return True
     except Exception as e:
         print(f"Error adding attack log batch ({len(rows)} rows): {e}")
@@ -1287,7 +1282,7 @@ def get_agent_about(agent_id: int, viewer_id: Optional[int] = None,
             for a in recent_attacks:
                 formatted_attacks.append({
                     'id': a['id'],
-                    'timestamp': a['created_at'].isoformat() if a['created_at'] else None,
+                    'timestamp': a['created_at'],
                     'source_ip': a['source_ip'],
                     'country': a['country_code'] or a['country_name'] or 'N/A',
                     'type': a['attack_type'] or a['service_type'] or 'Unknown',
@@ -1309,8 +1304,8 @@ def get_agent_about(agent_id: int, viewer_id: Optional[int] = None,
                 'owner_id': agent.get('owner_id'),
                 'owner_username': agent.get('owner_username'),
                 'alert_generated': agent['alert_generated'],
-                'created_at': agent['created_at'].isoformat() if agent['created_at'] else None,
-                'updated_at': agent['updated_at'].isoformat() if agent['updated_at'] else None,
+                'created_at': agent['created_at'],
+                'updated_at': agent['updated_at'],
                 'stats': {
                     'total_attacks': stats['total_attacks'] or 0,
                     'unique_ips': ip_stats['unique_ips'] or 0,

@@ -37,9 +37,7 @@ function prev() { if (page.value > 1) { page.value--; load() } }
 function next() { if (page.value < totalPages.value) { page.value++; load() } }
 
 function fmt(d: string | null): string {
-  if (!d) return '—'
-  const date = new Date(d)
-  return isNaN(date.getTime()) ? d : date.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'medium' })
+  return d || '—'
 }
 
 function target(a: AuditEntry): string {

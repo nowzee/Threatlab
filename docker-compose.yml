@@ -8,6 +8,8 @@ services:
       MYSQL_DATABASE: threatlabs
       MYSQL_USER: threatlabs_user
       MYSQL_PASSWORD: threatlabs_password
+      TZ: UTC
+    command: --default-time-zone=+00:00
     ports:
       - "127.0.0.1:3306:3306"
     volumes:
@@ -37,6 +39,7 @@ services:
       - DB_NAME=threatlabs
       - DB_TYPE=mysql
       - UPLOAD_DIR=/app/uploads
+      - TZ=UTC
     ports:
       - "5000:5000"
     volumes:

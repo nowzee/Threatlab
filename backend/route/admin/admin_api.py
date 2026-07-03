@@ -6,6 +6,9 @@ from module.auth.session_helpers import require_admin, current_user_id, current_
 from module.auth.password_policy import validate_password
 from module.database.users_admin import list_users, create_member, delete_user
 from module.database.audit import list_audit, log_audit
+from module.config.app_settings import (
+    get_timezone_name, set_timezone, is_valid_timezone, current_utc_offset,
+)
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/api/admin')
 
@@ -67,6 +70,37 @@ def admin_delete_user(user_id: int) -> Tuple[Response, int]:
               target_type='user', target_id=user_id, detail=f"username={uname}",
               ip_address=request.remote_addr)
     return jsonify({'success': True}), 200
+
+
+@admin_bp.route('/settings', methods=['GET'])
+@require_admin
+def admin_get_settings() -> Tuple[Response, int]:
+    """Return the platform-wide settings (currently the display timezone)."""
+    return jsonify({'success': True, 'settings': {
+        'timezone': get_timezone_name(),
+        'offset': current_utc_offset(),
+    }}), 200
+
+
+@admin_bp.route('/settings', methods=['PUT'])
+@require_admin
+def admin_update_settings() -> Tuple[Response, int]:
+    """Update platform-wide settings. Only a valid IANA timezone is accepted."""
+    data = request.get_json(silent=True) or {}
+    tz = (data.get('timezone') or '').strip()
+
+    if not tz:
+        return jsonify({'success': False, 'error': 'Fuseau horaire requis'}), 400
+    if not is_valid_timezone(tz):
+        return jsonify({'success': False, 'error': 'Fuseau horaire invalide'}), 400
+
+    if not set_timezone(tz):
+        return jsonify({'success': False, 'error': "Échec de l'enregistrement"}), 500
+
+    log_audit('settings.update', actor_id=current_user_id(), actor_username=current_username(),
+              target_type='setting', target_id='timezone', detail=f"timezone={tz}",
+              ip_address=request.remote_addr)
+    return jsonify({'success': True, 'settings': {'timezone': tz}}), 200
 
 
 @admin_bp.route('/audit', methods=['GET'])

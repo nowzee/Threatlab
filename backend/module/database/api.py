@@ -57,13 +57,11 @@ class ManageApiKey:
         if verify_api_key(cypher_api_key):
             return False
 
-        now = datetime.now()
-
         with DatabaseManagerUser() as db:
             # Store encrypted key with metadata (use backticks for 'key' reserved word)
             db.execute(
-                "INSERT INTO api_keys (`key`, name, integration, created_at) VALUES (?, ?, ?, ?)",
-                (cypher_api_key, name, integration, now)
+                "INSERT INTO api_keys (`key`, name, integration) VALUES (?, ?, ?)",
+                (cypher_api_key, name, integration)
             )
         return True
 

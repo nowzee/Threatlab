@@ -474,7 +474,7 @@ export default defineComponent({
           </tbody>
           <tbody v-else>
           <tr v-for="log in logs" :key="log.agent_id">
-            <td>{{log.created_at}}</td>
+            <td>{{ log.created_at }}</td>
             <td>{{ log.agent_id }}</td>
             <td>{{ log.agent_name }}</td>
             <td>{{ log.source_ip }}</td>

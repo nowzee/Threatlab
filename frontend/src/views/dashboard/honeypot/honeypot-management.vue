@@ -114,9 +114,7 @@ async function deleteSelected() {
 }
 
 function fmt(d: string): string {
-  if (!d) return '—'
-  const date = new Date(d)
-  return isNaN(date.getTime()) ? d : date.toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })
+  return d || '—'
 }
 
 // Format compact : 2000 -> "2k", 2340 -> "2.3k", 1500000 -> "1.5M".

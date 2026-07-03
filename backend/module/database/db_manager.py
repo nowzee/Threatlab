@@ -4,6 +4,12 @@ import time
 import string
 import secrets
 import hashlib
+from datetime import datetime
+
+try:
+    from zoneinfo import ZoneInfo
+except Exception:  # pragma: no cover
+    ZoneInfo = None
 
 # Database configuration via environment variables
 DB_TYPE = 'mysql'
@@ -71,10 +77,68 @@ def generate_random_string(length=12):
     chars = string.ascii_letters + string.digits
     return ''.join(secrets.choice(chars) for _ in range(length))
 
+_DEFAULT_TZ = 'Europe/Paris'
+_SAFE_TZ = set('abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_/+-:')
+_tz_cache = {'name': None, 'at': 0.0}
+_TZ_TTL = 15.0
+
+
+def invalidate_tz_cache() -> None:
+    """Force the next connection to re-read the configured timezone."""
+    _tz_cache['name'] = None
+    _tz_cache['at'] = 0.0
+
+
+def _configured_tz_name(cursor) -> str:
+    """Read the admin-configured timezone from app_settings (cached)."""
+    now = time.time()
+    if _tz_cache['name'] and now - _tz_cache['at'] < _TZ_TTL:
+        return _tz_cache['name']
+    name = _tz_cache['name'] or _DEFAULT_TZ
+    try:
+        cursor.execute("SELECT setting_value FROM app_settings WHERE setting_key = 'timezone'")
+        row = cursor.fetchone()
+        if row:
+            val = row.get('setting_value') if isinstance(row, dict) else row[0]
+            if val:
+                name = val
+    except Exception:
+        pass
+    _tz_cache['name'] = name
+    _tz_cache['at'] = now
+    return name
+
+
+def _offset_for(name: str) -> str:
+    """Current UTC offset of ``name`` as '+HH:MM' (fallback for numeric zones)."""
+    if ZoneInfo is not None:
+        try:
+            off = datetime.now(ZoneInfo(name)).strftime('%z')
+            if off:
+                return f"{off[:3]}:{off[3:]}"
+        except Exception:
+            pass
+    return '+00:00'
+
+
+def _apply_session_tz(cursor) -> None:
+    """Set the MySQL session time zone to the admin-configured zone."""
+    name = _configured_tz_name(cursor)
+    safe = name if name and all(c in _SAFE_TZ for c in name) else _DEFAULT_TZ
+    try:
+        cursor.execute("SET time_zone = %s", (safe,))
+    except Exception:
+        try:
+            cursor.execute("SET time_zone = %s", (_offset_for(safe),))
+        except Exception as e:
+            print(f"[db] could not set session time_zone: {e}")
+
+
 class DatabaseManagerHoneypot:
     def __init__(self):
         self.conn = connection_pool.get_connection()
         self.cursor = self.conn.cursor(dictionary=True)
+        _apply_session_tz(self.cursor)
 
     def __enter__(self):
         return self
@@ -117,6 +181,7 @@ class DatabaseManagerUser:
     def __init__(self):
         self.conn = connection_pool.get_connection()
         self.cursor = self.conn.cursor()
+        _apply_session_tz(self.cursor)
 
     def __enter__(self):
         return self

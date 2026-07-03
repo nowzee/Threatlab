@@ -71,13 +71,7 @@ export default defineComponent({
       }
     }
 
-    const formatDate = (dateString: string) => {
-      if (!dateString) return 'N/A'
-      const date = new Date(dateString)
-      return date.toLocaleString('fr-FR', {
-        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-      })
-    }
+    const formatDate = (dateString: string) => dateString || 'N/A'
 
     const getInstallCommand = () => {
       if (deployOS.value === 'windows') {
@@ -145,7 +139,6 @@ export default defineComponent({
         </button>
         <div class="header-info">
           <h1 class="page-title">{{ honeypot.name }}</h1>
-          <span class="mono-badge">{{ honeypot.type.toUpperCase() }}</span>
         </div>
       </div>
 

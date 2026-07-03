@@ -6,7 +6,29 @@ from the honeypot database, including timeline queries and alert details.
 """
 
 from typing import List, Dict, Any, Optional, Union
+from datetime import datetime
 from module.database.db_manager import DatabaseManagerHoneypot
+
+
+def get_db_now() -> datetime:
+    """Current time from MySQL (in the session's configured timezone)."""
+    with DatabaseManagerHoneypot() as db:
+        db.execute("SELECT NOW() AS now")
+        return db.fetchone()['now']
+
+
+def get_attack_counts_by_bucket(timeline: str) -> Dict[str, int]:
+    """Count attacks per time bucket (hourly for 24h, daily for 7d/30d)."""
+    days = {'24h': 1, '7d': 7, '30d': 30}.get(timeline, 1)
+    bucket_fmt = '%Y-%m-%d %H:00:00' if timeline == '24h' else '%Y-%m-%d'
+    with DatabaseManagerHoneypot() as db:
+        db.execute(
+            "SELECT DATE_FORMAT(created_at, %s) AS bucket, COUNT(*) AS c "
+            "FROM attack_logs "
+            "WHERE created_at >= DATE_SUB(NOW(), INTERVAL %s DAY) "
+            "GROUP BY bucket",
+            (bucket_fmt, days))
+        return {row['bucket']: row['c'] for row in db.fetchall()}
 
 
 def last_log_analyse(timeline: str) -> Union[List[tuple], bool]:

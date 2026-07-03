@@ -1,6 +1,6 @@
 from module.database.db_manager import DatabaseManagerHoneypot
+from module.database.detail_log_analyse import get_db_now
 from datetime import datetime, timedelta
-from collections import Counter
 import re
 
 
@@ -476,131 +476,66 @@ def get_ip_timeline(ip_address: str, timeline: str = "24h") -> list:
     """
     Retrieves the time-series data for a specific IP
     """
+    if timeline == "24h":
+        time_filter = "DATE_SUB(NOW(), INTERVAL 1 DAY)"
+        bucket_fmt = "%Y-%m-%d %H:00:00"
+    elif timeline == "7d":
+        time_filter = "DATE_SUB(NOW(), INTERVAL 7 DAY)"
+        bucket_fmt = "%Y-%m-%d"
+    elif timeline == "30d":
+        time_filter = "DATE_SUB(NOW(), INTERVAL 30 DAY)"
+        bucket_fmt = "%Y-%m-%d"
+    else:  # "all" or other - all historical data, daily buckets
+        time_filter = "'1970-01-01 00:00:00'"
+        bucket_fmt = "%Y-%m-%d"
+
     with DatabaseManagerHoneypot() as db:
-        # Map timeline parameter to MySQL datetime expression
-        if timeline == "24h":
-            time_filter = "DATE_SUB(NOW(), INTERVAL 1 DAY)"
-        elif timeline == "7d":
-            time_filter = "DATE_SUB(NOW(), INTERVAL 7 DAY)"
-        elif timeline == "30d":
-            time_filter = "DATE_SUB(NOW(), INTERVAL 30 DAY)"
-        else:  # "all" or other - get all historical data
-            time_filter = "'1970-01-01 00:00:00'"  # Unix epoch start
+        db.execute(
+            f"SELECT DATE_FORMAT(created_at, %s) AS bucket, COUNT(*) AS c "
+            f"FROM attack_logs "
+            f"WHERE source_ip = %s AND created_at >= {time_filter} "
+            f"GROUP BY bucket",
+            (bucket_fmt, ip_address))
+        counts = {row['bucket']: row['c'] for row in db.fetchall()}
 
-        # Fetch all attack timestamps for this IP in the time range
-        db.execute(f"""
-            SELECT created_at
-            FROM attack_logs
-            WHERE source_ip = %s
-            AND created_at >= {time_filter}
-            ORDER BY created_at ASC
-        """, (ip_address,))
+        first_local = None
+        if timeline not in ("24h", "7d", "30d"):
+            db.execute(
+                "SELECT DATE_FORMAT(MIN(created_at), %s) AS d "
+                "FROM attack_logs WHERE source_ip = %s",
+                ("%Y-%m-%d", ip_address))
+            row = db.fetchone()
+            first_local = row['d'] if row else None
 
-        logs = db.fetchall()
+    now = get_db_now()
+    data = []
 
-        # Process logs to create timeline with proper bucketing
-        data = []
-        now = datetime.now()
-        period_counts = Counter()
-
-        if logs:
-            for log in logs:
-                # Handle both datetime objects (MySQL) and strings (SQLite)
-                if isinstance(log['created_at'], datetime):
-                    created_at = log['created_at']
-                else:
-                    try:
-                        # Try parsing with microseconds first
-                        created_at = datetime.strptime(log['created_at'], "%Y-%m-%d %H:%M:%S.%f")
-                    except ValueError:
-                        try:
-                            # Fallback to parsing without microseconds
-                            created_at = datetime.strptime(log['created_at'], "%Y-%m-%d %H:%M:%S")
-                        except ValueError:
-                            continue
-
-                # Group attacks into time buckets: hourly for 24h, daily for longer periods
-                if timeline == "24h":
-                    # Round down to the hour for hourly buckets
-                    period_key = created_at.replace(minute=0, second=0, microsecond=0)
-                else:
-                    # Round down to the day for daily buckets
-                    period_key = created_at.replace(hour=0, minute=0, second=0, microsecond=0)
-
-                period_counts[period_key] += 1
-
-        # Generate complete timeline with zeros for periods without attacks
-        # This ensures charts display correctly with continuous time axis
-        if timeline == "24h":
-            periods = 24
-            # Iterate backwards from now to 24 hours ago
-            for i in range(periods - 1, -1, -1):
-                period = now - timedelta(hours=i)
-                key = period.replace(minute=0, second=0, microsecond=0)
-                label = f"{period.hour:02d}:00"
-                count = period_counts.get(key, 0)  # 0 if no attacks in this hour
-
-                data.append({
-                    "time": period.isoformat(),
-                    "label": label,
-                    "count": count
-                })
-        elif timeline == "7d":
-            periods = 7
-            for i in range(periods - 1, -1, -1):
+    if timeline == "24h":
+        for i in range(23, -1, -1):
+            period = now - timedelta(hours=i)
+            key = period.strftime("%Y-%m-%d %H:00:00")
+            data.append({"time": period.isoformat(),
+                         "label": f"{period.hour:02d}:00",
+                         "count": counts.get(key, 0)})
+    elif timeline in ("7d", "30d"):
+        periods = 7 if timeline == "7d" else 30
+        for i in range(periods - 1, -1, -1):
+            period = now - timedelta(days=i)
+            key = period.strftime("%Y-%m-%d")
+            data.append({"time": period.isoformat(),
+                         "label": f"{period.day:02d}/{period.month:02d}",
+                         "count": counts.get(key, 0)})
+    else:  # "all"
+        if first_local:
+            first_day = datetime.strptime(first_local, "%Y-%m-%d").date()
+            days_diff = (now.date() - first_day).days
+            if days_diff > 365:
+                days_diff = 365
+            for i in range(days_diff, -1, -1):
                 period = now - timedelta(days=i)
-                key = period.replace(hour=0, minute=0, second=0, microsecond=0)
-                label = f"{period.day:02d}/{period.month:02d}"
-                count = period_counts.get(key, 0)
+                key = period.strftime("%Y-%m-%d")
+                data.append({"time": period.isoformat(),
+                             "label": f"{period.day:02d}/{period.month:02d}",
+                             "count": counts.get(key, 0)})
 
-                data.append({
-                    "time": period.isoformat(),
-                    "label": label,
-                    "count": count
-                })
-        elif timeline == "30d":
-            periods = 30
-            for i in range(periods - 1, -1, -1):
-                period = now - timedelta(days=i)
-                key = period.replace(hour=0, minute=0, second=0, microsecond=0)
-                label = f"{period.day:02d}/{period.month:02d}"
-                count = period_counts.get(key, 0)
-
-                data.append({
-                    "time": period.isoformat(),
-                    "label": label,
-                    "count": count
-                })
-        else:  # "all" - group by day since the beginning
-            if logs and len(logs) > 0:
-                # Find the first date - handle both datetime objects and strings
-                if isinstance(logs[0]['created_at'], datetime):
-                    first_date = logs[0]['created_at']
-                else:
-                    try:
-                        first_date = datetime.strptime(logs[0]['created_at'], "%Y-%m-%d %H:%M:%S.%f")
-                    except ValueError:
-                        first_date = datetime.strptime(logs[0]['created_at'], "%Y-%m-%d %H:%M:%S")
-
-                first_date = first_date.replace(hour=0, minute=0, second=0, microsecond=0)
-                current_date = now.replace(hour=0, minute=0, second=0, microsecond=0)
-                days_diff = (current_date - first_date).days
-
-                # Limit to 365 days max to avoid too much data
-                if days_diff > 365:
-                    days_diff = 365
-                    first_date = current_date - timedelta(days=365)
-
-                for i in range(days_diff, -1, -1):
-                    period = now - timedelta(days=i)
-                    key = period.replace(hour=0, minute=0, second=0, microsecond=0)
-                    label = f"{period.day:02d}/{period.month:02d}"
-                    count = period_counts.get(key, 0)
-
-                    data.append({
-                        "time": period.isoformat(),
-                        "label": label,
-                        "count": count
-                    })
-
-        return data
+    return data

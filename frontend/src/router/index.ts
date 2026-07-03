@@ -21,6 +21,7 @@ import wordlists from "@/views/dashboard/wordlists/wordlists.vue"
 import payloads from "@/views/dashboard/payloads/payloads.vue"
 import adminUsers from "@/views/dashboard/admin/users.vue"
 import adminAudit from "@/views/dashboard/admin/audit.vue"
+import server_settings from "@/views/dashboard/settings/server.vue"
 
 
 const routes = [
@@ -49,7 +50,8 @@ const routes = [
             { path: '', redirect: { name: 'security_settings' } },
             { path: 'security', name: 'security_settings', component: security_settings },
             { path: 'api', name: 'api_settings', component: api_settings},
-            { path: 'appearance', name: 'appearance_settings', component: appearance_settings}
+            { path: 'appearance', name: 'appearance_settings', component: appearance_settings},
+            { path: 'server', name: 'server_settings', component: server_settings, meta: { requiresAdmin: true } }
         ]},
         ],
     },

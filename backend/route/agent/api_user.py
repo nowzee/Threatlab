@@ -9,6 +9,7 @@ from typing import Tuple
 from flask import Blueprint, jsonify, Response, request, send_file
 from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking, get_top_passwords, get_top_usernames, get_credential_combinations, get_wordlist_stats, get_uploaded_files_page, get_uploaded_file, get_shell_commands_page
 from module.auth.session_helpers import is_admin, current_user_id
+from module.database.detail_log_analyse import get_db_now
 from datetime import datetime
 import os
 import traceback
@@ -92,7 +93,8 @@ def generate_rapport() -> Tuple[Response, int]:
     try:
         # Fetch all required data from database for comprehensive report
         report_data = get_complete_report_data()
-        generation_date = datetime.now().strftime('%d/%m/%Y à %H:%M')
+        now = get_db_now()
+        generation_date = now.strftime('%d/%m/%Y à %H:%M')
 
         # Calculate percentage distribution for country attacks
         total_attacks = sum(item['attack_count'] for item in report_data['country_ranking'])
@@ -149,7 +151,7 @@ def generate_rapport() -> Tuple[Response, int]:
         template = Template(template_content)
         html = template.render(**context)
         # Generate timestamped filename for download
-        filename = f"ThreatLabs_Report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
+        filename = f"ThreatLabs_Report_{now.strftime('%Y%m%d_%H%M%S')}.html"
 
         # Create response with proper headers for file download
         response = Response(html, mimetype='text/html')
@@ -212,7 +214,7 @@ def download_wordlist(wordlist_type: str) -> Tuple[Response, int]:
         A text file download.
     """
     try:
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        timestamp = get_db_now().strftime('%Y%m%d_%H%M%S')
 
         if wordlist_type == 'passwords':
             data = get_top_passwords(None)
