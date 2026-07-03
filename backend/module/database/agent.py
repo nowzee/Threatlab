@@ -902,12 +902,16 @@ class ManagerAgent:
                                   ha.ip_address,
                                   ha.service_type,
                                   ha.updated_at,
-                                  ha.alert_generated,
+                                  COALESCE(a.cnt, 0) AS alert_generated,
                                   ha.created_at,
                                   ha.owner_id,
                                   u.username AS owner_username
                            FROM honey_agents ha
                                     LEFT JOIN users u ON ha.owner_id = u.id
+                                    LEFT JOIN (SELECT agent_id, COUNT(*) AS cnt
+                                               FROM attack_logs
+                                               WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                                               GROUP BY agent_id) a ON a.agent_id = ha.id
                            ORDER BY ha.id DESC
                            """)
             else:
@@ -917,10 +921,14 @@ class ManagerAgent:
                                   ha.ip_address,
                                   ha.service_type,
                                   ha.updated_at,
-                                  ha.alert_generated,
+                                  COALESCE(a.cnt, 0) AS alert_generated,
                                   ha.created_at,
                                   ha.owner_id
                            FROM honey_agents ha
+                                    LEFT JOIN (SELECT agent_id, COUNT(*) AS cnt
+                                               FROM attack_logs
+                                               WHERE created_at >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+                                               GROUP BY agent_id) a ON a.agent_id = ha.id
                            WHERE ha.owner_id = %s
                            ORDER BY ha.id DESC
                            """, (viewer_id,))

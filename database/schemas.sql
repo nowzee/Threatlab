@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS attack_logs (
     attack_type VARCHAR(50),
     country_code VARCHAR(10),
     country_name VARCHAR(100),
+    KEY idx_attack_logs_created_agent (created_at, agent_id),
     FOREIGN KEY (agent_id) REFERENCES honey_agents (id)
 );
 

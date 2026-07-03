@@ -50,6 +50,9 @@ export default defineComponent({
     const countryRanking = ref<CountryData[]>([])
     const passwordRanking = ref<PasswordData[]>([])
     const isLoading = ref(true)
+    const logsLoading = ref(true)
+    const countryLoading = ref(true)
+    const passwordLoading = ref(true)
     const error = ref<string | null>(null)
     let chartInstance: Chart | null = null
     let passwordChartInstance: Chart | null = null
@@ -98,6 +101,8 @@ export default defineComponent({
         logs.value = await response.json()
       } catch (e: any) {
         console.error('Error fetching log:', e)
+      } finally {
+        logsLoading.value = false
       }
     }
 
@@ -116,10 +121,12 @@ export default defineComponent({
         }
 
         countryRanking.value = await response.json()
-        await nextTick()
-        createChart()
       } catch (e: any) {
         console.error('Error fetching country ranking:', e)
+      } finally {
+        countryLoading.value = false
+        await nextTick()
+        createChart()
       }
     }
 
@@ -138,10 +145,12 @@ export default defineComponent({
         }
 
         passwordRanking.value = await response.json()
-        await nextTick()
-        createPasswordChart()
       } catch (e: any) {
         console.error('Error fetching password ranking:', e)
+      } finally {
+        passwordLoading.value = false
+        await nextTick()
+        createPasswordChart()
       }
     }
 
@@ -299,6 +308,9 @@ export default defineComponent({
       logs,
       countryRanking,
       isLoading,
+      logsLoading,
+      countryLoading,
+      passwordLoading,
       error
     }
   }
@@ -306,7 +318,7 @@ export default defineComponent({
 </script>
 
 <template>
-<div class="content-wrapper">
+<div class="content-wrapper home-page">
     <h1 class="page-title">
         <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <rect x="3" y="3" width="7" height="7"></rect>
@@ -331,7 +343,7 @@ export default defineComponent({
                         </svg>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value">{{ isLoading ? '‎' : metrics.number_honeypot }}</div>
+                        <div class="stat-value" :class="{ 'sk-bar sk-stat': isLoading }">{{ isLoading ? '' : metrics.number_honeypot }}</div>
                         <div class="stat-label">Nombre de honeypot</div>
                     </div>
                 </div>
@@ -347,7 +359,7 @@ export default defineComponent({
                         </svg>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value">{{ isLoading ? '‎' : metrics.tentative_access }}</div>
+                        <div class="stat-value" :class="{ 'sk-bar sk-stat': isLoading }">{{ isLoading ? '' : metrics.tentative_access }}</div>
                         <div class="stat-label">Tentatives d'accès</div>
                     </div>
                 </div>
@@ -366,7 +378,7 @@ export default defineComponent({
                         </svg>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value">{{ isLoading ? '‎' : metrics.ip_count }}</div>
+                        <div class="stat-value" :class="{ 'sk-bar sk-stat': isLoading }">{{ isLoading ? '' : metrics.ip_count }}</div>
                         <div class="stat-label">IP collectées</div>
                     </div>
                 </div>
@@ -385,7 +397,7 @@ export default defineComponent({
                         </svg>
                     </div>
                     <div class="stat-content">
-                        <div class="stat-value">{{ isLoading ? '‎' : metrics.Sample_downloaded }}</div>
+                        <div class="stat-value" :class="{ 'sk-bar sk-stat': isLoading }">{{ isLoading ? '' : metrics.Sample_downloaded }}</div>
                         <div class="stat-label">Samples téléchargés</div>
                     </div>
                 </div>
@@ -408,7 +420,8 @@ export default defineComponent({
             </h3>
         </div>
         <div class="chart-container">
-            <canvas id="countryChart"></canvas>
+            <div v-if="countryLoading" class="sk-bar sk-chart"></div>
+            <canvas v-show="!countryLoading" id="countryChart"></canvas>
         </div>
     </div>
 
@@ -420,7 +433,8 @@ export default defineComponent({
       </h3>
     </div>
     <div class="chart-container">
-            <canvas id="passwordChart"></canvas>
+            <div v-if="passwordLoading" class="sk-bar sk-chart"></div>
+            <canvas v-show="!passwordLoading" id="passwordChart"></canvas>
         </div>
 
   </div>
@@ -453,7 +467,12 @@ export default defineComponent({
             <th>Action</th>
           </tr>
           </thead>
-          <tbody>
+          <tbody v-if="logsLoading">
+          <tr v-for="n in 5" :key="'skrow' + n">
+            <td v-for="c in 8" :key="c"><span class="sk-bar sk-cell"></span></td>
+          </tr>
+          </tbody>
+          <tbody v-else>
           <tr v-for="log in logs" :key="log.agent_id">
             <td>{{log.created_at}}</td>
             <td>{{ log.agent_id }}</td>
@@ -482,4 +501,28 @@ export default defineComponent({
         height: 30vh;
         width: 100%;
     }
+
+    /* Skeleton de chargement — reflet qui glisse, sans spinner. S'adapte clair/sombre. */
+    .home-page { --sk-base: #262626; --sk-shine: rgba(255, 255, 255, 0.06); }
+    [data-theme="light"] .home-page { --sk-base: #e9e6df; --sk-shine: rgba(255, 255, 255, 0.6); }
+    .sk-bar {
+        position: relative;
+        display: block;
+        overflow: hidden;
+        background: var(--sk-base);
+        border-radius: 4px;
+    }
+    .sk-bar::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        transform: translateX(-100%);
+        background: linear-gradient(90deg, transparent, var(--sk-shine), transparent);
+        animation: sk-slide 1.4s ease-in-out infinite;
+    }
+    @keyframes sk-slide { to { transform: translateX(100%); } }
+    .sk-stat { width: 72px; height: 28px; }
+    .sk-chart { width: 100%; height: 100%; }
+    .sk-cell { width: 80%; height: 12px; }
+    @media (prefers-reduced-motion: reduce) { .sk-bar::after { animation: none; } }
 </style>
