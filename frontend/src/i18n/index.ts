@@ -1,4 +1,5 @@
 import { createI18n } from 'vue-i18n'
+import { countriesFr, countriesEn } from './countries'
 
 export const SUPPORTED_LOCALES = ['fr', 'en'] as const
 export type Locale = (typeof SUPPORTED_LOCALES)[number]
@@ -50,6 +51,7 @@ const messages = {
       stat4: 'ANALYSE TEMPS RÉEL',
       foot: '© 2026 Threatlab · Plateforme de threat intelligence',
     },
+    countries: countriesFr,
   },
   en: {
     login: {
@@ -88,6 +90,7 @@ const messages = {
       stat4: 'REAL-TIME ANALYSIS',
       foot: '© 2026 Threatlab · Threat intelligence platform',
     },
+    countries: countriesEn,
   },
 }
 

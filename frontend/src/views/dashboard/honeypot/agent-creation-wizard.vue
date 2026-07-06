@@ -1,6 +1,8 @@
 <script lang="ts">
 import { defineComponent, ref, reactive, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { COUNTRY_CODES } from '@/i18n/countries'
 
 interface AgentTypeConfig {
   label: string
@@ -55,6 +57,7 @@ export default defineComponent({
   setup() {
     const route = useRoute()
     const router = useRouter()
+    const { t, locale } = useI18n({ useScope: 'global' })
 
     const agentType = computed(() => (route.params.type as string) || 'ssh')
     const typeConfig = computed((): AgentTypeConfig => {
@@ -93,6 +96,15 @@ export default defineComponent({
         agentConfig.networkConfig.ports = String(cfg.defaultPort)
       }
     })
+
+    const countryOptions = computed(() =>
+      COUNTRY_CODES
+        .map(code => ({ code, label: t(`countries.${code}`) }))
+        .sort((a, b) => a.label.localeCompare(b.label, locale.value))
+    )
+    const countryLabel = computed(() =>
+      agentConfig.country ? t(`countries.${agentConfig.country}`) : ''
+    )
 
     const isSubmitting = ref(false)
     const createdAgentId = ref<number | null>(null)
@@ -168,7 +180,7 @@ export default defineComponent({
             agent_name: agentConfig.name,
             agent_type: agentType.value,
             ip_address: agentConfig.ipAddress || '0.0.0.0',
-            country_name: agentConfig.country,
+            country_code: agentConfig.country,
             banner: agentConfig.banner,
             port: agentConfig.networkConfig.ports,
             interactive: agentConfig.interactive,
@@ -237,6 +249,7 @@ export default defineComponent({
     return {
       agentType, typeConfig, currentStep, totalSteps, steps, stepErrors,
       agentConfig, isSubmitting, createdAgentId, copiedCommand,
+      countryOptions, countryLabel,
       getStepState, nextStep, prevStep, goToStep,
       addWhitelistEntry, removeWhitelistEntry, deployOS,
       createAgent, getInstallCommand, copyCommand, downloadAgent, goBack
@@ -289,7 +302,10 @@ export default defineComponent({
             </div>
             <div class="form-group">
               <label for="agent-country">Pays de deploiement</label>
-              <input id="agent-country" v-model="agentConfig.country" type="text" class="form-input" placeholder="Ex: France" />
+              <select id="agent-country" v-model="agentConfig.country" class="form-input">
+                <option value="">Selectionnez un pays</option>
+                <option v-for="c in countryOptions" :key="c.code" :value="c.code">{{ c.label }}</option>
+              </select>
             </div>
             <div class="form-group full-width">
               <label for="agent-description">Description *</label>
@@ -373,7 +389,7 @@ export default defineComponent({
                 <div class="review-item"><span class="review-label">Nom</span><span class="review-value">{{ agentConfig.name }}</span></div>
                 <div class="review-item"><span class="review-label">Type</span><span class="review-value badge-type">{{ typeConfig.label }}</span></div>
                 <div class="review-item"><span class="review-label">IP</span><code class="review-value">{{ agentConfig.ipAddress || '0.0.0.0' }}</code></div>
-                <div class="review-item"><span class="review-label">Pays</span><span class="review-value">{{ agentConfig.country || 'Non defini' }}</span></div>
+                <div class="review-item"><span class="review-label">Pays</span><span class="review-value">{{ countryLabel || 'Non defini' }}</span></div>
                 <div class="review-item full-width"><span class="review-label">Description</span><span class="review-value">{{ agentConfig.description }}</span></div>
               </div>
             </div>

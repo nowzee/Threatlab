@@ -12,6 +12,7 @@ import os
 import hashlib
 from module.database.agent import create_agent_token, get_agent_about, record_uploaded_file
 from module.database.db_manager import DatabaseManagerHoneypot
+from module.config.countries import resolve_country_name
 from module.ingestion.ingest import enqueue_report
 from string import Template
 from module.auth.decorator import agent_jwt_required
@@ -49,7 +50,8 @@ def agent_create() -> Tuple[Response, int]:
     - agent_name: Name of the agent
     - agent_type: Service type (default: 'ssh')
     - ip_address: Agent's IP address (default: '0.0.0.0')
-    - country_name: Country where the agent is deployed
+    - country_code: ISO 3166-1 alpha-2 code of the deployment country (optional,
+      validated server-side and stored as its canonical French name)
     - banner: Service banner to display (default: SSH banner)
 
     Returns:
@@ -60,7 +62,9 @@ def agent_create() -> Tuple[Response, int]:
         agent_name = request.json.get('agent_name')
         agent_type = request.json.get('agent_type', 'ssh')
         ip_address = request.json.get('ip_address', '0.0.0.0')
-        country_name = request.json.get('country_name')
+        country_name, country_ok = resolve_country_name(request.json.get('country_code'))
+        if not country_ok:
+            return jsonify({'success': False, 'error': 'Invalid country code'}), 400
         banner = request.json.get('banner', 'SSH-2.0-OpenSSH_8.2p1 Ubuntu-4ubuntu0.5')
         interactive = bool(request.json.get('interactive', True))
         allow_upload = bool(request.json.get('allow_upload', True))
