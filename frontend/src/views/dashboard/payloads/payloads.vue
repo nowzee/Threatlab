@@ -1,5 +1,6 @@
 <script lang="ts">
 import { defineComponent, ref, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import '@/assets/css/admin-paper.css'
 
 interface Payload {
@@ -29,6 +30,7 @@ interface Command {
 export default defineComponent({
   name: 'PayloadsView',
   setup() {
+    const router = useRouter()
     const itemsPerPage = 10
     const activeTab = ref<'payloads' | 'commands'>('payloads')
     const payloads = ref<Payload[]>([])
@@ -113,6 +115,10 @@ export default defineComponent({
       window.location.href = `/api/agent/user/payloads/download/${hash}`
     }
 
+    const viewPayload = (hash: string) => {
+      router.push({ name: 'payload-detail', params: { hash } })
+    }
+
     const formatBytes = (n: number) => {
       if (!n) return '0 B'
       const u = ['B', 'KB', 'MB', 'GB']
@@ -137,7 +143,7 @@ export default defineComponent({
       payloadTotal, cmdTotal, payloadQuery, cmdQuery, onPayloadSearch, onCmdSearch,
       payloadPage, payloadTotalPages, payloadPages, goPayloadPage,
       cmdPage, cmdTotalPages, cmdPages, goCmdPage,
-      setTab, setFilter, downloadPayload, formatBytes, formatDate, shortHash
+      setTab, setFilter, downloadPayload, viewPayload, formatBytes, formatDate, shortHash
     }
   }
 })
@@ -182,7 +188,12 @@ export default defineComponent({
               <td class="mono small">{{ p.username }}<span v-if="p.password">:{{ p.password }}</span></td>
               <td>{{ p.upload_count }}</td>
               <td class="small">{{ formatDate(p.last_seen) }}</td>
-              <td><button class="btn btn-sm dl" @click="downloadPayload(p.file_hash)">Télécharger</button></td>
+              <td>
+                <div class="pp-actions">
+                  <button class="btn btn-sm dl" @click="viewPayload(p.file_hash)">Voir</button>
+                  <button class="btn btn-sm dl" @click="downloadPayload(p.file_hash)">Télécharger</button>
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -297,7 +308,10 @@ export default defineComponent({
 /* Service tag: outlined so it stays visible on the light paper surface */
 .svc { border: 1px solid var(--ap-line-strong); }
 
-/* Download button: outlined, fills on hover (clear affordance vs a text-only hover) */
+/* Row actions: keep View + Download side by side, no wrap */
+.pp-actions { display: flex; gap: 8px; white-space: nowrap; }
+
+/* Action buttons: outlined, fill on hover (clear affordance vs a text-only hover) */
 .dl { border: 1px solid var(--ap-line-strong); background: transparent; color: var(--ap-ink); opacity: 1; }
 .dl:hover { background: var(--ap-ink); color: var(--ap-paper); border-color: var(--ap-ink); }
 

@@ -19,6 +19,7 @@ import api_settings from "@/views/dashboard/settings/api.vue";
 import appearance_settings from "@/views/dashboard/settings/appearance.vue";
 import wordlists from "@/views/dashboard/wordlists/wordlists.vue"
 import payloads from "@/views/dashboard/payloads/payloads.vue"
+import payloadDetail from "@/views/dashboard/payloads/payload-detail.vue"
 import adminUsers from "@/views/dashboard/admin/users.vue"
 import adminAudit from "@/views/dashboard/admin/audit.vue"
 import server_settings from "@/views/dashboard/settings/server.vue"
@@ -43,6 +44,7 @@ const routes = [
         { path: 'alert-details/:id', name: 'alert-details', component: alertDetails },
         { path: 'wordlists', name: 'wordlists', component: wordlists },
         { path: 'payloads', name: 'payloads', component: payloads },
+        { path: 'payloads/view/:hash', name: 'payload-detail', component: payloadDetail },
         { path: 'admin/users', name: 'admin-users', component: adminUsers, meta: { requiresAdmin: true } },
         { path: 'admin/audit', name: 'admin-audit', component: adminAudit, meta: { requiresAdmin: true } },
         { path: 'settings', name: 'settings', component: settings,

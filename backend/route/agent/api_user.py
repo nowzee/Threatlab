@@ -7,7 +7,7 @@ rankings, and generating reports for the user dashboard.
 
 from typing import Tuple
 from flask import Blueprint, jsonify, Response, request, send_file
-from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking, get_top_passwords, get_top_usernames, get_credential_combinations, get_wordlist_stats, get_uploaded_files_page, get_uploaded_file, get_shell_commands_page
+from module.database.agent import get_default_metric_data, get_agent_details, get_country_ranking, get_complete_report_data, get_password_ranking, get_top_passwords, get_top_usernames, get_credential_combinations, get_wordlist_stats, get_uploaded_files_page, get_uploaded_file, get_uploaded_file_meta, get_shell_commands_page
 from module.auth.session_helpers import is_admin, current_user_id
 from module.database.detail_log_analyse import get_db_now
 from datetime import datetime
@@ -284,6 +284,75 @@ def download_payload(file_hash: str) -> Tuple[Response, int]:
     except Exception as e:
         print(f"Error downloading payload: {e}")
         return jsonify({'error': 'Failed to download payload'}), 500
+
+
+# Raw-view caps: read at most 1 MB, hex-dump at most the first 64 KB of a binary.
+_VIEW_MAX_BYTES = 1024 * 1024
+_HEX_MAX_BYTES = 64 * 1024
+# Printable ASCII plus the usual whitespace controls — anything else counts as "binary".
+_TEXT_BYTES = bytes(range(0x20, 0x7f)) + b'\t\n\r\f\b'
+
+
+def _looks_binary(sample: bytes) -> bool:
+    """Heuristic: a NUL byte or >30% non-text bytes marks the sample as binary."""
+    if not sample:
+        return False
+    if b'\x00' in sample:
+        return True
+    non_text = sample.translate(None, _TEXT_BYTES)
+    return len(non_text) / len(sample) > 0.30
+
+
+def _hexdump(data: bytes) -> str:
+    """Classic `hexdump -C` style: offset, 16 hex bytes, ASCII gutter."""
+    lines = []
+    for off in range(0, len(data), 16):
+        chunk = data[off:off + 16]
+        hex_part = ' '.join(f'{b:02x}' for b in chunk).ljust(47)
+        ascii_part = ''.join(chr(b) if 0x20 <= b < 0x7f else '.' for b in chunk)
+        lines.append(f'{off:08x}  {hex_part}  |{ascii_part}|')
+    return '\n'.join(lines)
+
+
+@agent_user_api_bp.route("/payloads/view/<file_hash>", methods=['GET'])
+def view_payload(file_hash: str) -> Tuple[Response, int]:
+    """
+    Return a captured file's raw content for inline viewing (not as a download).
+
+    Text files come back decoded (UTF-8, lossy); binaries come back as a hex
+    dump. Both are size-capped so a large sample never floods the browser. Full
+    metadata is included so the viewer can render a complete detail page.
+    """
+    try:
+        meta = get_uploaded_file_meta(file_hash)
+        if not meta:
+            return jsonify({'error': 'Payload not found'}), 404
+        path = meta.get('stored_path')
+        if not path or not os.path.exists(path):
+            return jsonify({'error': 'Payload file missing on disk'}), 404
+
+        with open(path, 'rb') as f:
+            data = f.read(_VIEW_MAX_BYTES + 1)
+        truncated = len(data) > _VIEW_MAX_BYTES
+        data = data[:_VIEW_MAX_BYTES]
+
+        is_binary = _looks_binary(data[:8192])
+        result = {
+            'meta': {k: meta.get(k) for k in (
+                'file_hash', 'file_name', 'file_size', 'source_ip', 'username',
+                'password', 'service_type', 'agent_id', 'upload_count',
+                'first_seen', 'last_seen')},
+            'is_binary': is_binary,
+            'truncated': truncated,
+            'shown_bytes': len(data),
+            'content': None if is_binary else data.decode('utf-8', errors='replace'),
+            'hexdump': _hexdump(data[:_HEX_MAX_BYTES]) if is_binary else None,
+        }
+        return jsonify(result), 200
+    except Exception as e:
+        print(f"Error viewing payload: {e}")
+        traceback.print_exc()
+        return jsonify({'error': 'Failed to read payload'}), 500
 
 
 @agent_user_api_bp.route("/commands", methods=['GET'])

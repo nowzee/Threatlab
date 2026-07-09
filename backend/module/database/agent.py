@@ -559,6 +559,19 @@ def get_uploaded_file(file_hash: str) -> Optional[Dict[str, Any]]:
         return None
 
 
+def get_uploaded_file_meta(file_hash: str) -> Optional[Dict[str, Any]]:
+    """Return the full metadata row (including stored_path) of a captured file by hash."""
+    try:
+        with DatabaseManagerHoneypot() as db:
+            _ensure_uploaded_files_table(db)
+            db.execute("SELECT " + _UPLOAD_COLS + " FROM uploaded_files WHERE file_hash = %s",
+                       (file_hash,))
+            return db.fetchone()
+    except Exception as e:
+        print(f"Error fetching uploaded file meta: {e}")
+        return None
+
+
 def get_shell_commands_page(status: str = 'all', page: int = 1, limit: int = 10,
                             q: Optional[str] = None) -> Dict[str, Any]:
     """
