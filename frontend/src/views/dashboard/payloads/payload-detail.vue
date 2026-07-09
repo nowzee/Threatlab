@@ -122,8 +122,21 @@ export default defineComponent({
       <p class="muted" style="margin:0">{{ error }}</p>
     </div>
 
-    <div v-else-if="data" class="split">
-      <!-- Raw content -->
+    <div v-else-if="data">
+      <!-- Metadata: compact strip that wraps at any width -->
+      <div class="card pd-meta">
+        <div class="pd-mi"><span class="pd-l">Taille</span><span class="pd-v">{{ formatBytes(data.meta.file_size) }}</span></div>
+        <div class="pd-mi"><span class="pd-l">Service</span><span class="pd-v">{{ data.meta.service_type || '-' }}</span></div>
+        <div class="pd-mi"><span class="pd-l">IP source</span><span class="pd-v mono">{{ data.meta.source_ip || '-' }}</span></div>
+        <div class="pd-mi"><span class="pd-l">Identifiants</span><span class="pd-v mono">{{ (data.meta.username || data.meta.password) ? (data.meta.username + (data.meta.password ? ':' + data.meta.password : '')) : '-' }}</span></div>
+        <div class="pd-mi"><span class="pd-l">Occurrences</span><span class="pd-v">{{ data.meta.upload_count }}</span></div>
+        <div class="pd-mi"><span class="pd-l">Agent</span><span class="pd-v">{{ data.meta.agent_id ?? '-' }}</span></div>
+        <div class="pd-mi"><span class="pd-l">Première capture</span><span class="pd-v">{{ formatDate(data.meta.first_seen) }}</span></div>
+        <div class="pd-mi"><span class="pd-l">Dernière capture</span><span class="pd-v">{{ formatDate(data.meta.last_seen) }}</span></div>
+        <div class="pd-mi pd-mi-wide"><span class="pd-l">SHA-256</span><span class="pd-v mono pd-hash">{{ data.meta.file_hash }}</span></div>
+      </div>
+
+      <!-- Raw content: full width, height-capped, scrollable -->
       <div class="card no-pad">
         <div class="card-head pd-head">
           <h3>Contenu brut</h3>
@@ -141,58 +154,45 @@ export default defineComponent({
         <pre v-if="body" class="code pd-pre" :class="{ 'pd-nowrap': data.is_binary }">{{ body }}</pre>
         <div v-else class="empty">Fichier vide.</div>
       </div>
-
-      <!-- Metadata -->
-      <div class="card">
-        <div class="card-head"><h3>Métadonnées</h3></div>
-        <table class="kv">
-          <tbody>
-            <tr><td>Nom</td><td class="mono">{{ data.meta.file_name || '-' }}</td></tr>
-            <tr><td>SHA-256</td><td class="mono" style="word-break:break-all">{{ data.meta.file_hash }}</td></tr>
-            <tr><td>Taille</td><td>{{ formatBytes(data.meta.file_size) }}</td></tr>
-            <tr><td>Service</td><td><span class="pill"><span class="d"></span>{{ data.meta.service_type || '-' }}</span></td></tr>
-            <tr><td>IP source</td><td class="mono">{{ data.meta.source_ip || '-' }}</td></tr>
-            <tr>
-              <td>Identifiants</td>
-              <td class="mono">
-                <template v-if="data.meta.username || data.meta.password">
-                  {{ data.meta.username }}<span v-if="data.meta.password">:{{ data.meta.password }}</span>
-                </template>
-                <template v-else>-</template>
-              </td>
-            </tr>
-            <tr><td>Occurrences</td><td>{{ data.meta.upload_count }}</td></tr>
-            <tr><td>Agent</td><td>{{ data.meta.agent_id ?? '-' }}</td></tr>
-            <tr><td>Première capture</td><td class="small">{{ formatDate(data.meta.first_seen) }}</td></tr>
-            <tr><td>Dernière capture</td><td class="small">{{ formatDate(data.meta.last_seen) }}</td></tr>
-          </tbody>
-        </table>
-      </div>
     </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-/* Uses admin-paper primitives (.split/.card/.card-head/.kv/.code/.pill/.btn)
-   and the --ap-* palette. Only view-specific tweaks live here. */
+/* Uses admin-paper primitives (.card/.card-head/.code/.pill/.btn) and the
+   --ap-* palette. Single-column, full-width layout — robust at any width/zoom. */
 
 /* Back button row — sits above the header, outside the paper scope */
 .pd-back { margin-bottom: 20px; }
 
-.pd-head { padding: 16px 20px; margin-bottom: 0; }
-.pd-head-right { display: flex; align-items: center; gap: 12px; }
+/* Metadata strip: a wrapping row of label/value pairs (no fragile grid) */
+.pd-meta { display: flex; flex-wrap: wrap; gap: 14px 28px; padding: 16px 20px; margin-bottom: 16px; }
+.pd-mi { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pd-mi-wide { flex-basis: 100%; }
+.pd-l { font-family: var(--ap-mono); font-size: 9.5px; text-transform: uppercase; letter-spacing: 1px; color: var(--ap-gray); }
+.pd-v { font-size: 13px; color: var(--ap-ink); }
+.pd-hash { word-break: break-all; }
+
+/* Content card header */
+.pd-head { padding: 14px 20px; margin-bottom: 0; }
+.pd-head-right { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 
 .pd-notice {
   padding: 10px 20px; font-size: 12px; color: var(--ap-ink);
   background: var(--ap-warn-bg); border-bottom: 1px solid var(--ap-line);
 }
 
-/* Scrollable raw content pane — the .code block already carries the ink surface */
-.pd-pre {
-  margin: 0; max-height: 70vh; overflow: auto; border-left: none;
-  border-radius: 0; font-size: 12.5px; line-height: 1.6;
+/* Scrollable raw content pane. min-width:0 stops long lines from blowing out
+   the layout; the .code block already carries the ink surface + colours.
+   `pre.` prefix raises specificity so these beat the shared .code rule. */
+pre.pd-pre {
+  margin: 0; min-width: 0; max-width: 100%;
+  max-height: 65vh; overflow: auto;
+  border-left: none; border-radius: 0;
+  font-size: 13px; line-height: 1.55;
+  white-space: pre-wrap; word-break: break-word;
 }
 /* Hex dump: keep the columns aligned (scroll sideways rather than wrap) */
-.pd-nowrap { white-space: pre; word-break: normal; }
+pre.pd-nowrap { white-space: pre; word-break: normal; }
 </style>
