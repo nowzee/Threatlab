@@ -14,7 +14,7 @@ Jinja2==3.1.6
 MarkupSafe==3.0.3
 mysql-connector-python==9.6.0
 packaging==26.0
-pillow==12.1.1
+pillow==12.3.0
 pycparser==3.0
 pycryptodome==3.23.0
 PyJWT==2.11.0
